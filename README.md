@@ -1,4 +1,4 @@
-# Crown Overview Tools v0.1.0
+# Crown Overview Tools v0.1.1
 
 Scene-gated strategic overview tools for the **Crown of Ashes** and **Crown of Ashes (Copy)** scenes.
 
@@ -50,3 +50,9 @@ await canvas.scene.setFlag("world", "overviewMapMode", false);
 
 Foundry modules load at world level, but this module is scene-gated. It should stay quiet on ordinary scenes and tactical battle scenes.
 
+
+
+## v0.1.1
+
+- Moves the Crown Overview panel to the right of Foundry's left-side toolbar.
+- Slightly narrows the panel and buttons so it takes up less screen space.
