@@ -1,6 +1,6 @@
 (() => {
   const MODULE_ID = "crown-overview-tools";
-  const MODULE_VERSION = "0.2.1";
+  const MODULE_VERSION = "0.2.2";
   const FLAG_SCOPE = "world";
   const WORLD_TILE_KEY = "worldTile";
   const WORLD_PIECE_KEY = "worldPiece";
@@ -701,6 +701,7 @@
         <button data-coa-action="roundClock">Round Clock</button>
         <button data-coa-action="resetMovement">Reset Movement</button>
         <button data-coa-action="resetBuildCapacity">Reset Build Uses</button>
+        <button data-coa-action="repairBuildLocks">Repair Build Locks</button>
         <button data-coa-action="processPendingBuilds">Process Pending Builds</button>
         <button data-coa-action="createPiece">Create World Piece</button>
         <button data-coa-action="linkTiles">Link Selected Tiles</button>
@@ -3138,6 +3139,144 @@
     ui.notifications.info(`Pending builds processed: ${applied} applied, ${failed} failed.`);
   }
 
+  function buildRecordMatchesUser(record, targetUserId, targetUserName) {
+    if (!record) return false;
+    if (String(record.userId || "") === String(targetUserId || "")) return true;
+    if (String(record.builderUserId || "") === String(targetUserId || "")) return true;
+    if (String(record.requesterUserId || "") === String(targetUserId || "")) return true;
+    if (normalize(record.userName || "") && normalize(record.userName || "") === normalize(targetUserName || "")) return true;
+    if (normalize(record.builderUserName || "") && normalize(record.builderUserName || "") === normalize(targetUserName || "")) return true;
+    if (normalize(record.requesterUserName || "") && normalize(record.requesterUserName || "") === normalize(targetUserName || "")) return true;
+    return false;
+  }
+
+  function pieceBuildBelongsToTarget(piece, targetAllPlayers, targetUserId, targetUserName) {
+    if (targetAllPlayers) return true;
+    if (!piece) return false;
+    if (String(piece.ownerUserId || piece.playerOwnerUserId || piece.controllerUserId || "") === String(targetUserId || "")) return true;
+    if (String(piece.lastBuiltByUserId || piece.lastBuildUserId || "") === String(targetUserId || "")) return true;
+    if (String(piece.pendingBuildRequesterUserId || "") === String(targetUserId || "")) return true;
+    if (normalize(piece.ownerUserName || piece.playerOwnerUserName || piece.controllerUserName || "") === normalize(targetUserName || "")) return true;
+    if (normalize(piece.lastBuiltBy || piece.lastBuiltByUserName || "") === normalize(targetUserName || "")) return true;
+    return false;
+  }
+
+  function pendingRequestMatchesTarget(request, targetAllPlayers, targetUserId, targetUserName) {
+    if (targetAllPlayers) return true;
+    if (!request) return false;
+    if (String(request.requesterUserId || "") === String(targetUserId || "")) return true;
+    if (String(request.builderUserId || "") === String(targetUserId || "")) return true;
+    if (normalize(request.requesterUserName || "") === normalize(targetUserName || "")) return true;
+    if (normalize(request.builderUserName || "") === normalize(targetUserName || "")) return true;
+    return false;
+  }
+
+  async function clearBuildTracking({ playerId = "all", scope = "current", clearPieceFlags = true, clearPending = true, forceAllLedger = false } = {}) {
+    const clock = getClock();
+    const roundKey = getRoundKey(clock);
+    const targetAllPlayers = playerId === "all" || forceAllLedger;
+    const targetUser = targetAllPlayers ? null : game.users.get(playerId);
+    const targetUserName = targetUser?.name || "";
+
+    const ledger = foundry.utils.deepClone(getBuildLedger() || {});
+    let ledgerCleared = 0;
+
+    const clearLedgerRound = key => {
+      if (!ledger?.[key]) return;
+      const round = ledger[key];
+
+      if (targetAllPlayers) {
+        ledgerCleared += Object.keys(round.users || {}).length;
+        ledgerCleared += Array.isArray(round.builds) ? round.builds.length : 0;
+        delete ledger[key];
+        return;
+      }
+
+      if (round.users) {
+        for (const userKey of Object.keys(round.users)) {
+          const record = round.users[userKey];
+          if (String(userKey) === String(playerId) || buildRecordMatchesUser(record, playerId, targetUserName)) {
+            delete round.users[userKey];
+            ledgerCleared++;
+          }
+        }
+      }
+
+      if (Array.isArray(round.builds)) {
+        const before = round.builds.length;
+        round.builds = round.builds.filter(build => !buildRecordMatchesUser(build, playerId, targetUserName));
+        ledgerCleared += before - round.builds.length;
+      }
+
+      if (!Object.keys(round.users || {}).length && !(round.builds || []).length) delete ledger[key];
+    };
+
+    if (scope === "all" || forceAllLedger) {
+      for (const key of Object.keys(ledger || {})) clearLedgerRound(key);
+    } else if (roundKey) {
+      clearLedgerRound(roundKey);
+    }
+
+    if (scope === "all" && targetAllPlayers) await canvas.scene.unsetFlag(FLAG_SCOPE, BUILD_LEDGER_KEY);
+    else await saveBuildLedger(ledger || {});
+
+    let piecesCleared = 0;
+    let pendingCleared = 0;
+
+    if (clearPieceFlags || clearPending || forceAllLedger) {
+      for (const token of canvas.tokens.placeables) {
+        const piece = getWorldPiece(token);
+        if (!piece) continue;
+
+        const belongsToTarget = pieceBuildBelongsToTarget(piece, targetAllPlayers, playerId, targetUserName);
+        if (!belongsToTarget) continue;
+
+        const updatedPiece = foundry.utils.deepClone(piece);
+        let changed = false;
+
+        const lockMatchesScope = scope === "all" || forceAllLedger || String(updatedPiece.lastBuildRoundKey || "") === String(roundKey || "");
+        if ((clearPieceFlags || forceAllLedger) && lockMatchesScope) {
+          for (const key of [
+            "lastBuildRoundKey", "lastBuiltBuilding", "lastBuiltTileId", "lastBuiltTileName", "lastBuiltAt", "lastBuiltBy",
+            "lastBuiltByUserId", "lastBuiltByUserName", "lastBuildStatus", "pendingBuildRoundKey", "pendingBuildBuilding",
+            "pendingBuildTileId", "pendingBuildTileName", "pendingBuildRequestedAt", "pendingBuildRequesterUserId"
+          ]) delete updatedPiece[key];
+          changed = true;
+        }
+
+        if ((clearPending || forceAllLedger) && Array.isArray(updatedPiece.pendingBuildRequests)) {
+          const before = updatedPiece.pendingBuildRequests.length;
+          updatedPiece.pendingBuildRequests = updatedPiece.pendingBuildRequests.filter(request => {
+            const requestMatchesScope = scope === "all" || forceAllLedger || String(request.roundKey || "") === String(roundKey || "");
+            if (!requestMatchesScope) return true;
+            return !pendingRequestMatchesTarget(request, targetAllPlayers, playerId, targetUserName);
+          });
+          pendingCleared += before - updatedPiece.pendingBuildRequests.length;
+          if (updatedPiece.pendingBuildRequests.length !== before) changed = true;
+        }
+
+        const pendingStillActive = Array.isArray(updatedPiece.pendingBuildRequests) && updatedPiece.pendingBuildRequests.some(request => request?.status === PENDING_BUILD_STATUS_PENDING);
+        if (!pendingStillActive) {
+          delete updatedPiece.pendingBuildRoundKey;
+          delete updatedPiece.pendingBuildBuilding;
+          delete updatedPiece.pendingBuildTileId;
+          delete updatedPiece.pendingBuildTileName;
+          delete updatedPiece.pendingBuildRequestedAt;
+        }
+
+        if (changed) {
+          updatedPiece.lastBuildResetAt = new Date().toISOString();
+          updatedPiece.lastBuildResetBy = game.user.name;
+          updatedPiece.lastBuildResetSource = `Crown Overview Tools ${MODULE_VERSION}`;
+          await saveWorldPiece(token, updatedPiece);
+          piecesCleared++;
+        }
+      }
+    }
+
+    return { ledgerCleared, piecesCleared, pendingCleared, roundKey };
+  }
+
   async function resetBuildCapacity() {
     if (!requireOverviewScene()) return;
 
@@ -3173,6 +3312,7 @@
           </div>
           <div class="form-group"><label><input type="checkbox" name="clearPieceFlags" checked> Clear world piece build locks</label></div>
           <div class="form-group"><label><input type="checkbox" name="clearPending" checked> Clear pending build requests for the selected scope</label></div>
+          <p class="notes">If a player is stuck, choose All players + All rounds, or use Repair Build Locks.</p>
         </form>`,
         buttons: {
           reset: { label: "Reset Build Uses", callback: html => {
@@ -3187,7 +3327,7 @@
           cancel: { label: "Cancel", callback: () => resolve(null) }
         },
         default: "reset"
-      }, { width: 560, height: 380, resizable: true }).render(true);
+      }, { width: 560, height: 410, resizable: true }).render(true);
     });
 
     if (!result) return;
@@ -3196,100 +3336,40 @@
       return;
     }
 
-    const targetAllPlayers = result.playerId === "all";
-    const targetUser = targetAllPlayers ? null : game.users.get(result.playerId);
-    const targetName = targetAllPlayers ? "All players" : (targetUser?.name || result.playerId);
-
-    const ledger = foundry.utils.deepClone(getBuildLedger());
-    let ledgerCleared = 0;
-
-    function clearLedgerRound(key) {
-      if (!ledger?.[key]) return;
-      if (targetAllPlayers) {
-        ledgerCleared += Object.keys(ledger[key].users || {}).length;
-        delete ledger[key];
-        return;
-      }
-      if (ledger[key].users?.[result.playerId]) {
-        delete ledger[key].users[result.playerId];
-        ledgerCleared++;
-      }
-      if (Array.isArray(ledger[key].builds)) {
-        ledger[key].builds = ledger[key].builds.filter(build => String(build.userId || "") !== String(result.playerId));
-      }
-      if (!Object.keys(ledger[key].users || {}).length && !ledger[key].builds?.length) delete ledger[key];
-    }
-
-    if (result.scope === "all") {
-      for (const key of Object.keys(ledger || {})) clearLedgerRound(key);
-    } else {
-      clearLedgerRound(roundKey);
-    }
-    await saveBuildLedger(ledger || {});
-
-    let piecesCleared = 0;
-    if (result.clearPieceFlags || result.clearPending) {
-      for (const token of canvas.tokens.placeables) {
-        const piece = getWorldPiece(token);
-        if (!piece) continue;
-
-        const belongsToTarget = targetAllPlayers ||
-          String(piece.ownerUserId || piece.playerOwnerUserId || "") === String(result.playerId) ||
-          normalize(piece.ownerUserName || piece.playerOwnerUserName || "") === normalize(targetUser?.name || "");
-
-        if (!belongsToTarget) continue;
-
-        const updatedPiece = foundry.utils.deepClone(piece);
-        let changed = false;
-
-        const lockMatchesScope = result.scope === "all" || String(updatedPiece.lastBuildRoundKey || "") === String(roundKey || "");
-        if (result.clearPieceFlags && lockMatchesScope) {
-          delete updatedPiece.lastBuildRoundKey;
-          delete updatedPiece.lastBuiltBuilding;
-          delete updatedPiece.lastBuiltTileId;
-          delete updatedPiece.lastBuiltTileName;
-          delete updatedPiece.lastBuiltAt;
-          delete updatedPiece.lastBuiltBy;
-          delete updatedPiece.lastBuildStatus;
-          changed = true;
-        }
-
-        if (result.clearPending && Array.isArray(updatedPiece.pendingBuildRequests)) {
-          const before = updatedPiece.pendingBuildRequests.length;
-          updatedPiece.pendingBuildRequests = updatedPiece.pendingBuildRequests.filter(request => {
-            const requestMatchesScope = result.scope === "all" || String(request.roundKey || "") === String(roundKey || "");
-            if (!requestMatchesScope) return true;
-            if (targetAllPlayers) return false;
-            return String(request.requesterUserId || "") !== String(result.playerId);
-          });
-          if (updatedPiece.pendingBuildRequests.length !== before) changed = true;
-        }
-
-        const pendingStillActive = Array.isArray(updatedPiece.pendingBuildRequests) && updatedPiece.pendingBuildRequests.some(request => request?.status === PENDING_BUILD_STATUS_PENDING);
-        if (!pendingStillActive) {
-          delete updatedPiece.pendingBuildRoundKey;
-          delete updatedPiece.pendingBuildBuilding;
-          delete updatedPiece.pendingBuildTileId;
-          delete updatedPiece.pendingBuildTileName;
-          delete updatedPiece.pendingBuildRequestedAt;
-        }
-
-        if (changed) {
-          updatedPiece.lastBuildResetAt = new Date().toISOString();
-          updatedPiece.lastBuildResetBy = game.user.name;
-          updatedPiece.lastBuildResetSource = `Crown Overview Tools ${MODULE_VERSION}`;
-          await saveWorldPiece(token, updatedPiece);
-          piecesCleared++;
-        }
-      }
-    }
+    const targetName = result.playerId === "all" ? "All players" : (game.users.get(result.playerId)?.name || result.playerId);
+    const summary = await clearBuildTracking(result);
 
     await ChatMessage.create({
       speaker: ChatMessage.getSpeaker({ alias: "Crown Build" }),
-      content: `<h2>Build Uses Reset</h2><p><strong>Player:</strong> ${escapeHtml(targetName)}</p><p><strong>Scope:</strong> ${escapeHtml(result.scope === "all" ? "All rounds" : currentLabel)}</p><p><strong>Ledger entries cleared:</strong> ${escapeHtml(ledgerCleared)}</p><p><strong>World pieces unlocked:</strong> ${escapeHtml(piecesCleared)}</p>`
+      content: `<h2>Build Uses Reset</h2><p><strong>Player:</strong> ${escapeHtml(targetName)}</p><p><strong>Scope:</strong> ${escapeHtml(result.scope === "all" ? "All rounds" : currentLabel)}</p><p><strong>Ledger entries cleared:</strong> ${escapeHtml(summary.ledgerCleared)}</p><p><strong>Pending requests cleared:</strong> ${escapeHtml(summary.pendingCleared)}</p><p><strong>World pieces unlocked:</strong> ${escapeHtml(summary.piecesCleared)}</p>`
     });
 
-    ui.notifications.info(`Build uses reset for ${targetName}. World pieces unlocked: ${piecesCleared}.`);
+    ui.notifications.info(`Build uses reset for ${targetName}. World pieces unlocked: ${summary.piecesCleared}.`);
+  }
+
+  async function repairBuildLocks() {
+    if (!requireOverviewScene()) return;
+
+    if (!game.user.isGM) {
+      ui.notifications.warn("Only the GM can repair build locks.");
+      return;
+    }
+
+    const confirmed = await Dialog.confirm({
+      title: "Repair Build Locks?",
+      content: `<p>This will hard-clear the scene build ledger, pending build requests, and build-lock fields from every World Piece on this scene.</p><p><strong>It will not remove buildings from holdings.</strong></p>`
+    });
+
+    if (!confirmed) return;
+
+    const summary = await clearBuildTracking({ playerId: "all", scope: "all", clearPieceFlags: true, clearPending: true, forceAllLedger: true });
+
+    await ChatMessage.create({
+      speaker: ChatMessage.getSpeaker({ alias: "Crown Build" }),
+      content: `<h2>Build Locks Repaired</h2><p><strong>Scene:</strong> ${escapeHtml(canvas.scene?.name || "Unknown")}</p><p><strong>Ledger entries cleared:</strong> ${escapeHtml(summary.ledgerCleared)}</p><p><strong>Pending requests cleared:</strong> ${escapeHtml(summary.pendingCleared)}</p><p><strong>World pieces unlocked:</strong> ${escapeHtml(summary.piecesCleared)}</p><p>Existing buildings on tiles were not changed.</p>`
+    });
+
+    ui.notifications.info(`Build locks repaired. World pieces unlocked: ${summary.piecesCleared}.`);
   }
 
   async function buildOnCurrentTile() {

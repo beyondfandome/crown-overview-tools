@@ -1,8 +1,8 @@
 {
   "id": "crown-overview-tools",
   "title": "Crown Overview Tools",
-  "description": "Scene-gated strategic overview map tools for Crown of Ashes. v0.2.1 adds edit world piece, improved sticky player vision, and build-use reset fixes.",
-  "version": "0.2.1",
+  "description": "Scene-gated strategic overview map tools for Crown of Ashes. v0.2.2 repairs stuck build-use locks and adds a hard build-lock repair tool.",
+  "version": "0.2.2",
   "authors": [
     {
       "name": "Beyond Fandome"
@@ -20,6 +20,6 @@
   ],
   "url": "https://github.com/beyondfandome/crown-overview-tools",
   "manifest": "https://raw.githubusercontent.com/beyondfandome/crown-overview-tools/main/module.json",
-  "download": "https://github.com/beyondfandome/crown-overview-tools/releases/download/v0.2.1/crown-overview-tools-v0.2.1.zip",
+  "download": "https://github.com/beyondfandome/crown-overview-tools/releases/download/v0.2.2/crown-overview-tools-v0.2.2.zip",
   "socket": true
 }

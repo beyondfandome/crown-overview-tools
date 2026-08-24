@@ -1,19 +1,14 @@
-# Crown Overview Tools v0.2.1
+# Crown Overview Tools v0.2.2
 
 Strategic overview map tools for Crown of Ashes.
 
-## Included in v0.2.1
+## Included in v0.2.2
 
-- Compatibility metadata updated for Foundry VTT v14.
-- World piece tooltip is positioned above the tile/location tooltip.
-- Player vision is stricter on overview scenes: world-piece tokens outside revealed tiles are hidden from non-GM users.
-- Non-GM overview maps receive a darkened strategic fog overlay with holes over revealed tiles.
-- Edit World Piece tool added for GMs.
-- Edit World Piece can update name, type, movement, faction, controller, token image, and token size.
-- Reset Build Uses now supports all players or a selected player.
-- Reset Build Uses now clears current round or all round history.
-- Reset Build Uses now clears pending build locks more reliably.
-- Pending build processing no longer falsely blocks itself because the player had a pending build lock.
+- Adds GM-only **Repair Build Locks**.
+- Hard-clears the scene build ledger, pending build requests, and world-piece build locks without deleting buildings from tiles.
+- Improves **Reset Build Uses** so it clears build records by user ID, player name, builder/requester IDs, and legacy pending-build fields.
+- Reset Build Uses now reports ledger entries, pending requests, and world pieces unlocked.
+- Keeps v0.2.1 features: stricter player vision, My Holdings, Edit World Piece, player build ownership checks, pending build support, piece tooltip positioning, and Foundry v14 compatibility metadata.
 
 ## Overview scenes
 
@@ -22,3 +17,13 @@ This module activates on:
 - Crown of Ashes
 - Crown of Ashes (Copy)
 
+## Build lock recovery
+
+If a player is stuck with “already built this turn” during testing:
+
+1. Log in as GM.
+2. Open the Crown overview scene.
+3. Click **Repair Build Locks**.
+4. Confirm.
+
+This does not remove existing buildings from holdings.
