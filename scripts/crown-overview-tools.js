@@ -1,6 +1,6 @@
 (() => {
   const MODULE_ID = "crown-overview-tools";
-  const MODULE_VERSION = "0.1.4";
+  const MODULE_VERSION = "0.1.5";
   const FLAG_SCOPE = "world";
   const WORLD_TILE_KEY = "worldTile";
   const WORLD_PIECE_KEY = "worldPiece";
@@ -20,6 +20,7 @@
   const HOVER_KEY = "COA_WORLD_TILE_HOVER";
   const VISIBILITY_KEY = "COA_WORLD_TILE_VISIBILITY";
   const LINK_VIEWER_KEY = "COA_WORLD_TILE_LINK_VIEWER";
+  const BUILD_LEDGER_KEY = "worldBuildLedger";
 
   const DEFAULT_IMAGES = {
     character: "icons/svg/mystery-man.svg",
@@ -691,6 +692,7 @@
     const gmButtons = game.user.isGM ? `
       <div class="coa-panel-section">
         <button data-coa-action="roundClock">Round Clock</button>
+        <button data-coa-action="resetMovement">Reset Movement</button>
         <button data-coa-action="createPiece">Create World Piece</button>
         <button data-coa-action="linkTiles">Link Selected Tiles</button>
         <button data-coa-action="unlinkTiles">Unlink Selected Tiles</button>
@@ -698,6 +700,7 @@
         <button data-coa-action="togglePort">Make / Edit Port</button>
         <button data-coa-action="assignHouse">Assign House Data</button>
         <button data-coa-action="importRealm">Import CSV</button>
+        <button data-coa-action="exportRealm">Export CSV</button>
         <button data-coa-action="hideTileText">Hide Original Tile Text</button>
       </div>
     ` : "";
@@ -714,8 +717,7 @@
         <button data-coa-action="toggleClickMove">Click Move: ${globalThis[CLICK_MOVE_KEY] ? "On" : "Off"}</button>
         <button data-coa-action="toggleRouteTooltip">Route Tooltip: ${globalThis[ROUTE_TOOLTIP_KEY] ? "On" : "Off"}</button>
         <button data-coa-action="portCrossing">Port Crossing</button>
-        <button data-coa-action="resetMovement">Reset Movement</button>
-        <button data-coa-action="exportRealm">Export CSV</button>
+        <button data-coa-action="buildOnCurrentTile">Build</button>
       </div>
       ${gmButtons}
     `;
@@ -2075,6 +2077,251 @@
     await ChatMessage.create({ speaker: ChatMessage.getSpeaker({ alias: "Port Crossing" }), content: `<h2>Port Crossing</h2><p><strong>Piece:</strong> ${escapeHtml(piece.name || token.document.name)}</p><p><strong>From:</strong> ${escapeHtml(getTileName(sourcePort))}</p><p><strong>To:</strong> ${escapeHtml(getTileName(destinationPort))}</p><p><strong>Route:</strong> ${destinationData.crossingType === "same-sea" ? "Same Sea Tile" : "Adjacent Sea Tile"}</p><p><strong>Crossing Check:</strong> ${escapeHtml(crossingResult)} on 1d10</p>${secondaryRoll ? `<p><strong>Loss Roll:</strong> ${escapeHtml(secondaryRoll.total)}%</p>` : ""}${resultText}<p><strong>Movement Spent:</strong> ${escapeHtml(crossingCost)}</p><p><strong>Total Movement Used:</strong> ${escapeHtml(piece.movementUsed)} / ${escapeHtml(piece.movementMax || 0)}</p>` });
   }
 
+
+  function getRoundKey(clock = getClock()) {
+    if (!clock) return null;
+    return `${Number(clock.year ?? 100)}|${String(clock.season ?? "Spring")}|${Number(clock.round ?? 1)}`;
+  }
+
+  function getCurrentTileEntryForToken(token, piece = getWorldPiece(token)) {
+    let entry = findTileAtPoint(getTokenCenter(token));
+    if (!entry && piece?.currentTileId) entry = getTileById(piece.currentTileId);
+    return entry || null;
+  }
+
+  function getBuildLedger() {
+    return canvas.scene?.getFlag(FLAG_SCOPE, BUILD_LEDGER_KEY) ?? {};
+  }
+
+  async function saveBuildLedger(ledger) {
+    await canvas.scene.setFlag(FLAG_SCOPE, BUILD_LEDGER_KEY, ledger);
+  }
+
+  function getAlreadyBuiltForRound(ledger, roundKey, userId) {
+    return ledger?.[roundKey]?.users?.[userId] ?? null;
+  }
+
+  function buildBuildingOptions(existingBuildings) {
+    const existing = new Set((existingBuildings || []).map(String));
+    return BUILDINGS
+      .filter(building => !existing.has(building))
+      .map(building => `<option value="${escapeHtml(building)}">${escapeHtml(building)}</option>`)
+      .join("");
+  }
+
+  async function buildOnCurrentTile() {
+    if (!requireOverviewScene()) return;
+
+    const selected = canvas.tokens.controlled;
+    if (selected.length !== 1) {
+      ui.notifications.warn("Select exactly one world piece first.");
+      return;
+    }
+
+    const token = selected[0];
+    const piece = getWorldPiece(token);
+
+    if (!piece) {
+      ui.notifications.warn("Selected token is not a world piece.");
+      return;
+    }
+
+    if (!canUserControlWorldPiece(token, piece)) {
+      ui.notifications.warn("You can only build with world pieces you control.");
+      return;
+    }
+
+    const clock = getClock();
+    const roundKey = getRoundKey(clock);
+
+    if (!roundKey) {
+      ui.notifications.warn("Initialize the World Round Clock before building, so the one-building-per-turn rule can be tracked.");
+      return;
+    }
+
+    const entry = getCurrentTileEntryForToken(token, piece);
+    if (!entry) {
+      ui.notifications.warn("Could not determine which world tile this piece occupies.");
+      return;
+    }
+
+    const worldTile = entry.tile;
+    const drawing = entry.drawing;
+    const doc = drawing.document;
+
+    if (isSeaByTile(worldTile)) {
+      ui.notifications.warn("Sea tiles cannot build settlements/buildings.");
+      return;
+    }
+
+    const house = foundry.utils.deepClone(doc.getFlag(FLAG_SCOPE, HOUSE_KEY) ?? {});
+    const existingBuildings = Array.isArray(house.builtBuildings) ? [...house.builtBuildings] : [];
+
+    if (existingBuildings.length >= 4) {
+      ui.notifications.warn(`${worldTile.name || "This tile"} already has the maximum of 4 buildings.`);
+      return;
+    }
+
+    const ledger = foundry.utils.deepClone(getBuildLedger());
+    const existingBuildThisRound = getAlreadyBuiltForRound(ledger, roundKey, game.user.id);
+
+    if (!game.user.isGM && existingBuildThisRound) {
+      ui.notifications.warn(`You have already built this turn: ${existingBuildThisRound.building} at ${existingBuildThisRound.tileName}.`);
+      return;
+    }
+
+    if (!game.user.isGM && piece.lastBuildRoundKey === roundKey) {
+      ui.notifications.warn(`${piece.name || token.document.name} has already built this turn.`);
+      return;
+    }
+
+    const buildingOptions = buildBuildingOptions(existingBuildings);
+    if (!buildingOptions) {
+      ui.notifications.warn("No available buildings remain for this tile.");
+      return;
+    }
+
+    const currentLevel = Math.min(existingBuildings.length, 4);
+    const nextLevel = Math.min(existingBuildings.length + 1, 4);
+    const currentDevelopment = DEVELOPMENT_LEVELS[currentLevel]?.label || "Ruins";
+    const nextDevelopment = DEVELOPMENT_LEVELS[nextLevel]?.label || "City";
+    const dateLabel = getDateLabel(clock);
+
+    const details = await new Promise(resolve => {
+      new Dialog({
+        title: `Build — ${worldTile.name || "World Tile"}`,
+        content: `<form>
+          <div style="padding:8px;margin-bottom:10px;border:1px solid #777;border-radius:6px;">
+            <strong>Piece:</strong> ${escapeHtml(piece.name || token.document.name)}<br>
+            <strong>Tile:</strong> ${escapeHtml(worldTile.name || "Unnamed Tile")}<br>
+            <strong>Region:</strong> ${escapeHtml(worldTile.region || house.region || "None")}<br>
+            <strong>Date:</strong> ${escapeHtml(dateLabel)}<br>
+            <strong>Buildings:</strong> ${escapeHtml(existingBuildings.length)} / 4<br>
+            <strong>Development:</strong> ${escapeHtml(currentDevelopment)} → ${escapeHtml(nextDevelopment)}
+          </div>
+
+          <div class="form-group">
+            <label><strong>Building to construct</strong></label>
+            <select name="building" style="width:100%;">
+              ${buildingOptions}
+            </select>
+          </div>
+
+          <div style="padding:8px;margin-top:10px;border:1px solid #777;border-radius:6px;">
+            <strong>Existing Buildings:</strong><br>
+            ${existingBuildings.length ? escapeHtml(existingBuildings.join(", ")) : "None"}
+          </div>
+
+          <p class="notes">Players may place one building per world round. Each tile can hold a maximum of four buildings.</p>
+        </form>`,
+        buttons: {
+          build: {
+            label: "Build",
+            callback: html => {
+              const form = html[0].querySelector("form");
+              resolve({ building: String(form.building.value || "").trim() });
+            }
+          },
+          cancel: { label: "Cancel", callback: () => resolve(null) }
+        },
+        default: "build"
+      }, { width: 560, height: 430, resizable: true }).render(true);
+    });
+
+    if (!details?.building) return;
+
+    if (existingBuildings.includes(details.building)) {
+      ui.notifications.warn(`${details.building} already exists in ${worldTile.name}.`);
+      return;
+    }
+
+    const updatedBuildings = [...existingBuildings, details.building].slice(0, 4);
+    const developmentLevel = updatedBuildings.length;
+    const developmentLabel = DEVELOPMENT_LEVELS[developmentLevel]?.label || "City";
+    const oldPopulation = house.population;
+    const population = randomPopulation(developmentLevel);
+    const now = new Date().toISOString();
+
+    const updatedHouse = {
+      ...house,
+      house: house.house || worldTile.owner || "Neutral",
+      lord: house.lord || "",
+      region: house.region || worldTile.region || "",
+      culture: house.culture || "",
+      developmentLevel,
+      developmentLabel,
+      population,
+      builtBuildings: updatedBuildings,
+      worldTileId: doc.id,
+      worldTileName: worldTile.name || "Unnamed Tile",
+      lastBuiltBuilding: details.building,
+      lastBuiltRoundKey: roundKey,
+      lastBuiltDateLabel: dateLabel,
+      lastBuiltByUserId: game.user.id,
+      lastBuiltByUserName: game.user.name,
+      lastBuiltByPieceId: token.document.id,
+      lastBuiltByPieceName: piece.name || token.document.name,
+      lastBuiltAt: now,
+      buildLog: [
+        ...(Array.isArray(house.buildLog) ? house.buildLog : []),
+        {
+          building: details.building,
+          roundKey,
+          dateLabel,
+          userId: game.user.id,
+          userName: game.user.name,
+          pieceId: token.document.id,
+          pieceName: piece.name || token.document.name,
+          builtAt: now
+        }
+      ],
+      version: `Crown Overview Tools ${MODULE_VERSION}`,
+      updatedAt: now,
+      updatedBy: game.user.name
+    };
+
+    await doc.setFlag(FLAG_SCOPE, HOUSE_KEY, updatedHouse);
+
+    const updatedPiece = foundry.utils.deepClone(piece);
+    updatedPiece.lastBuildRoundKey = roundKey;
+    updatedPiece.lastBuiltBuilding = details.building;
+    updatedPiece.lastBuiltTileId = worldTile.id || doc.id;
+    updatedPiece.lastBuiltTileName = worldTile.name || "Unnamed Tile";
+    updatedPiece.lastBuiltAt = now;
+    updatedPiece.lastBuiltBy = game.user.name;
+    await saveWorldPiece(token, updatedPiece);
+
+    ledger[roundKey] = ledger[roundKey] || { dateLabel, users: {}, builds: [] };
+    ledger[roundKey].dateLabel = dateLabel;
+    ledger[roundKey].users = ledger[roundKey].users || {};
+    ledger[roundKey].builds = Array.isArray(ledger[roundKey].builds) ? ledger[roundKey].builds : [];
+    ledger[roundKey].users[game.user.id] = {
+      userName: game.user.name,
+      building: details.building,
+      tileId: worldTile.id || doc.id,
+      tileName: worldTile.name || "Unnamed Tile",
+      pieceId: token.document.id,
+      pieceName: piece.name || token.document.name,
+      builtAt: now
+    };
+    ledger[roundKey].builds.push(ledger[roundKey].users[game.user.id]);
+    await saveBuildLedger(ledger);
+
+    await ChatMessage.create({
+      speaker: ChatMessage.getSpeaker({ alias: "Crown Build" }),
+      content: `<h2>Building Constructed</h2>
+        <p><strong>Player:</strong> ${escapeHtml(game.user.name)}</p>
+        <p><strong>Piece:</strong> ${escapeHtml(piece.name || token.document.name)}</p>
+        <p><strong>Tile:</strong> ${escapeHtml(worldTile.name || "Unnamed Tile")}</p>
+        <p><strong>Building:</strong> ${escapeHtml(details.building)}</p>
+        <p><strong>Development:</strong> ${escapeHtml(developmentLabel)} (${escapeHtml(developmentLevel)} / 4)</p>
+        <p><strong>Population:</strong> ${escapeHtml(Number(population).toLocaleString())}${oldPopulation !== undefined && oldPopulation !== "" ? ` <span style="opacity:0.75;">previously ${escapeHtml(oldPopulation)}</span>` : ""}</p>
+        <p><strong>Date:</strong> ${escapeHtml(dateLabel)}</p>`
+    });
+
+    ui.notifications.info(`${details.building} built in ${worldTile.name || "selected tile"}.`);
+  }
+
   async function assignHouse() {
     if (!requireOverviewScene()) return;
     const selected = canvas.drawings.controlled;
@@ -2316,6 +2563,7 @@
     toggleClickMove,
     toggleRouteTooltip,
     portCrossing,
+    buildOnCurrentTile,
     resetMovement,
     roundClock,
     createPiece: createWorldPiece,
