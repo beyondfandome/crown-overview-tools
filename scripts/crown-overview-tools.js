@@ -1,6 +1,6 @@
 (() => {
   const MODULE_ID = "crown-overview-tools";
-  const MODULE_VERSION = "0.1.8";
+  const MODULE_VERSION = "0.2.0";
   const FLAG_SCOPE = "world";
   const WORLD_TILE_KEY = "worldTile";
   const WORLD_PIECE_KEY = "worldPiece";
@@ -23,6 +23,9 @@
   const VISIBILITY_KEY = "COA_WORLD_TILE_VISIBILITY";
   const LINK_VIEWER_KEY = "COA_WORLD_TILE_LINK_VIEWER";
   const BUILD_LEDGER_KEY = "worldBuildLedger";
+  const PENDING_BUILD_STATUS_PENDING = "pending";
+  const PENDING_BUILD_STATUS_APPLIED = "applied";
+  const PENDING_BUILD_STATUS_FAILED = "failed";
   const SOCKET_NAME = `module.${MODULE_ID}`;
 
   const DEFAULT_IMAGES = {
@@ -697,6 +700,7 @@
         <button data-coa-action="roundClock">Round Clock</button>
         <button data-coa-action="resetMovement">Reset Movement</button>
         <button data-coa-action="resetBuildCapacity">Reset Build Uses</button>
+        <button data-coa-action="processPendingBuilds">Process Pending Builds</button>
         <button data-coa-action="createPiece">Create World Piece</button>
         <button data-coa-action="linkTiles">Link Selected Tiles</button>
         <button data-coa-action="unlinkTiles">Unlink Selected Tiles</button>
@@ -725,6 +729,7 @@
         <button data-coa-action="togglePieceTooltip">Piece Tooltip: ${globalThis[PIECE_TOOLTIP_KEY] ? "On" : "Off"}</button>
         <button data-coa-action="portCrossing">Port Crossing</button>
         <button data-coa-action="buildOnCurrentTile">Build</button>
+        <button data-coa-action="showHoldings">My Holdings</button>
       </div>
       ${gmButtons}
     `;
@@ -1275,19 +1280,60 @@
     graphics.endFill();
   }
 
-  function revealForToken(token) {
+  function getRevealEntriesForToken(token) {
+    if (!token || !getWorldPiece(token)) return [];
+    const current = findCurrentTileForToken(token) || getTileById(getWorldPiece(token)?.currentTileId);
+    if (!current) return [];
+    return [current, ...getLinkedTiles(current)];
+  }
+
+  function getControlledRevealSourceTokens() {
+    const selectedWorldPieces = canvas.tokens.controlled.filter(token => Boolean(getWorldPiece(token)));
+    if (selectedWorldPieces.length === 1) return selectedWorldPieces;
+
+    if (game.user.isGM) return [];
+
+    return canvas.tokens.placeables.filter(token => {
+      const piece = getWorldPiece(token);
+      return Boolean(piece) && canUserControlWorldPiece(token, piece);
+    });
+  }
+
+  function revealForTokens(tokens) {
     const manager = globalThis[VISIBILITY_KEY];
     if (!manager) return;
-    if (!getWorldPiece(token)) { clearReveal(); return; }
-    const current = findCurrentTileForToken(token);
-    if (!current) { clearReveal(); return; }
-    const linked = getLinkedTiles(current);
-    manager.revealedEntries = [current, ...linked];
+
+    const byTileId = new Map();
+    for (const token of tokens || []) {
+      for (const entry of getRevealEntriesForToken(token)) {
+        const id = String(getTileId(entry) || entry.tile?.id || entry.drawing?.document?.id || "");
+        if (id && !byTileId.has(id)) byTileId.set(id, entry);
+      }
+    }
+
+    manager.revealedEntries = [...byTileId.values()];
     manager.graphics.clear();
+
+    if (!manager.revealedEntries.length) {
+      manager.graphics.visible = false;
+      canvas.visibility?.refreshVisibility?.();
+      refreshTokenVisibility();
+      return;
+    }
+
     manager.graphics.visible = true;
     for (const entry of manager.revealedEntries) drawTileIntoVision(manager.graphics, entry.drawing);
     canvas.visibility?.refreshVisibility?.();
     refreshTokenVisibility();
+  }
+
+  function revealForCurrentPlayerPieces() {
+    revealForTokens(getControlledRevealSourceTokens());
+  }
+
+  function revealForToken(token) {
+    if (!token || !getWorldPiece(token)) { revealForCurrentPlayerPieces(); return; }
+    revealForTokens([token]);
   }
 
   function startVisibility() {
@@ -1307,16 +1353,14 @@
     const originalIsVisibleGetter = originalIsVisibleDescriptor.get;
     const controlHook = Hooks.on("controlToken", (token, controlled) => {
       if (!isOverviewScene()) return;
-      if (controlled && canvas.tokens.controlled.length === 1) revealForToken(token);
-      else if (canvas.tokens.controlled.length === 1) revealForToken(canvas.tokens.controlled[0]);
-      else clearReveal();
+      if (canvas.tokens.controlled.length === 1 && getWorldPiece(canvas.tokens.controlled[0])) revealForToken(canvas.tokens.controlled[0]);
+      else revealForCurrentPlayerPieces();
     });
     const updateHook = Hooks.on("updateToken", (document, changes) => {
       if (!isOverviewScene()) return;
       if (changes.x === undefined && changes.y === undefined) return;
-      const token = canvas.tokens.get(document.id);
-      if (token && token.controlled && canvas.tokens.controlled.length === 1) revealForToken(token);
-      else refreshTokenVisibility();
+      if (canvas.tokens.controlled.length === 1 && getWorldPiece(canvas.tokens.controlled[0])) revealForToken(canvas.tokens.controlled[0]);
+      else revealForCurrentPlayerPieces();
     });
 
     globalThis[VISIBILITY_KEY] = { TokenClass, originalIsVisibleDescriptor, graphics, visionContainer, revealedEntries: [], controlHook, updateHook };
@@ -1330,8 +1374,8 @@
       }
     });
 
-    if (canvas.tokens.controlled.length === 1) revealForToken(canvas.tokens.controlled[0]);
-    else clearReveal();
+    if (canvas.tokens.controlled.length === 1 && getWorldPiece(canvas.tokens.controlled[0])) revealForToken(canvas.tokens.controlled[0]);
+    else revealForCurrentPlayerPieces();
   }
 
   function stopVisibility() {
@@ -1601,10 +1645,10 @@
     el = document.createElement("div");
     el.id = PIECE_TOOLTIP_ID;
     el.style.position = "fixed";
-    el.style.left = "315px";
-    el.style.bottom = "24px";
-    el.style.width = "360px";
-    el.style.maxHeight = "55vh";
+    el.style.right = "84px";
+    el.style.bottom = "132px";
+    el.style.width = "330px";
+    el.style.maxHeight = "45vh";
     el.style.overflowY = "auto";
     el.style.zIndex = "100001";
     el.style.padding = "10px 12px";
@@ -2456,12 +2500,98 @@
     return activeGms.find(user => String(user.viewedScene || "") === String(sceneId || "")) || activeGms[0];
   }
 
+  function getPendingBuildRequestsFromPiece(piece) {
+    return Array.isArray(piece?.pendingBuildRequests) ? [...piece.pendingBuildRequests] : [];
+  }
+
+  function hasPendingBuildForRound(roundKey, userId) {
+    if (!roundKey || !userId) return null;
+    for (const token of canvas.tokens.placeables) {
+      const piece = getWorldPiece(token);
+      if (!piece) continue;
+      const requests = getPendingBuildRequestsFromPiece(piece);
+      const found = requests.find(request =>
+        request &&
+        request.status === PENDING_BUILD_STATUS_PENDING &&
+        String(request.roundKey || "") === String(roundKey) &&
+        String(request.requesterUserId || "") === String(userId)
+      );
+      if (found) return { token, piece, request: found };
+    }
+    return null;
+  }
+
+  async function savePendingBuildRequest({ token, piece, entry, building }) {
+    const clock = getClock();
+    const roundKey = getRoundKey(clock);
+    const dateLabel = clock ? getDateLabel(clock) : "Unknown Date";
+    const existingPending = hasPendingBuildForRound(roundKey, game.user.id);
+
+    if (existingPending) {
+      ui.notifications.warn(`You already have a pending build this round: ${existingPending.request.building} at ${existingPending.request.tileName}.`);
+      return false;
+    }
+
+    const updatedPiece = foundry.utils.deepClone(piece || getWorldPiece(token) || {});
+    const requests = getPendingBuildRequestsFromPiece(updatedPiece);
+    const request = {
+      id: foundry.utils.randomID(16),
+      status: PENDING_BUILD_STATUS_PENDING,
+      sceneId: canvas.scene?.id,
+      sceneName: canvas.scene?.name,
+      roundKey,
+      dateLabel,
+      requesterUserId: game.user.id,
+      requesterUserName: game.user.name,
+      tokenId: token.document.id,
+      tokenName: token.document.name,
+      pieceName: updatedPiece.name || token.document.name,
+      drawingId: entry.drawing.document.id,
+      tileId: entry.tile.id || entry.drawing.document.id,
+      tileName: entry.tile.name || "Unnamed Tile",
+      building,
+      requestedAt: new Date().toISOString(),
+      requestedSource: `Crown Overview Tools ${MODULE_VERSION}`
+    };
+
+    requests.push(request);
+    updatedPiece.pendingBuildRequests = requests;
+    updatedPiece.pendingBuildRoundKey = roundKey;
+    updatedPiece.pendingBuildBuilding = building;
+    updatedPiece.pendingBuildTileId = request.tileId;
+    updatedPiece.pendingBuildTileName = request.tileName;
+    updatedPiece.pendingBuildRequestedAt = request.requestedAt;
+    updatedPiece.lastBuildRoundKey = roundKey;
+    updatedPiece.lastBuiltBuilding = building;
+    updatedPiece.lastBuiltTileId = request.tileId;
+    updatedPiece.lastBuiltTileName = request.tileName;
+    updatedPiece.lastBuiltAt = request.requestedAt;
+    updatedPiece.lastBuiltBy = game.user.name;
+    updatedPiece.lastBuildStatus = PENDING_BUILD_STATUS_PENDING;
+
+    await saveWorldPiece(token, updatedPiece);
+
+    await ChatMessage.create({
+      speaker: ChatMessage.getSpeaker({ alias: "Crown Build" }),
+      content: `<h2>Build Request Queued</h2>
+        <p><strong>Player:</strong> ${escapeHtml(game.user.name)}</p>
+        <p><strong>Piece:</strong> ${escapeHtml(updatedPiece.name || token.document.name)}</p>
+        <p><strong>Tile:</strong> ${escapeHtml(request.tileName)}</p>
+        <p><strong>Building:</strong> ${escapeHtml(building)}</p>
+        <p><strong>Date:</strong> ${escapeHtml(dateLabel)}</p>
+        <p>No active GM was online, so this has been saved as a pending request. A GM can apply it later with <strong>Process Pending Builds</strong>.</p>`
+    });
+
+    ui.notifications.info(`No active GM online. Queued pending build: ${building} at ${request.tileName}.`);
+    return true;
+  }
+
   async function requestGmBuild({ token, entry, building }) {
     const gm = findActiveGmForScene(canvas.scene?.id);
 
     if (!gm) {
-      ui.notifications.error("No active GM is online to process this build request.");
-      return false;
+      const piece = getWorldPiece(token);
+      return await savePendingBuildRequest({ token, piece, entry, building });
     }
 
     const payload = {
@@ -2659,6 +2789,151 @@
     });
   }
 
+  function getPendingBuildEntries() {
+    const entries = [];
+    for (const token of canvas.tokens.placeables) {
+      const piece = getWorldPiece(token);
+      if (!piece) continue;
+      const requests = getPendingBuildRequestsFromPiece(piece).filter(request => request?.status === PENDING_BUILD_STATUS_PENDING);
+      for (const request of requests) entries.push({ token, piece, request });
+    }
+    return entries;
+  }
+
+  async function markPendingBuildRequest(token, piece, requestId, status, extra = {}) {
+    const updatedPiece = foundry.utils.deepClone(piece || getWorldPiece(token) || {});
+    const requests = getPendingBuildRequestsFromPiece(updatedPiece).map(request => {
+      if (String(request.id || "") !== String(requestId || "")) return request;
+      return {
+        ...request,
+        status,
+        ...extra,
+        resolvedAt: new Date().toISOString(),
+        resolvedBy: game.user.name
+      };
+    });
+
+    updatedPiece.pendingBuildRequests = requests;
+
+    const stillPending = requests.find(request => request?.status === PENDING_BUILD_STATUS_PENDING);
+    if (!stillPending) {
+      delete updatedPiece.pendingBuildRoundKey;
+      delete updatedPiece.pendingBuildBuilding;
+      delete updatedPiece.pendingBuildTileId;
+      delete updatedPiece.pendingBuildTileName;
+      delete updatedPiece.pendingBuildRequestedAt;
+      if (status === PENDING_BUILD_STATUS_FAILED) {
+        delete updatedPiece.lastBuildRoundKey;
+        delete updatedPiece.lastBuiltBuilding;
+        delete updatedPiece.lastBuiltTileId;
+        delete updatedPiece.lastBuiltTileName;
+        delete updatedPiece.lastBuiltAt;
+        delete updatedPiece.lastBuiltBy;
+      }
+    }
+
+    updatedPiece.lastBuildStatus = status;
+    await saveWorldPiece(token, updatedPiece);
+    return updatedPiece;
+  }
+
+  async function processPendingBuilds() {
+    if (!requireOverviewScene()) return;
+
+    if (!game.user.isGM) {
+      ui.notifications.warn("Only the GM can process pending builds.");
+      return;
+    }
+
+    const pending = getPendingBuildEntries();
+    if (!pending.length) {
+      ui.notifications.info("There are no pending build requests on this scene.");
+      return;
+    }
+
+    const rows = pending.map((entry, index) => {
+      const request = entry.request;
+      return `<label style="display:block;margin:5px 0;padding:5px;border-bottom:1px solid rgba(255,255,255,0.12);">
+        <input type="checkbox" name="requestIndex" value="${escapeHtml(index)}" checked>
+        <strong>${escapeHtml(request.requesterUserName || "Player")}</strong> — ${escapeHtml(request.building || "Building")} at ${escapeHtml(request.tileName || "Unknown Tile")}
+        <br><span style="opacity:0.75;font-size:12px;">Piece: ${escapeHtml(request.pieceName || request.tokenName || entry.token.document.name)} | Date: ${escapeHtml(request.dateLabel || request.roundKey || "Unknown")}</span>
+      </label>`;
+    }).join("");
+
+    const result = await new Promise(resolve => {
+      new Dialog({
+        title: "Process Pending Builds",
+        content: `<form>
+          <p>Select pending builds to apply. Failed requests will be marked and reported in chat.</p>
+          <div style="max-height:360px;overflow-y:auto;border:1px solid #777;border-radius:6px;padding:6px;">${rows}</div>
+        </form>`,
+        buttons: {
+          apply: {
+            label: "Apply Selected",
+            callback: html => {
+              const form = html[0].querySelector("form");
+              const indexes = Array.from(form.querySelectorAll('input[name="requestIndex"]:checked')).map(input => Number(input.value));
+              resolve({ action: "apply", indexes });
+            }
+          },
+          cancel: { label: "Cancel", callback: () => resolve(null) }
+        },
+        default: "apply"
+      }, { width: 650, height: 520, resizable: true }).render(true);
+    });
+
+    if (!result || result.action !== "apply") return;
+    if (!result.indexes.length) {
+      ui.notifications.warn("No pending builds selected.");
+      return;
+    }
+
+    let applied = 0;
+    let failed = 0;
+    let summary = "";
+
+    for (const index of result.indexes) {
+      const item = pending[index];
+      if (!item) continue;
+      const { token, request } = item;
+      const piece = getWorldPiece(token);
+      if (!piece) continue;
+
+      try {
+        const entry = canvas.drawings.placeables
+          .map(drawing => ({ drawing, tile: getWorldTile(drawing) }))
+          .find(candidate => candidate.drawing.document.id === request.drawingId || candidate.tile?.id === request.tileId);
+
+        if (!entry?.tile) throw new Error(`Could not find target tile ${request.tileName || request.tileId}.`);
+
+        await applyBuildToTile({
+          token,
+          piece,
+          entry,
+          building: request.building,
+          builderUserId: request.requesterUserId,
+          builderUserName: request.requesterUserName || "Player"
+        });
+
+        await markPendingBuildRequest(token, getWorldPiece(token), request.id, PENDING_BUILD_STATUS_APPLIED, { appliedBuilding: request.building });
+        applied++;
+        summary += `<li><strong>Applied:</strong> ${escapeHtml(request.requesterUserName || "Player")} — ${escapeHtml(request.building)} at ${escapeHtml(request.tileName)}</li>`;
+      } catch (err) {
+        console.error("Pending build failed:", err, request);
+        await markPendingBuildRequest(token, getWorldPiece(token), request.id, PENDING_BUILD_STATUS_FAILED, { failedReason: String(err.message || err) });
+        failed++;
+        summary += `<li><strong>Failed:</strong> ${escapeHtml(request.requesterUserName || "Player")} — ${escapeHtml(request.building)} at ${escapeHtml(request.tileName)}<br><span style="color:#ff9999;">${escapeHtml(err.message || err)}</span></li>`;
+      }
+    }
+
+    await ChatMessage.create({
+      speaker: ChatMessage.getSpeaker({ alias: "Crown Build" }),
+      content: `<h2>Pending Builds Processed</h2><p><strong>Applied:</strong> ${escapeHtml(applied)}</p><p><strong>Failed:</strong> ${escapeHtml(failed)}</p><ul>${summary}</ul>`
+    });
+
+    ui.notifications.info(`Pending builds processed: ${applied} applied, ${failed} failed.`);
+  }
+
   async function resetBuildCapacity() {
     if (!requireOverviewScene()) return;
 
@@ -2732,6 +3007,16 @@
         delete updatedPiece.lastBuiltBuilding;
         delete updatedPiece.lastBuiltTileId;
         delete updatedPiece.lastBuiltTileName;
+        delete updatedPiece.pendingBuildRoundKey;
+        delete updatedPiece.pendingBuildBuilding;
+        delete updatedPiece.pendingBuildTileId;
+        delete updatedPiece.pendingBuildTileName;
+        delete updatedPiece.pendingBuildRequestedAt;
+        if (Array.isArray(updatedPiece.pendingBuildRequests)) {
+          if (result.scope === "all") updatedPiece.pendingBuildRequests = [];
+          else updatedPiece.pendingBuildRequests = updatedPiece.pendingBuildRequests.filter(request => String(request.roundKey || "") !== String(roundKey || ""));
+        }
+        delete updatedPiece.lastBuildStatus;
         updatedPiece.lastBuildResetAt = new Date().toISOString();
         updatedPiece.lastBuildResetBy = game.user.name;
         updatedPiece.lastBuildResetSource = `Crown Overview Tools ${MODULE_VERSION}`;
@@ -2809,6 +3094,12 @@
 
     const ledger = foundry.utils.deepClone(getBuildLedger());
     const existingBuildThisRound = getAlreadyBuiltForRound(ledger, roundKey, game.user.id);
+    const pendingBuildThisRound = hasPendingBuildForRound(roundKey, game.user.id);
+
+    if (!game.user.isGM && pendingBuildThisRound) {
+      ui.notifications.warn(`You already have a pending build this turn: ${pendingBuildThisRound.request.building} at ${pendingBuildThisRound.request.tileName}.`);
+      return;
+    }
 
     if (!game.user.isGM && existingBuildThisRound) {
       ui.notifications.warn(`You have already built this turn: ${existingBuildThisRound.building} at ${existingBuildThisRound.tileName}.`);
@@ -3120,6 +3411,132 @@
     }, { width: 680, height: 820, resizable: true }).render(true);
   }
 
+
+  function getHoldingsForUser(user) {
+    const entries = [];
+    for (const entry of getWorldTileEntries()) {
+      const house = getHouseData(entry.drawing) || {};
+      const ownerId = getTileOwnerUserId(entry.tile, house);
+      const ownerName = getTileOwnerUserName(entry.tile, house);
+      const matches = user
+        ? ((ownerId && String(ownerId) === String(user.id)) || (!ownerId && ownerName && normalize(ownerName) === normalize(user.name)))
+        : Boolean(ownerId || ownerName);
+      if (matches) entries.push({ ...entry, house });
+    }
+    entries.sort((a, b) => {
+      const ar = String(a.house.region || a.tile.region || "");
+      const br = String(b.house.region || b.tile.region || "");
+      return ar.localeCompare(br) || String(a.tile.name || "").localeCompare(String(b.tile.name || ""));
+    });
+    return entries;
+  }
+
+  function numberText(value) {
+    const number = Number(value);
+    return Number.isFinite(number) ? number.toLocaleString() : "0";
+  }
+
+  function holdingsSummary(entries) {
+    let population = 0;
+    let treasury = 0;
+    let buildings = 0;
+    for (const entry of entries) {
+      const house = entry.house || {};
+      const pop = Number(house.population || 0);
+      const cash = Number(house.treasury || 0);
+      if (Number.isFinite(pop)) population += pop;
+      if (Number.isFinite(cash)) treasury += cash;
+      buildings += Array.isArray(house.builtBuildings) ? house.builtBuildings.length : 0;
+    }
+    return { population, treasury, buildings };
+  }
+
+  async function chooseHoldingsUser() {
+    if (!game.user.isGM) return game.user;
+    const users = getPlayerUsers();
+    const options = users.map(user => `<option value="${escapeHtml(user.id)}">${escapeHtml(user.name)}</option>`).join("");
+    return await new Promise(resolve => {
+      new Dialog({
+        title: "View Player Holdings",
+        content: `
+          <form>
+            <p>Choose which player's assigned holdings to view.</p>
+            <div class="form-group">
+              <label>Player</label>
+              <select name="userId" style="width:100%;">
+                ${options}
+              </select>
+            </div>
+          </form>
+        `,
+        buttons: {
+          view: { label: "View Holdings", callback: html => {
+            const form = html[0].querySelector("form");
+            resolve(game.users.get(String(form.userId.value || "")) || null);
+          } },
+          cancel: { label: "Cancel", callback: () => resolve(null) }
+        },
+        default: "view"
+      }, { width: 520, height: 260, resizable: true }).render(true);
+    });
+  }
+
+  async function showHoldings() {
+    if (!requireOverviewScene()) return;
+    const user = await chooseHoldingsUser();
+    if (!user) return;
+
+    const entries = getHoldingsForUser(user);
+    const summary = holdingsSummary(entries);
+
+    const rows = entries.map(entry => {
+      const tile = entry.tile || {};
+      const house = entry.house || {};
+      const built = Array.isArray(house.builtBuildings) ? house.builtBuildings : [];
+      const developmentLevel = built.length;
+      const developmentLabel = house.developmentLabel || DEVELOPMENT_LEVELS[developmentLevel]?.label || "Ruins";
+      const resources = [house.primaryExport || house.exports, house.secondaryExport].filter(Boolean).join(", ") || "None";
+      return `
+        <tr>
+          <td style="padding:5px 7px;border:1px solid #777;"><strong>${escapeHtml(tile.name || "Unnamed Tile")}</strong><br><span style="opacity:0.75;">${escapeHtml(house.region || tile.region || "Unassigned")}</span></td>
+          <td style="padding:5px 7px;border:1px solid #777;">${escapeHtml(house.house || tile.owner || "None")}<br><span style="opacity:0.75;">Ruler: ${escapeHtml(house.lord || "None")}</span></td>
+          <td style="padding:5px 7px;border:1px solid #777;">${escapeHtml(developmentLabel)} (${escapeHtml(developmentLevel)}/4)<br><span style="opacity:0.75;">${escapeHtml(built.length ? built.join(", ") : "No buildings")}</span></td>
+          <td style="padding:5px 7px;border:1px solid #777;">Pop: ${escapeHtml(numberText(house.population))}<br>Treasury: ${escapeHtml(numberText(house.treasury))}</td>
+          <td style="padding:5px 7px;border:1px solid #777;">${escapeHtml(resources)}</td>
+        </tr>
+      `;
+    }).join("") || `<tr><td colspan="5" style="padding:8px;border:1px solid #777;">No holdings assigned to ${escapeHtml(user.name)} yet.</td></tr>`;
+
+    new Dialog({
+      title: `Holdings — ${user.name}`,
+      content: `
+        <div style="max-height:70vh;overflow:auto;">
+          <h2 style="margin-top:0;">${escapeHtml(user.name)} Holdings</h2>
+          <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-bottom:10px;">
+            <div style="padding:8px;border:1px solid #777;border-radius:6px;"><strong>Tiles</strong><br>${escapeHtml(entries.length)}</div>
+            <div style="padding:8px;border:1px solid #777;border-radius:6px;"><strong>Buildings</strong><br>${escapeHtml(summary.buildings)}</div>
+            <div style="padding:8px;border:1px solid #777;border-radius:6px;"><strong>Population</strong><br>${escapeHtml(summary.population.toLocaleString())}</div>
+            <div style="padding:8px;border:1px solid #777;border-radius:6px;"><strong>Treasury</strong><br>${escapeHtml(summary.treasury.toLocaleString())}</div>
+          </div>
+          <table style="border-collapse:collapse;width:100%;font-size:13px;">
+            <thead>
+              <tr>
+                <th style="padding:5px 7px;border:1px solid #777;text-align:left;">Tile</th>
+                <th style="padding:5px 7px;border:1px solid #777;text-align:left;">House / Ruler</th>
+                <th style="padding:5px 7px;border:1px solid #777;text-align:left;">Development</th>
+                <th style="padding:5px 7px;border:1px solid #777;text-align:left;">Economy</th>
+                <th style="padding:5px 7px;border:1px solid #777;text-align:left;">Exports</th>
+              </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>
+      `,
+      buttons: { close: { label: "Close" } },
+      default: "close"
+    }, { width: 900, height: "auto", resizable: true }).render(true);
+  }
+
   async function exportRealm() {
     if (!requireOverviewScene()) return;
     const rows = [];
@@ -3300,8 +3717,10 @@
     togglePieceTooltip,
     portCrossing,
     buildOnCurrentTile,
+    showHoldings,
     resetMovement,
     resetBuildCapacity,
+    processPendingBuilds,
     roundClock,
     createPiece: createWorldPiece,
     linkTiles,

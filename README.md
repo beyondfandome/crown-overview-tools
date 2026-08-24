@@ -1,59 +1,38 @@
-# Crown Overview Tools v0.1.8
+# Crown Overview Tools v0.2.0
 
-Scene-gated strategic overview map tools for the Crown of Ashes campaign map.
+Scene-gated strategic overview map tools for Foundry VTT.
 
-## Active scenes
+## Included in v0.2.0
 
-This module activates on:
+- Sticky player map vision
+  - selecting one world piece shows that piece's current tile and linked tiles
+  - deselecting now falls back to the combined vision of all world pieces controlled by that player
+  - players should no longer see the whole map simply because no token is selected
+- My Holdings button
+  - players can view their assigned tiles
+  - shows buildings, development, population, treasury, and exports
+  - GMs can choose a player from a dropdown and inspect their holdings
+- Includes v0.1.9 pending build support
+  - player builds go to an active GM if online
+  - if no GM is online, builds are queued as pending requests
+  - GM can process pending builds later
+- Includes previous tools
+  - draggable overview panel
+  - click-to-move
+  - route tooltip
+  - piece tooltip
+  - build button
+  - assign tile owner
+  - assign piece owner
+  - port crossing
+  - round clock
+  - CSV import/export
+
+## Scene activation
+
+This module activates only on scenes named:
 
 - Crown of Ashes
 - Crown of Ashes (Copy)
 
-It stays quiet on normal battle scenes.
-
-## Included
-
-- Draggable Crown Overview panel
-- World date banner
-- World round clock
-- World piece creation
-- World path movement
-- Click-to-move movement with confirmation
-- Route tooltip comparing land, sea/port, and default routes
-- World piece hover tooltip
-- Port crossing
-- Automatic spacing when multiple pieces occupy the same tile
-- Tile linking and unlinking
-- Tile link viewer
-- Port editor
-- House data editor
-- CSV export/import
-- Hover highlight and tile tooltip
-- World map visibility tools
-- Safe original tile text hiding
-- Build button for player construction
-- Assign Tile Owner button for GM player ownership
-- Assign Piece Owner button for GM piece/token ownership
-
-## New in v0.1.8
-
-- Player Build requests now route through the active GM client by module socket.
-- This fixes Trusted Player permission errors when building updates House Data on a Drawing.
-- Adds GM-only Reset Build Uses button.
-- Reset Build Uses can clear the current round build ledger or all build ledger data.
-- Reset Build Uses can also clear the world-piece build lock, useful after admin testing or manually deleting buildings.
-
-## Player build rules
-
-Players can build only if:
-
-- They control the selected world piece.
-- The piece is standing on the target tile.
-- The tile is assigned to their Foundry player account.
-- The tile is not a sea tile.
-- The tile has fewer than four buildings.
-- They have not already built this world round.
-
-Player builds are submitted to the active GM client for the actual Drawing/House Data update. The GM must be logged in and on the same Crown overview scene.
-
-GMs are not limited by tile ownership or one-build-per-round, but the four-building cap and no-sea-building rule remain in place.
+or scenes explicitly flagged as overview scenes.
