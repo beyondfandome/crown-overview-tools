@@ -1,6 +1,6 @@
 (() => {
   const MODULE_ID = "crown-overview-tools";
-  const MODULE_VERSION = "0.1.6";
+  const MODULE_VERSION = "0.1.8";
   const FLAG_SCOPE = "world";
   const WORLD_TILE_KEY = "worldTile";
   const WORLD_PIECE_KEY = "worldPiece";
@@ -16,11 +16,14 @@
   const HOVER_TOOLTIP_ID = "world-tile-hover-tooltip";
   const ROUTE_TOOLTIP_ID = "coa-route-tooltip";
   const ROUTE_TOOLTIP_KEY = "COA_WORLD_ROUTE_TOOLTIP";
+  const PIECE_TOOLTIP_ID = "coa-world-piece-tooltip";
+  const PIECE_TOOLTIP_KEY = "COA_WORLD_PIECE_TOOLTIP";
   const CLICK_MOVE_KEY = "COA_WORLD_CLICK_MOVE";
   const HOVER_KEY = "COA_WORLD_TILE_HOVER";
   const VISIBILITY_KEY = "COA_WORLD_TILE_VISIBILITY";
   const LINK_VIEWER_KEY = "COA_WORLD_TILE_LINK_VIEWER";
   const BUILD_LEDGER_KEY = "worldBuildLedger";
+  const SOCKET_NAME = `module.${MODULE_ID}`;
 
   const DEFAULT_IMAGES = {
     character: "icons/svg/mystery-man.svg",
@@ -693,12 +696,14 @@
       <div class="coa-panel-section">
         <button data-coa-action="roundClock">Round Clock</button>
         <button data-coa-action="resetMovement">Reset Movement</button>
+        <button data-coa-action="resetBuildCapacity">Reset Build Uses</button>
         <button data-coa-action="createPiece">Create World Piece</button>
         <button data-coa-action="linkTiles">Link Selected Tiles</button>
         <button data-coa-action="unlinkTiles">Unlink Selected Tiles</button>
         <button data-coa-action="viewLinks">View Tile Links</button>
         <button data-coa-action="togglePort">Make / Edit Port</button>
         <button data-coa-action="assignTileOwner">Assign Tile Owner</button>
+        <button data-coa-action="assignPieceOwner">Assign Piece Owner</button>
         <button data-coa-action="assignHouse">Assign House Data</button>
         <button data-coa-action="importRealm">Import CSV</button>
         <button data-coa-action="exportRealm">Export CSV</button>
@@ -717,6 +722,7 @@
         <button data-coa-action="pathMove">Move Piece</button>
         <button data-coa-action="toggleClickMove">Click Move: ${globalThis[CLICK_MOVE_KEY] ? "On" : "Off"}</button>
         <button data-coa-action="toggleRouteTooltip">Route Tooltip: ${globalThis[ROUTE_TOOLTIP_KEY] ? "On" : "Off"}</button>
+        <button data-coa-action="togglePieceTooltip">Piece Tooltip: ${globalThis[PIECE_TOOLTIP_KEY] ? "On" : "Off"}</button>
         <button data-coa-action="portCrossing">Port Crossing</button>
         <button data-coa-action="buildOnCurrentTile">Build</button>
       </div>
@@ -1374,6 +1380,17 @@
     if (piece.ownerUserName && normalize(piece.ownerUserName) === normalize(game.user.name)) return true;
     return false;
   }
+  function canUserControlWorldPieceForUser(token, piece = getWorldPiece(token), user = game.user) {
+    if (!user || !token || !piece) return false;
+    if (user.isGM) return true;
+    if (piece.ownerUserId && String(piece.ownerUserId) === String(user.id)) return true;
+    if (piece.ownerUserName && normalize(piece.ownerUserName) === normalize(user.name)) return true;
+
+    const actorOwnership = token.actor?.ownership || {};
+    const level = Number(actorOwnership[user.id] ?? actorOwnership.default ?? 0);
+    return level >= CONST.DOCUMENT_OWNERSHIP_LEVELS.OWNER;
+  }
+
 
   function getTileOwnerUserId(worldTile, house = null) {
     return String(
@@ -1534,6 +1551,249 @@
     return { piece: currentPiece, spentThisMove };
   }
 
+
+  function getActorOwnerNames(actor) {
+    if (!actor) return [];
+    const ownership = actor.ownership || {};
+    const ownerLevel = CONST.DOCUMENT_OWNERSHIP_LEVELS?.OWNER ?? 3;
+    return getPlayerUsers()
+      .filter(user => Number(ownership[user.id] || 0) >= ownerLevel)
+      .map(user => user.name);
+  }
+
+  function getWorldPieceOwnerName(token, piece = getWorldPiece(token)) {
+    if (piece?.ownerUserName) return String(piece.ownerUserName);
+    if (piece?.playerOwnerUserName) return String(piece.playerOwnerUserName);
+    if (piece?.ownerUserId && game.users.get(piece.ownerUserId)) return game.users.get(piece.ownerUserId).name;
+    if (piece?.playerOwnerUserId && game.users.get(piece.playerOwnerUserId)) return game.users.get(piece.playerOwnerUserId).name;
+    const actorOwners = getActorOwnerNames(token?.actor);
+    return actorOwners.length ? actorOwners.join(", ") : "Unassigned";
+  }
+
+  function pointInsideToken(point, token) {
+    if (!point || !token) return false;
+    const gridSize = getGridSize();
+    const x = Number(token.document.x || 0);
+    const y = Number(token.document.y || 0);
+    const width = Number(token.document.width || 1) * gridSize;
+    const height = Number(token.document.height || 1) * gridSize;
+    return point.x >= x && point.y >= y && point.x <= x + width && point.y <= y + height;
+  }
+
+  function findWorldPieceAtPoint(point) {
+    const candidates = canvas.tokens.placeables
+      .filter(token => Boolean(getWorldPiece(token)))
+      .filter(token => token.visible !== false)
+      .filter(token => pointInsideToken(point, token))
+      .sort((a, b) => {
+        const as = Number(a.document.sort || 0);
+        const bs = Number(b.document.sort || 0);
+        if (bs !== as) return bs - as;
+        return String(b.document.id || "").localeCompare(String(a.document.id || ""));
+      });
+    return candidates[0] || null;
+  }
+
+  function getOrCreatePieceTooltip() {
+    let el = document.getElementById(PIECE_TOOLTIP_ID);
+    if (el) return el;
+
+    el = document.createElement("div");
+    el.id = PIECE_TOOLTIP_ID;
+    el.style.position = "fixed";
+    el.style.left = "315px";
+    el.style.bottom = "24px";
+    el.style.width = "360px";
+    el.style.maxHeight = "55vh";
+    el.style.overflowY = "auto";
+    el.style.zIndex = "100001";
+    el.style.padding = "10px 12px";
+    el.style.border = "1px solid rgba(180,145,90,0.85)";
+    el.style.borderRadius = "8px";
+    el.style.background = "rgba(20,20,20,0.94)";
+    el.style.color = "#f0f0f0";
+    el.style.fontSize = "13px";
+    el.style.lineHeight = "1.4";
+    el.style.pointerEvents = "none";
+    el.style.boxShadow = "0 4px 18px rgba(0,0,0,0.45)";
+    el.style.display = "none";
+    document.body.appendChild(el);
+    return el;
+  }
+
+  function hidePieceTooltip() {
+    const el = document.getElementById(PIECE_TOOLTIP_ID);
+    if (el) el.style.display = "none";
+  }
+
+  function renderPieceTooltip(token) {
+    const piece = getWorldPiece(token);
+    if (!piece) { hidePieceTooltip(); return; }
+
+    const currentEntry = findTileAtPoint(getTokenCenter(token)) || getTileById(piece.currentTileId);
+    const currentTileName = currentEntry?.tile?.name || piece.currentTileName || "Unknown";
+    const ownerName = getWorldPieceOwnerName(token, piece);
+    const movementUsed = Number(piece.movementUsed || 0);
+    const movementMax = Number(piece.movementMax || 0);
+    const movementRemaining = Math.max(0, movementMax - movementUsed);
+
+    let extra = "";
+    if (piece.pieceType === "army" && (piece.strengthCurrent !== undefined || piece.strengthMax !== undefined)) {
+      extra += `<strong>Strength:</strong> ${escapeHtml(piece.strengthCurrent ?? "?")} / ${escapeHtml(piece.strengthMax ?? "?")}<br>`;
+    }
+    if (piece.pieceType === "character" && piece.wounds !== undefined) {
+      extra += `<strong>Wounds:</strong> ${escapeHtml(piece.wounds)}<br>`;
+    }
+
+    const el = getOrCreatePieceTooltip();
+    el.innerHTML = `
+      <div>
+        <strong style="font-size:17px;">${escapeHtml(piece.name || token.document.name || "World Piece")}</strong>
+        <div style="margin-top:6px;">
+          <strong>Type:</strong> ${escapeHtml(piece.pieceType || "Unknown")}<br>
+          <strong>Player Owner:</strong> ${escapeHtml(ownerName)}<br>
+          <strong>Faction:</strong> ${escapeHtml(piece.faction || "None")}<br>
+          <strong>Current Tile:</strong> ${escapeHtml(currentTileName)}<br>
+          <strong>Movement:</strong> ${escapeHtml(movementUsed)} / ${escapeHtml(movementMax)} used — ${escapeHtml(movementRemaining)} remaining<br>
+          ${extra}
+        </div>
+      </div>
+    `;
+    el.style.display = "block";
+  }
+
+  function updatePieceTooltip() {
+    if (!isOverviewScene() || !canvas?.ready) return;
+    const mousePoint = getMouseWorldPoint();
+    if (!mousePoint) { hidePieceTooltip(); return; }
+    const token = findWorldPieceAtPoint(mousePoint);
+    const manager = globalThis[PIECE_TOOLTIP_KEY];
+    if (!manager) return;
+    const currentId = token?.document?.id || null;
+    if (manager.lastTokenId === currentId) return;
+    manager.lastTokenId = currentId;
+    if (!token) hidePieceTooltip();
+    else renderPieceTooltip(token);
+  }
+
+  function startPieceTooltip() {
+    stopPieceTooltip(false);
+    globalThis[PIECE_TOOLTIP_KEY] = {
+      version: MODULE_VERSION,
+      interval: setInterval(updatePieceTooltip, 120),
+      lastTokenId: null,
+      startedAt: new Date().toISOString()
+    };
+    updatePieceTooltip();
+    ui.notifications.info("World piece hover tooltip enabled.");
+    renderPanel();
+  }
+
+  function stopPieceTooltip(notify = true) {
+    const manager = globalThis[PIECE_TOOLTIP_KEY];
+    if (manager?.interval) clearInterval(manager.interval);
+    document.getElementById(PIECE_TOOLTIP_ID)?.remove();
+    globalThis[PIECE_TOOLTIP_KEY] = null;
+    if (notify) ui.notifications.info("World piece hover tooltip disabled.");
+    renderPanel();
+  }
+
+  async function togglePieceTooltip() {
+    if (!requireOverviewScene()) return;
+    if (globalThis[PIECE_TOOLTIP_KEY]) stopPieceTooltip(true);
+    else startPieceTooltip();
+  }
+
+  async function applyWorldPieceOwner(token, piece, ownerUser, clearOtherPlayers = true) {
+    const updatedPiece = foundry.utils.deepClone(piece || getWorldPiece(token) || {});
+
+    if (ownerUser) {
+      updatedPiece.ownerUserId = ownerUser.id;
+      updatedPiece.ownerUserName = ownerUser.name;
+      updatedPiece.playerOwnerUserId = ownerUser.id;
+      updatedPiece.playerOwnerUserName = ownerUser.name;
+    } else {
+      delete updatedPiece.ownerUserId;
+      delete updatedPiece.ownerUserName;
+      delete updatedPiece.playerOwnerUserId;
+      delete updatedPiece.playerOwnerUserName;
+    }
+
+    updatedPiece.ownerAssignedAt = new Date().toISOString();
+    updatedPiece.ownerAssignedBy = game.user.name;
+    updatedPiece.ownerAssignedSource = `Crown Overview Tools ${MODULE_VERSION}`;
+
+    await saveWorldPiece(token, updatedPiece);
+
+    if (token.actor) {
+      const ownership = foundry.utils.deepClone(token.actor.ownership || {});
+      if (clearOtherPlayers) {
+        for (const user of getPlayerUsers()) {
+          ownership[user.id] = CONST.DOCUMENT_OWNERSHIP_LEVELS.NONE;
+        }
+      }
+      if (ownerUser) ownership[ownerUser.id] = CONST.DOCUMENT_OWNERSHIP_LEVELS.OWNER;
+      await token.actor.update({ ownership });
+    }
+
+    return updatedPiece;
+  }
+
+  async function assignPieceOwner() {
+    if (!requireOverviewScene()) return;
+    if (!game.user.isGM) { ui.notifications.warn("Only the GM can assign world piece owners."); return; }
+
+    const selected = canvas.tokens.controlled.filter(token => Boolean(getWorldPiece(token)));
+    if (!selected.length) { ui.notifications.warn("Select one or more World Piece tokens first."); return; }
+
+    const users = getPlayerUsers();
+    const firstPiece = getWorldPiece(selected[0]);
+    const currentOwnerId = firstPiece?.ownerUserId || firstPiece?.playerOwnerUserId || "";
+    const userOptions = [
+      `<option value="" ${!currentOwnerId ? "selected" : ""}>Unassigned / clear owner</option>`,
+      ...users.map(user => `<option value="${escapeHtml(user.id)}" ${String(user.id) === String(currentOwnerId) ? "selected" : ""}>${escapeHtml(user.name)}</option>`)
+    ].join("");
+
+    const result = await new Promise(resolve => {
+      new Dialog({
+        title: "Assign Piece Owner",
+        content: `<form>
+          <p>Assign selected world piece token(s) to a Foundry player.</p>
+          <div class="form-group"><label>Player Owner / Controller</label><select name="ownerUserId" style="width:100%;">${userOptions}</select></div>
+          <div class="form-group"><label><input type="checkbox" name="clearOthers" checked /> Remove other non-GM ownership</label></div>
+        </form>`,
+        buttons: {
+          save: { label: "Assign", callback: html => {
+            const form = html[0].querySelector("form");
+            resolve({ ownerUserId: String(form.ownerUserId.value || ""), clearOthers: form.clearOthers.checked });
+          }},
+          cancel: { label: "Cancel", callback: () => resolve(null) }
+        },
+        default: "save"
+      }, { width: 540, height: 310, resizable: true }).render(true);
+    });
+
+    if (!result) return;
+
+    const ownerUser = result.ownerUserId ? game.users.get(result.ownerUserId) : null;
+    let updated = 0;
+    const rows = [];
+
+    for (const token of selected) {
+      const piece = getWorldPiece(token);
+      const updatedPiece = await applyWorldPieceOwner(token, piece, ownerUser, result.clearOthers);
+      rows.push(`<li><strong>${escapeHtml(updatedPiece.name || token.document.name)}</strong> → ${escapeHtml(ownerUser?.name || "Unassigned")}</li>`);
+      updated++;
+    }
+
+    await ChatMessage.create({
+      speaker: ChatMessage.getSpeaker({ alias: "Crown Piece Owner" }),
+      content: `<h2>World Piece Owner Assigned</h2><p><strong>Player Owner:</strong> ${escapeHtml(ownerUser?.name || "Unassigned")}</p><p><strong>Pieces Updated:</strong> ${escapeHtml(updated)}</p><ul>${rows.join("")}</ul>`
+    });
+
+    ui.notifications.info(`Assigned owner for ${updated} world piece(s): ${ownerUser?.name || "Unassigned"}.`);
+  }
+
   async function createWorldPiece() {
     if (!requireOverviewScene()) return;
     const selected = canvas.drawings.controlled;
@@ -1542,6 +1802,11 @@
     const worldTile = getWorldTile(drawing);
     if (!worldTile) { ui.notifications.warn("The selected drawing has not been assigned as a World Tile."); return; }
     const tileType = getTileType(worldTile);
+
+    const playerOwnerOptions = [
+      `<option value="">Unassigned / GM only</option>`,
+      ...getPlayerUsers().map(user => `<option value="${escapeHtml(user.id)}">${escapeHtml(user.name)}</option>`)
+    ].join("");
 
     const details = await new Promise(resolve => {
       new Dialog({
@@ -1557,6 +1822,7 @@
           <div class="form-group"><label>Piece Type</label><select name="pieceType" style="width:100%;"><option value="character">Character</option><option value="army" selected>Army</option><option value="fleet">Fleet</option><option value="dragon">Dragon / Flying Unit</option></select></div>
           <div class="form-group"><label>Movement Points Per Turn</label><input type="number" name="movementMax" value="3" min="0" step="1" style="width:100%;" /></div>
           <div class="form-group"><label>Faction / Owner</label><input type="text" name="faction" placeholder="Stark, Lannister, Neutral..." style="width:100%;" /></div>
+          <div class="form-group"><label>Player Owner / Controller</label><select name="ownerUserId" style="width:100%;">${playerOwnerOptions}</select><p class="notes">This controls which player can select and move the piece.</p></div>
           <div class="form-group"><label>Token Image Path</label><input type="text" name="imagePath" placeholder="Leave blank for default icon" style="width:100%;" /></div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
             <div class="form-group"><label>Token Width</label><input type="number" name="tokenWidth" value="1" min="0.25" step="0.25" style="width:100%;" /></div>
@@ -1571,6 +1837,7 @@
               pieceType: normalize(form.pieceType.value || "army"),
               movementMax: Math.max(0, Number(form.movementMax.value || 3)),
               faction: String(form.faction.value || "").trim(),
+              ownerUserId: String(form.ownerUserId.value || ""),
               imagePath: String(form.imagePath.value || "").trim(),
               width: Math.max(0.25, Number(form.tokenWidth.value || 1)),
               height: Math.max(0.25, Number(form.tokenHeight.value || 1))
@@ -1579,7 +1846,7 @@
           cancel: { label: "Cancel", callback: () => resolve(null) }
         },
         default: "create"
-      }, { width: 600, height: 680, resizable: true }).render(true);
+      }, { width: 600, height: 740, resizable: true }).render(true);
     });
     if (!details) return;
     if (!details.name) { ui.notifications.warn("Give the World Piece a name."); return; }
@@ -1591,6 +1858,7 @@
     const image = details.imagePath || DEFAULT_IMAGES[details.pieceType] || "icons/svg/mystery-man.svg";
     const folder = await getOrCreateWorldMapFolder();
     const actorType = getSafeActorType();
+    const ownerUser = details.ownerUserId ? game.users.get(details.ownerUserId) : null;
     const pieceData = {
       name: details.name,
       pieceType: details.pieceType,
@@ -1602,6 +1870,10 @@
       currentTileName: worldTile.name || "Unnamed Tile",
       previousTileId: null,
       previousTileName: null,
+      ownerUserId: ownerUser?.id || "",
+      ownerUserName: ownerUser?.name || "",
+      playerOwnerUserId: ownerUser?.id || "",
+      playerOwnerUserName: ownerUser?.name || "",
       version: `Crown Overview Tools ${MODULE_VERSION}`,
       assignedAt: new Date().toISOString(),
       assignedBy: game.user.name,
@@ -1627,6 +1899,15 @@
       }
     });
 
+    if (ownerUser) {
+      const ownership = foundry.utils.deepClone(actor.ownership || {});
+      for (const user of getPlayerUsers()) {
+        ownership[user.id] = CONST.DOCUMENT_OWNERSHIP_LEVELS.NONE;
+      }
+      ownership[ownerUser.id] = CONST.DOCUMENT_OWNERSHIP_LEVELS.OWNER;
+      await actor.update({ ownership });
+    }
+
     const center = getDrawingCenter(drawing);
     const gridSize = getGridSize();
     const tokenData = actor.prototypeToken.toObject();
@@ -1646,8 +1927,8 @@
     tokenData.flags[FLAG_SCOPE] = tokenData.flags[FLAG_SCOPE] || {};
     tokenData.flags[FLAG_SCOPE][WORLD_PIECE_KEY] = foundry.utils.deepClone(pieceData);
     await canvas.scene.createEmbeddedDocuments("Token", [tokenData]);
-    ui.notifications.info(`Created ${details.name} (${details.pieceType}) in ${worldTile.name || "selected World Tile"}.`);
-    await ChatMessage.create({ speaker: ChatMessage.getSpeaker({ alias: "World Piece" }), content: `<h2>World Piece Created</h2><p><strong>Name:</strong> ${escapeHtml(details.name)}</p><p><strong>Type:</strong> ${escapeHtml(details.pieceType)}</p><p><strong>Faction:</strong> ${escapeHtml(details.faction || "None")}</p><p><strong>Spawned At:</strong> ${escapeHtml(worldTile.name || "Unnamed Tile")}</p><p><strong>Movement:</strong> 0 / ${escapeHtml(details.movementMax)} used</p>` });
+    ui.notifications.info(`Created ${details.name} (${details.pieceType}) in ${worldTile.name || "selected World Tile"}${ownerUser ? " for " + ownerUser.name : ""}.`);
+    await ChatMessage.create({ speaker: ChatMessage.getSpeaker({ alias: "World Piece" }), content: `<h2>World Piece Created</h2><p><strong>Name:</strong> ${escapeHtml(details.name)}</p><p><strong>Type:</strong> ${escapeHtml(details.pieceType)}</p><p><strong>Faction:</strong> ${escapeHtml(details.faction || "None")}</p><p><strong>Player Owner:</strong> ${escapeHtml(ownerUser?.name || "Unassigned")}</p><p><strong>Spawned At:</strong> ${escapeHtml(worldTile.name || "Unnamed Tile")}</p><p><strong>Movement:</strong> 0 / ${escapeHtml(details.movementMax)} used</p>` });
   }
 
   async function resetMovement() {
@@ -2155,6 +2436,318 @@
       .join("");
   }
 
+  function canUserBuildOnTileForUser(worldTile, house = null, user = game.user) {
+    if (!user) return false;
+    if (user.isGM) return true;
+
+    const ownerUserId = getTileOwnerUserId(worldTile, house);
+    if (ownerUserId) return String(ownerUserId) === String(user.id);
+
+    const ownerUserName = getTileOwnerUserName(worldTile, house);
+    if (ownerUserName) return normalize(ownerUserName) === normalize(user.name);
+
+    return false;
+  }
+
+  function findActiveGmForScene(sceneId = canvas.scene?.id) {
+    const activeGms = game.users.contents.filter(user => user.isGM && user.active);
+    if (!activeGms.length) return null;
+
+    return activeGms.find(user => String(user.viewedScene || "") === String(sceneId || "")) || activeGms[0];
+  }
+
+  async function requestGmBuild({ token, entry, building }) {
+    const gm = findActiveGmForScene(canvas.scene?.id);
+
+    if (!gm) {
+      ui.notifications.error("No active GM is online to process this build request.");
+      return false;
+    }
+
+    const payload = {
+      type: "buildRequest",
+      targetGmId: gm.id,
+      sceneId: canvas.scene?.id,
+      sceneName: canvas.scene?.name,
+      requesterUserId: game.user.id,
+      requesterUserName: game.user.name,
+      tokenId: token.document.id,
+      tokenName: token.document.name,
+      drawingId: entry.drawing.document.id,
+      tileId: entry.tile.id || entry.drawing.document.id,
+      tileName: entry.tile.name || "Unnamed Tile",
+      building
+    };
+
+    game.socket.emit(SOCKET_NAME, payload);
+    ui.notifications.info(`Build request sent to GM ${gm.name} for ${entry.tile.name || "selected tile"}.`);
+    return true;
+  }
+
+  async function applyBuildToTile({ token, piece, entry, building, builderUserId, builderUserName }) {
+    const builderUser = game.users.get(builderUserId) || null;
+    const builderIsGm = Boolean(builderUser?.isGM);
+    const worldTile = entry.tile;
+    const drawing = entry.drawing;
+    const doc = drawing.document;
+    const clock = getClock();
+    const roundKey = getRoundKey(clock);
+
+    if (!roundKey) throw new Error("World Round Clock is not initialized.");
+    if (isSeaByTile(worldTile)) throw new Error("Sea tiles cannot build settlements/buildings.");
+    if (!canUserControlWorldPieceForUser(token, piece, builderUser || { id: builderUserId, name: builderUserName, isGM: false })) throw new Error(`${builderUserName} does not control ${piece.name || token.document.name}.`);
+
+    const house = foundry.utils.deepClone(doc.getFlag(FLAG_SCOPE, HOUSE_KEY) ?? {});
+
+    if (!canUserBuildOnTileForUser(worldTile, house, builderUser || { id: builderUserId, name: builderUserName, isGM: false })) {
+      throw new Error(getBuildBlockedReason(worldTile, house));
+    }
+
+    const existingBuildings = Array.isArray(house.builtBuildings) ? [...house.builtBuildings] : [];
+
+    if (existingBuildings.length >= 4) throw new Error(`${worldTile.name || "This tile"} already has the maximum of 4 buildings.`);
+    if (existingBuildings.includes(building)) throw new Error(`${building} already exists in ${worldTile.name || "this tile"}.`);
+
+    const ledger = foundry.utils.deepClone(getBuildLedger());
+    const existingBuildThisRound = getAlreadyBuiltForRound(ledger, roundKey, builderUserId);
+
+    if (!builderIsGm && existingBuildThisRound) {
+      throw new Error(`${builderUserName} has already built this turn: ${existingBuildThisRound.building} at ${existingBuildThisRound.tileName}.`);
+    }
+
+    if (!builderIsGm && piece.lastBuildRoundKey === roundKey) {
+      throw new Error(`${piece.name || token.document.name} has already built this turn.`);
+    }
+
+    const updatedBuildings = [...existingBuildings, building].slice(0, 4);
+    const developmentLevel = updatedBuildings.length;
+    const developmentLabel = DEVELOPMENT_LEVELS[developmentLevel]?.label || "City";
+    const oldPopulation = house.population;
+    const population = randomPopulation(developmentLevel);
+    const now = new Date().toISOString();
+    const dateLabel = getDateLabel(clock);
+
+    const updatedHouse = {
+      ...house,
+      house: house.house || worldTile.owner || "Neutral",
+      lord: house.lord || "",
+      region: house.region || worldTile.region || "",
+      culture: house.culture || "",
+      developmentLevel,
+      developmentLabel,
+      population,
+      builtBuildings: updatedBuildings,
+      worldTileId: doc.id,
+      worldTileName: worldTile.name || "Unnamed Tile",
+      lastBuiltBuilding: building,
+      lastBuiltRoundKey: roundKey,
+      lastBuiltDateLabel: dateLabel,
+      lastBuiltByUserId: builderUserId,
+      lastBuiltByUserName: builderUserName,
+      lastBuiltByPieceId: token.document.id,
+      lastBuiltByPieceName: piece.name || token.document.name,
+      lastBuiltAt: now,
+      buildLog: [
+        ...(Array.isArray(house.buildLog) ? house.buildLog : []),
+        {
+          building,
+          roundKey,
+          dateLabel,
+          userId: builderUserId,
+          userName: builderUserName,
+          pieceId: token.document.id,
+          pieceName: piece.name || token.document.name,
+          builtAt: now
+        }
+      ],
+      version: `Crown Overview Tools ${MODULE_VERSION}`,
+      updatedAt: now,
+      updatedBy: game.user.name
+    };
+
+    await doc.setFlag(FLAG_SCOPE, HOUSE_KEY, updatedHouse);
+
+    const updatedPiece = foundry.utils.deepClone(piece);
+    updatedPiece.lastBuildRoundKey = roundKey;
+    updatedPiece.lastBuiltBuilding = building;
+    updatedPiece.lastBuiltTileId = worldTile.id || doc.id;
+    updatedPiece.lastBuiltTileName = worldTile.name || "Unnamed Tile";
+    updatedPiece.lastBuiltAt = now;
+    updatedPiece.lastBuiltBy = builderUserName;
+    await saveWorldPiece(token, updatedPiece);
+
+    ledger[roundKey] = ledger[roundKey] || { dateLabel, users: {}, builds: [] };
+    ledger[roundKey].dateLabel = dateLabel;
+    ledger[roundKey].users = ledger[roundKey].users || {};
+    ledger[roundKey].builds = Array.isArray(ledger[roundKey].builds) ? ledger[roundKey].builds : [];
+    ledger[roundKey].users[builderUserId] = {
+      userName: builderUserName,
+      building,
+      tileId: worldTile.id || doc.id,
+      tileName: worldTile.name || "Unnamed Tile",
+      pieceId: token.document.id,
+      pieceName: piece.name || token.document.name,
+      builtAt: now
+    };
+    ledger[roundKey].builds.push(ledger[roundKey].users[builderUserId]);
+    await saveBuildLedger(ledger);
+
+    await ChatMessage.create({
+      speaker: ChatMessage.getSpeaker({ alias: "Crown Build" }),
+      content: `<h2>Building Constructed</h2>
+        <p><strong>Player:</strong> ${escapeHtml(builderUserName)}</p>
+        <p><strong>Piece:</strong> ${escapeHtml(piece.name || token.document.name)}</p>
+        <p><strong>Tile:</strong> ${escapeHtml(worldTile.name || "Unnamed Tile")}</p>
+        <p><strong>Tile Owner:</strong> ${escapeHtml(getTileOwnerUserName(worldTile, updatedHouse) || "Unassigned")}</p>
+        <p><strong>Building:</strong> ${escapeHtml(building)}</p>
+        <p><strong>Development:</strong> ${escapeHtml(developmentLabel)} (${escapeHtml(developmentLevel)} / 4)</p>
+        <p><strong>Population:</strong> ${escapeHtml(Number(population).toLocaleString())}${oldPopulation !== undefined && oldPopulation !== "" ? ` <span style="opacity:0.75;">previously ${escapeHtml(oldPopulation)}</span>` : ""}</p>
+        <p><strong>Date:</strong> ${escapeHtml(dateLabel)}</p>`
+    });
+
+    ui.notifications.info(`${building} built in ${worldTile.name || "selected tile"}.`);
+    return true;
+  }
+
+  async function handleBuildRequest(message) {
+    if (!game.user.isGM) return;
+    if (message.targetGmId && String(message.targetGmId) !== String(game.user.id)) return;
+
+    if (String(message.sceneId || "") !== String(canvas.scene?.id || "")) {
+      ui.notifications.warn(`Build request from ${message.requesterUserName || "player"} ignored: GM is not on ${message.sceneName || "the requested scene"}.`);
+      return;
+    }
+
+    try {
+      const token = canvas.tokens.get(message.tokenId) || canvas.tokens.placeables.find(t => t.document.id === message.tokenId);
+      if (!token) throw new Error(`Could not find world piece token ${message.tokenName || message.tokenId}.`);
+
+      const piece = getWorldPiece(token);
+      if (!piece) throw new Error(`${token.document.name} is not a world piece.`);
+
+      const entry = canvas.drawings.placeables
+        .map(drawing => ({ drawing, tile: getWorldTile(drawing) }))
+        .find(candidate => candidate.drawing.document.id === message.drawingId || candidate.tile?.id === message.tileId);
+
+      if (!entry?.tile) throw new Error(`Could not find target tile ${message.tileName || message.tileId}.`);
+
+      ui.notifications.info(`Processing build request from ${message.requesterUserName}: ${message.building} at ${entry.tile.name || "selected tile"}.`);
+
+      await applyBuildToTile({
+        token,
+        piece,
+        entry,
+        building: message.building,
+        builderUserId: message.requesterUserId,
+        builderUserName: message.requesterUserName || "Player"
+      });
+    } catch (err) {
+      console.error("Crown Overview build request failed:", err, message);
+      ui.notifications.error(`Build request from ${message.requesterUserName || "player"} failed: ${err.message || err}`);
+      await ChatMessage.create({
+        speaker: ChatMessage.getSpeaker({ alias: "Crown Build" }),
+        content: `<h2>Build Request Failed</h2><p><strong>Player:</strong> ${escapeHtml(message.requesterUserName || "Unknown")}</p><p><strong>Reason:</strong> ${escapeHtml(err.message || err)}</p>`
+      });
+    }
+  }
+
+  function registerSocketHandlers() {
+    if (!game.socket) return;
+    game.socket.on(SOCKET_NAME, async message => {
+      if (!message || message.type !== "buildRequest") return;
+      await handleBuildRequest(message);
+    });
+  }
+
+  async function resetBuildCapacity() {
+    if (!requireOverviewScene()) return;
+
+    if (!game.user.isGM) {
+      ui.notifications.warn("Only the GM can reset build uses.");
+      return;
+    }
+
+    const clock = getClock();
+    const roundKey = getRoundKey(clock);
+    const currentLabel = clock ? getDateLabel(clock) : "Current Round";
+
+    const result = await new Promise(resolve => {
+      new Dialog({
+        title: "Reset Build Uses",
+        content: `<form>
+          <p>Clear the one-build-per-round tracking. This does not remove buildings from tiles.</p>
+          <div class="form-group">
+            <label>Reset Scope</label>
+            <select name="scope" style="width:100%;">
+              <option value="current" selected>Current round only — ${escapeHtml(currentLabel)}</option>
+              <option value="all">All rounds / full build ledger</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label><input type="checkbox" name="clearPieceFlags" checked> Also clear matching world piece build locks</label>
+          </div>
+        </form>`,
+        buttons: {
+          reset: {
+            label: "Reset Build Uses",
+            callback: html => {
+              const form = html[0].querySelector("form");
+              resolve({ scope: String(form.scope.value || "current"), clearPieceFlags: form.clearPieceFlags.checked });
+            }
+          },
+          cancel: { label: "Cancel", callback: () => resolve(null) }
+        },
+        default: "reset"
+      }, { width: 520, height: 300, resizable: true }).render(true);
+    });
+
+    if (!result) return;
+
+    const ledger = foundry.utils.deepClone(getBuildLedger());
+    let ledgerCleared = 0;
+
+    if (result.scope === "all") {
+      ledgerCleared = Object.keys(ledger || {}).length;
+      await saveBuildLedger({});
+    } else {
+      if (!roundKey) {
+        ui.notifications.warn("The World Round Clock is not initialized, so there is no current round to reset.");
+        return;
+      }
+      if (ledger?.[roundKey]) ledgerCleared = 1;
+      delete ledger[roundKey];
+      await saveBuildLedger(ledger);
+    }
+
+    let piecesCleared = 0;
+    if (result.clearPieceFlags) {
+      for (const token of canvas.tokens.placeables) {
+        const piece = getWorldPiece(token);
+        if (!piece) continue;
+
+        if (result.scope !== "all" && piece.lastBuildRoundKey !== roundKey) continue;
+
+        const updatedPiece = foundry.utils.deepClone(piece);
+        delete updatedPiece.lastBuildRoundKey;
+        delete updatedPiece.lastBuiltBuilding;
+        delete updatedPiece.lastBuiltTileId;
+        delete updatedPiece.lastBuiltTileName;
+        updatedPiece.lastBuildResetAt = new Date().toISOString();
+        updatedPiece.lastBuildResetBy = game.user.name;
+        updatedPiece.lastBuildResetSource = `Crown Overview Tools ${MODULE_VERSION}`;
+        await saveWorldPiece(token, updatedPiece);
+        piecesCleared++;
+      }
+    }
+
+    await ChatMessage.create({
+      speaker: ChatMessage.getSpeaker({ alias: "Crown Build" }),
+      content: `<h2>Build Uses Reset</h2><p><strong>Scope:</strong> ${escapeHtml(result.scope === "all" ? "All rounds" : currentLabel)}</p><p><strong>Ledger entries cleared:</strong> ${escapeHtml(ledgerCleared)}</p><p><strong>World pieces unlocked:</strong> ${escapeHtml(piecesCleared)}</p>`
+    });
+
+    ui.notifications.info(`Build uses reset. World pieces unlocked: ${piecesCleared}.`);
+  }
+
   async function buildOnCurrentTile() {
     if (!requireOverviewScene()) return;
 
@@ -2288,92 +2881,19 @@
       return;
     }
 
-    const updatedBuildings = [...existingBuildings, details.building].slice(0, 4);
-    const developmentLevel = updatedBuildings.length;
-    const developmentLabel = DEVELOPMENT_LEVELS[developmentLevel]?.label || "City";
-    const oldPopulation = house.population;
-    const population = randomPopulation(developmentLevel);
-    const now = new Date().toISOString();
+    if (!game.user.isGM) {
+      await requestGmBuild({ token, entry, building: details.building });
+      return;
+    }
 
-    const updatedHouse = {
-      ...house,
-      house: house.house || worldTile.owner || "Neutral",
-      lord: house.lord || "",
-      region: house.region || worldTile.region || "",
-      culture: house.culture || "",
-      developmentLevel,
-      developmentLabel,
-      population,
-      builtBuildings: updatedBuildings,
-      worldTileId: doc.id,
-      worldTileName: worldTile.name || "Unnamed Tile",
-      lastBuiltBuilding: details.building,
-      lastBuiltRoundKey: roundKey,
-      lastBuiltDateLabel: dateLabel,
-      lastBuiltByUserId: game.user.id,
-      lastBuiltByUserName: game.user.name,
-      lastBuiltByPieceId: token.document.id,
-      lastBuiltByPieceName: piece.name || token.document.name,
-      lastBuiltAt: now,
-      buildLog: [
-        ...(Array.isArray(house.buildLog) ? house.buildLog : []),
-        {
-          building: details.building,
-          roundKey,
-          dateLabel,
-          userId: game.user.id,
-          userName: game.user.name,
-          pieceId: token.document.id,
-          pieceName: piece.name || token.document.name,
-          builtAt: now
-        }
-      ],
-      version: `Crown Overview Tools ${MODULE_VERSION}`,
-      updatedAt: now,
-      updatedBy: game.user.name
-    };
-
-    await doc.setFlag(FLAG_SCOPE, HOUSE_KEY, updatedHouse);
-
-    const updatedPiece = foundry.utils.deepClone(piece);
-    updatedPiece.lastBuildRoundKey = roundKey;
-    updatedPiece.lastBuiltBuilding = details.building;
-    updatedPiece.lastBuiltTileId = worldTile.id || doc.id;
-    updatedPiece.lastBuiltTileName = worldTile.name || "Unnamed Tile";
-    updatedPiece.lastBuiltAt = now;
-    updatedPiece.lastBuiltBy = game.user.name;
-    await saveWorldPiece(token, updatedPiece);
-
-    ledger[roundKey] = ledger[roundKey] || { dateLabel, users: {}, builds: [] };
-    ledger[roundKey].dateLabel = dateLabel;
-    ledger[roundKey].users = ledger[roundKey].users || {};
-    ledger[roundKey].builds = Array.isArray(ledger[roundKey].builds) ? ledger[roundKey].builds : [];
-    ledger[roundKey].users[game.user.id] = {
-      userName: game.user.name,
+    await applyBuildToTile({
+      token,
+      piece,
+      entry,
       building: details.building,
-      tileId: worldTile.id || doc.id,
-      tileName: worldTile.name || "Unnamed Tile",
-      pieceId: token.document.id,
-      pieceName: piece.name || token.document.name,
-      builtAt: now
-    };
-    ledger[roundKey].builds.push(ledger[roundKey].users[game.user.id]);
-    await saveBuildLedger(ledger);
-
-    await ChatMessage.create({
-      speaker: ChatMessage.getSpeaker({ alias: "Crown Build" }),
-      content: `<h2>Building Constructed</h2>
-        <p><strong>Player:</strong> ${escapeHtml(game.user.name)}</p>
-        <p><strong>Piece:</strong> ${escapeHtml(piece.name || token.document.name)}</p>
-        <p><strong>Tile:</strong> ${escapeHtml(worldTile.name || "Unnamed Tile")}</p>
-        <p><strong>Tile Owner:</strong> ${escapeHtml(getTileOwnerUserName(worldTile, updatedHouse) || "Unassigned")}</p>
-        <p><strong>Building:</strong> ${escapeHtml(details.building)}</p>
-        <p><strong>Development:</strong> ${escapeHtml(developmentLabel)} (${escapeHtml(developmentLevel)} / 4)</p>
-        <p><strong>Population:</strong> ${escapeHtml(Number(population).toLocaleString())}${oldPopulation !== undefined && oldPopulation !== "" ? ` <span style="opacity:0.75;">previously ${escapeHtml(oldPopulation)}</span>` : ""}</p>
-        <p><strong>Date:</strong> ${escapeHtml(dateLabel)}</p>`
+      builderUserId: game.user.id,
+      builderUserName: game.user.name
     });
-
-    ui.notifications.info(`${details.building} built in ${worldTile.name || "selected tile"}.`);
   }
 
   async function assignTileOwner() {
@@ -2757,6 +3277,7 @@
     removePanel();
     stopHover();
     stopRouteTooltip(false);
+    stopPieceTooltip(false);
     stopClickMove(false);
     clearLinkOverlay();
     stopVisibility();
@@ -2776,9 +3297,11 @@
     pathMove,
     toggleClickMove,
     toggleRouteTooltip,
+    togglePieceTooltip,
     portCrossing,
     buildOnCurrentTile,
     resetMovement,
+    resetBuildCapacity,
     roundClock,
     createPiece: createWorldPiece,
     linkTiles,
@@ -2786,6 +3309,7 @@
     viewLinks,
     togglePort,
     assignTileOwner,
+    assignPieceOwner,
     assignHouse,
     exportRealm,
     importRealm,
@@ -2809,6 +3333,7 @@
 
   Hooks.once("ready", () => {
     globalThis.CROWN_OVERVIEW_TOOLS = API;
+    registerSocketHandlers();
     if (game.settings.get(MODULE_ID, "autoStart")) refreshSceneFeatures();
   });
 

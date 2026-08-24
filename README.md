@@ -1,4 +1,4 @@
-# Crown Overview Tools v0.1.6
+# Crown Overview Tools v0.1.8
 
 Scene-gated strategic overview map tools for the Crown of Ashes campaign map.
 
@@ -20,6 +20,7 @@ It stays quiet on normal battle scenes.
 - World path movement
 - Click-to-move movement with confirmation
 - Route tooltip comparing land, sea/port, and default routes
+- World piece hover tooltip
 - Port crossing
 - Automatic spacing when multiple pieces occupy the same tile
 - Tile linking and unlinking
@@ -27,21 +28,20 @@ It stays quiet on normal battle scenes.
 - Port editor
 - House data editor
 - CSV export/import
-- Hover highlight and tooltip
+- Hover highlight and tile tooltip
 - World map visibility tools
 - Safe original tile text hiding
 - Build button for player construction
 - Assign Tile Owner button for GM player ownership
+- Assign Piece Owner button for GM piece/token ownership
 
-## New in v0.1.6
+## New in v0.1.8
 
-- Adds GM-only Assign Tile Owner button.
-- GM can select one or more world tiles and assign them to a Foundry player from a dropdown.
-- Assigned player ownership is stored on both the World Tile and House Data flags.
-- Hover tooltip shows Player Owner when assigned.
-- Build now checks that non-GM players are building on a tile assigned to their Foundry user.
-- GM can still build anywhere for setup and correction.
-- Assign House Data preserves existing tile owner metadata.
+- Player Build requests now route through the active GM client by module socket.
+- This fixes Trusted Player permission errors when building updates House Data on a Drawing.
+- Adds GM-only Reset Build Uses button.
+- Reset Build Uses can clear the current round build ledger or all build ledger data.
+- Reset Build Uses can also clear the world-piece build lock, useful after admin testing or manually deleting buildings.
 
 ## Player build rules
 
@@ -53,5 +53,7 @@ Players can build only if:
 - The tile is not a sea tile.
 - The tile has fewer than four buildings.
 - They have not already built this world round.
+
+Player builds are submitted to the active GM client for the actual Drawing/House Data update. The GM must be logged in and on the same Crown overview scene.
 
 GMs are not limited by tile ownership or one-build-per-round, but the four-building cap and no-sea-building rule remain in place.

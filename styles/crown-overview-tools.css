@@ -74,7 +74,8 @@
 }
 
 #world-tile-hover-tooltip,
-#coa-route-tooltip {
+#coa-route-tooltip,
+#coa-world-piece-tooltip {
   font-family: var(--font-primary, sans-serif);
 }
 
