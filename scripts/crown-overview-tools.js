@@ -1,6 +1,6 @@
 (() => {
   const MODULE_ID = "crown-overview-tools";
-  const MODULE_VERSION = "0.1.5";
+  const MODULE_VERSION = "0.1.6";
   const FLAG_SCOPE = "world";
   const WORLD_TILE_KEY = "worldTile";
   const WORLD_PIECE_KEY = "worldPiece";
@@ -698,6 +698,7 @@
         <button data-coa-action="unlinkTiles">Unlink Selected Tiles</button>
         <button data-coa-action="viewLinks">View Tile Links</button>
         <button data-coa-action="togglePort">Make / Edit Port</button>
+        <button data-coa-action="assignTileOwner">Assign Tile Owner</button>
         <button data-coa-action="assignHouse">Assign House Data</button>
         <button data-coa-action="importRealm">Import CSV</button>
         <button data-coa-action="exportRealm">Export CSV</button>
@@ -798,13 +799,14 @@
     const isSea = isSeaByTile(tile);
     const adjacentNames = Array.isArray(tile.adjacentTileNames) ? tile.adjacentTileNames.join(", ") : "";
     const buildings = !isSea && house && Array.isArray(house.builtBuildings) ? house.builtBuildings.join(", ") : "";
+    const tileOwnerName = getTileOwnerUserName(tile, house);
 
     let html = `<div><strong style="font-size:17px;">${escapeHtml(tile.name || "Unnamed Tile")}</strong>
       <div style="margin-top:6px;">
         <strong>Region:</strong> ${escapeHtml(tile.region || "None")}<br>
         <strong>Type:</strong> ${escapeHtml(tile.tileType || "land")}<br>
         <strong>Terrain:</strong> ${escapeHtml(tile.terrainLabel || tile.terrainKey || "None")}<br>
-        <strong>Move Cost:</strong> ${escapeHtml(tile.movementCost ?? 1)}
+        <strong>Move Cost:</strong> ${escapeHtml(tile.movementCost ?? 1)}${tileOwnerName ? `<br><strong>Player Owner:</strong> ${escapeHtml(tileOwnerName)}` : ""}
       </div>`;
 
     if (house) {
@@ -1371,6 +1373,50 @@
     if (piece.ownerUserId && String(piece.ownerUserId) === String(game.user.id)) return true;
     if (piece.ownerUserName && normalize(piece.ownerUserName) === normalize(game.user.name)) return true;
     return false;
+  }
+
+  function getTileOwnerUserId(worldTile, house = null) {
+    return String(
+      house?.ownerUserId ||
+      house?.playerOwnerUserId ||
+      worldTile?.ownerUserId ||
+      worldTile?.playerOwnerUserId ||
+      ""
+    ).trim();
+  }
+
+  function getTileOwnerUserName(worldTile, house = null) {
+    return String(
+      house?.ownerUserName ||
+      house?.playerOwnerUserName ||
+      worldTile?.ownerUserName ||
+      worldTile?.playerOwnerUserName ||
+      ""
+    ).trim();
+  }
+
+  function canUserBuildOnTile(worldTile, house = null) {
+    if (game.user.isGM) return true;
+
+    const ownerUserId = getTileOwnerUserId(worldTile, house);
+    if (ownerUserId) return String(ownerUserId) === String(game.user.id);
+
+    const ownerUserName = getTileOwnerUserName(worldTile, house);
+    if (ownerUserName) return normalize(ownerUserName) === normalize(game.user.name);
+
+    return false;
+  }
+
+  function getBuildBlockedReason(worldTile, house = null) {
+    const ownerName = getTileOwnerUserName(worldTile, house);
+    if (ownerName) return `${worldTile?.name || "This tile"} is assigned to ${ownerName}. You are ${game.user.name}.`;
+    return `${worldTile?.name || "This tile"} is not assigned to any player yet. Ask the GM to use Assign Tile Owner.`;
+  }
+
+  function getPlayerUsers() {
+    return game.users.contents
+      .filter(user => !user.isGM)
+      .sort((a, b) => a.name.localeCompare(b.name));
   }
 
   function getOccupantsForTile(tile, movingToken = null) {
@@ -2155,6 +2201,12 @@
     }
 
     const house = foundry.utils.deepClone(doc.getFlag(FLAG_SCOPE, HOUSE_KEY) ?? {});
+
+    if (!canUserBuildOnTile(worldTile, house)) {
+      ui.notifications.warn(getBuildBlockedReason(worldTile, house));
+      return;
+    }
+
     const existingBuildings = Array.isArray(house.builtBuildings) ? [...house.builtBuildings] : [];
 
     if (existingBuildings.length >= 4) {
@@ -2195,6 +2247,7 @@
             <strong>Piece:</strong> ${escapeHtml(piece.name || token.document.name)}<br>
             <strong>Tile:</strong> ${escapeHtml(worldTile.name || "Unnamed Tile")}<br>
             <strong>Region:</strong> ${escapeHtml(worldTile.region || house.region || "None")}<br>
+            <strong>Player Owner:</strong> ${escapeHtml(getTileOwnerUserName(worldTile, house) || (game.user.isGM ? "GM Override" : "Unassigned"))}<br>
             <strong>Date:</strong> ${escapeHtml(dateLabel)}<br>
             <strong>Buildings:</strong> ${escapeHtml(existingBuildings.length)} / 4<br>
             <strong>Development:</strong> ${escapeHtml(currentDevelopment)} → ${escapeHtml(nextDevelopment)}
@@ -2313,6 +2366,7 @@
         <p><strong>Player:</strong> ${escapeHtml(game.user.name)}</p>
         <p><strong>Piece:</strong> ${escapeHtml(piece.name || token.document.name)}</p>
         <p><strong>Tile:</strong> ${escapeHtml(worldTile.name || "Unnamed Tile")}</p>
+        <p><strong>Tile Owner:</strong> ${escapeHtml(getTileOwnerUserName(worldTile, updatedHouse) || "Unassigned")}</p>
         <p><strong>Building:</strong> ${escapeHtml(details.building)}</p>
         <p><strong>Development:</strong> ${escapeHtml(developmentLabel)} (${escapeHtml(developmentLevel)} / 4)</p>
         <p><strong>Population:</strong> ${escapeHtml(Number(population).toLocaleString())}${oldPopulation !== undefined && oldPopulation !== "" ? ` <span style="opacity:0.75;">previously ${escapeHtml(oldPopulation)}</span>` : ""}</p>
@@ -2320,6 +2374,160 @@
     });
 
     ui.notifications.info(`${details.building} built in ${worldTile.name || "selected tile"}.`);
+  }
+
+  async function assignTileOwner() {
+    if (!requireOverviewScene()) return;
+
+    if (!game.user.isGM) {
+      ui.notifications.warn("Only the GM can assign tile owners.");
+      return;
+    }
+
+    const selected = canvas.drawings.controlled
+      .map(drawing => ({ drawing, tile: getWorldTile(drawing) }))
+      .filter(entry => Boolean(entry.tile));
+
+    if (!selected.length) {
+      ui.notifications.warn("Select one or more world tile drawings first.");
+      return;
+    }
+
+    const players = getPlayerUsers();
+    if (!players.length) {
+      ui.notifications.warn("No non-GM player users found.");
+      return;
+    }
+
+    const currentHouse = selected.length === 1 ? getHouseData(selected[0].drawing) : null;
+    const currentTile = selected.length === 1 ? selected[0].tile : null;
+    const currentOwnerId = getTileOwnerUserId(currentTile, currentHouse);
+    const currentOwnerName = getTileOwnerUserName(currentTile, currentHouse);
+
+    const userOptions = [
+      `<option value="" ${!currentOwnerId ? "selected" : ""}>Unassigned / clear owner</option>`,
+      ...players.map(user => `<option value="${escapeHtml(user.id)}" ${String(user.id) === String(currentOwnerId) ? "selected" : ""}>${escapeHtml(user.name)}</option>`)
+    ].join("");
+
+    const result = await new Promise(resolve => {
+      new Dialog({
+        title: "Assign Tile Owner",
+        content: `<form>
+          <div style="padding:8px;margin-bottom:10px;border:1px solid #777;border-radius:6px;">
+            <strong>Tiles selected:</strong> ${escapeHtml(selected.length)}<br>
+            ${selected.length === 1 ? `<strong>Tile:</strong> ${escapeHtml(selected[0].tile.name || "Unnamed Tile")}<br>` : ""}
+            <strong>Current Player Owner:</strong> ${escapeHtml(currentOwnerName || "Unassigned")}
+          </div>
+
+          <div class="form-group">
+            <label><strong>Player Owner</strong></label>
+            <select name="ownerUserId" style="width:100%;">
+              ${userOptions}
+            </select>
+            <p class="notes">Players can build only on tiles assigned to their Foundry player account.</p>
+          </div>
+
+          <div class="form-group">
+            <label>Ruler Display Name</label>
+            <input type="text" name="rulerName" value="${escapeHtml(currentHouse?.lord || currentOwnerName || "")}" style="width:100%;" />
+            <p class="notes">This is the visible Ruler field shown in the hover tooltip. It can be character flavour; the actual build permission uses the selected player above.</p>
+          </div>
+
+          <div class="form-group">
+            <label>
+              <input type="checkbox" name="updateRuler" checked />
+              Update Lord / Ruler display field
+            </label>
+          </div>
+        </form>`,
+        buttons: {
+          save: {
+            label: "Assign Owner",
+            callback: html => {
+              const form = html[0].querySelector("form");
+              resolve({
+                ownerUserId: String(form.ownerUserId.value || ""),
+                rulerName: String(form.rulerName.value || "").trim(),
+                updateRuler: form.updateRuler.checked
+              });
+            }
+          },
+          cancel: { label: "Cancel", callback: () => resolve(null) }
+        },
+        default: "save"
+      }, { width: 560, height: 410, resizable: true }).render(true);
+    });
+
+    if (!result) return;
+
+    const ownerUser = result.ownerUserId ? game.users.get(result.ownerUserId) : null;
+    const ownerName = ownerUser?.name || "";
+    const now = new Date().toISOString();
+    let updated = 0;
+    const rows = [];
+
+    for (const entry of selected) {
+      const drawing = entry.drawing;
+      const doc = drawing.document;
+      const worldTile = foundry.utils.deepClone(entry.tile || {});
+      const house = foundry.utils.deepClone(doc.getFlag(FLAG_SCOPE, HOUSE_KEY) ?? {});
+
+      if (ownerUser) {
+        worldTile.ownerUserId = ownerUser.id;
+        worldTile.ownerUserName = ownerUser.name;
+        worldTile.playerOwnerUserId = ownerUser.id;
+        worldTile.playerOwnerUserName = ownerUser.name;
+
+        house.ownerUserId = ownerUser.id;
+        house.ownerUserName = ownerUser.name;
+        house.playerOwnerUserId = ownerUser.id;
+        house.playerOwnerUserName = ownerUser.name;
+      } else {
+        delete worldTile.ownerUserId;
+        delete worldTile.ownerUserName;
+        delete worldTile.playerOwnerUserId;
+        delete worldTile.playerOwnerUserName;
+
+        delete house.ownerUserId;
+        delete house.ownerUserName;
+        delete house.playerOwnerUserId;
+        delete house.playerOwnerUserName;
+      }
+
+      if (result.updateRuler) {
+        house.lord = result.rulerName || ownerName || "";
+      }
+
+      house.region = house.region || worldTile.region || "";
+      house.worldTileId = doc.id;
+      house.worldTileName = worldTile.name || "Unnamed Tile";
+      house.ownerAssignedAt = now;
+      house.ownerAssignedBy = game.user.name;
+      house.ownerAssignedSource = `Crown Overview Tools ${MODULE_VERSION}`;
+      house.version = `Crown Overview Tools ${MODULE_VERSION}`;
+      house.updatedAt = now;
+      house.updatedBy = game.user.name;
+
+      worldTile.ownerAssignedAt = now;
+      worldTile.ownerAssignedBy = game.user.name;
+      worldTile.ownerAssignedSource = `Crown Overview Tools ${MODULE_VERSION}`;
+
+      await doc.setFlag(FLAG_SCOPE, WORLD_TILE_KEY, worldTile);
+      await doc.setFlag(FLAG_SCOPE, HOUSE_KEY, house);
+
+      updated++;
+      rows.push(`<li><strong>${escapeHtml(worldTile.name || "Unnamed Tile")}</strong> → ${escapeHtml(ownerName || "Unassigned")}${house.lord ? `, ruler display: ${escapeHtml(house.lord)}` : ""}</li>`);
+    }
+
+    await ChatMessage.create({
+      speaker: ChatMessage.getSpeaker({ alias: "Crown Tile Owner" }),
+      content: `<h2>Tile Owner Assigned</h2>
+        <p><strong>Updated:</strong> ${escapeHtml(updated)}</p>
+        <p><strong>Player Owner:</strong> ${escapeHtml(ownerName || "Unassigned")}</p>
+        <ul>${rows.join("")}</ul>`
+    });
+
+    ui.notifications.info(`Assigned owner for ${updated} tile(s): ${ownerName || "Unassigned"}.`);
   }
 
   async function assignHouse() {
@@ -2367,6 +2575,12 @@
           allegiance: String(form.allegiance.value || "").trim(),
           worldTileId: doc.id,
           worldTileName: worldTile.name,
+          ownerUserId: existing.ownerUserId || worldTile.ownerUserId || "",
+          ownerUserName: existing.ownerUserName || worldTile.ownerUserName || "",
+          playerOwnerUserId: existing.playerOwnerUserId || worldTile.playerOwnerUserId || existing.ownerUserId || worldTile.ownerUserId || "",
+          playerOwnerUserName: existing.playerOwnerUserName || worldTile.playerOwnerUserName || existing.ownerUserName || worldTile.ownerUserName || "",
+          ownerAssignedAt: existing.ownerAssignedAt || worldTile.ownerAssignedAt || "",
+          ownerAssignedBy: existing.ownerAssignedBy || worldTile.ownerAssignedBy || "",
           version: `Crown Overview Tools ${MODULE_VERSION}`,
           updatedAt: new Date().toISOString(),
           updatedBy: game.user.name
@@ -2571,6 +2785,7 @@
     unlinkTiles,
     viewLinks,
     togglePort,
+    assignTileOwner,
     assignHouse,
     exportRealm,
     importRealm,

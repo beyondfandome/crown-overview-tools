@@ -1,8 +1,8 @@
 {
   "id": "crown-overview-tools",
   "title": "Crown Overview Tools",
-  "description": "Scene-gated strategic overview map tools for Crown of Ashes. v0.1.5 adds player building from owned world pieces, with one build per world round and a maximum of four buildings per tile.",
-  "version": "0.1.5",
+  "description": "Scene-gated strategic overview map tools for Crown of Ashes. v0.1.6 adds GM tile-owner assignment and player build permissions based on Foundry player ownership.",
+  "version": "0.1.6",
   "authors": [
     {
       "name": "Beyond Fandome"
@@ -20,5 +20,5 @@
   ],
   "url": "https://github.com/beyondfandome/crown-overview-tools",
   "manifest": "https://raw.githubusercontent.com/beyondfandome/crown-overview-tools/main/module.json",
-  "download": "https://github.com/beyondfandome/crown-overview-tools/releases/download/v0.1.5/crown-overview-tools-v0.1.5.zip"
+  "download": "https://github.com/beyondfandome/crown-overview-tools/releases/download/v0.1.6/crown-overview-tools-v0.1.6.zip"
 }

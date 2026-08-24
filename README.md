@@ -1,56 +1,57 @@
-# Crown Overview Tools v0.1.5
+# Crown Overview Tools v0.1.6
 
-Strategic overview map helpers for Foundry VTT.
+Scene-gated strategic overview map tools for the Crown of Ashes campaign map.
 
-This module is scene-gated and activates on:
+## Active scenes
+
+This module activates on:
 
 - Crown of Ashes
 - Crown of Ashes (Copy)
 
-## Included in v0.1.5
+It stays quiet on normal battle scenes.
 
-- Draggable Crown Overview panel with saved position
+## Included
+
+- Draggable Crown Overview panel
 - World date banner
 - World round clock
-- World piece movement reset
 - World piece creation
-- World path movement through linked tiles
-- Route tooltip toggle
-- Click Move toggle
-- Automatic destination spacing when multiple world pieces occupy the same tile
-- Player Build button
-  - Select an owned world piece
-  - Build on the tile that piece currently occupies
-  - One building per player per world round
-  - Maximum four buildings per tile
-  - Development updates automatically from building count
-  - Population rerolls when the development level changes
+- World path movement
+- Click-to-move movement with confirmation
+- Route tooltip comparing land, sea/port, and default routes
 - Port crossing
+- Automatic spacing when multiple pieces occupy the same tile
 - Tile linking and unlinking
 - Tile link viewer
 - Port editor
 - House data editor
 - CSV export/import
 - Hover highlight and tooltip
-- World map visibility helpers
-- Safe original tile label hiding
+- World map visibility tools
+- Safe original tile text hiding
+- Build button for player construction
+- Assign Tile Owner button for GM player ownership
 
-## Build
+## New in v0.1.6
 
-Players can use **Build** after selecting a world piece they control. The module determines the tile occupied by that piece and offers available buildings that are not already built there.
+- Adds GM-only Assign Tile Owner button.
+- GM can select one or more world tiles and assign them to a Foundry player from a dropdown.
+- Assigned player ownership is stored on both the World Tile and House Data flags.
+- Hover tooltip shows Player Owner when assigned.
+- Build now checks that non-GM players are building on a tile assigned to their Foundry user.
+- GM can still build anywhere for setup and correction.
+- Assign House Data preserves existing tile owner metadata.
 
-Each player may build once per world round. The round is tracked using the World Round Clock, so initialize the clock before using the build system.
+## Player build rules
 
-Each tile can hold a maximum of four buildings. The tile's development level is calculated from the number of completed buildings:
+Players can build only if:
 
-- 0 buildings = Ruins
-- 1 building = Village
-- 2 buildings = Holdfast
-- 3 buildings = Town
-- 4 buildings = City
+- They control the selected world piece.
+- The piece is standing on the target tile.
+- The tile is assigned to their Foundry player account.
+- The tile is not a sea tile.
+- The tile has fewer than four buildings.
+- They have not already built this world round.
 
-## Click Move
-
-Turn on **Click Move**, select one world piece, then click a destination tile. The module shows a confirmation dialog with route options and cost before moving the token.
-
-If another world piece is already in the destination tile, the moved token is placed in an open nearby slot so pieces do not overlap directly.
+GMs are not limited by tile ownership or one-build-per-round, but the four-building cap and no-sea-building rule remain in place.
