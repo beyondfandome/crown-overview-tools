@@ -1,6 +1,6 @@
 (() => {
   const MODULE_ID = "crown-overview-tools";
-  const MODULE_VERSION = "0.1.1";
+  const MODULE_VERSION = "0.1.2";
   const FLAG_SCOPE = "world";
   const WORLD_TILE_KEY = "worldTile";
   const WORLD_PIECE_KEY = "worldPiece";
@@ -12,6 +12,7 @@
   const ALLOWED_SCENE_NAMES = ["Crown of Ashes", "Crown of Ashes (Copy)"];
   const DATE_BANNER_ID = "coa-world-date-banner";
   const PANEL_ID = "coa-overview-panel";
+  const PANEL_POSITION_KEY = "COA_OVERVIEW_PANEL_POSITION_V1";
   const HOVER_TOOLTIP_ID = "world-tile-hover-tooltip";
   const ROUTE_TOOLTIP_ID = "coa-route-tooltip";
   const HOVER_KEY = "COA_WORLD_TILE_HOVER";
@@ -544,6 +545,135 @@
     document.getElementById(DATE_BANNER_ID)?.remove();
   }
 
+  function getDefaultPanelPosition() {
+    return {
+      left: 86,
+      top: 96
+    };
+  }
+
+  function loadPanelPosition() {
+    const fallback = getDefaultPanelPosition();
+
+    try {
+      const raw = localStorage.getItem(PANEL_POSITION_KEY);
+      if (!raw) return fallback;
+
+      const parsed = JSON.parse(raw);
+      const left = Number(parsed.left);
+      const top = Number(parsed.top);
+
+      if (!Number.isFinite(left) || !Number.isFinite(top)) return fallback;
+
+      return {
+        left,
+        top
+      };
+    } catch (err) {
+      return fallback;
+    }
+  }
+
+  function savePanelPosition(left, top) {
+    try {
+      localStorage.setItem(PANEL_POSITION_KEY, JSON.stringify({
+        left: Math.round(left),
+        top: Math.round(top)
+      }));
+    } catch (err) {
+      console.warn("Crown Overview Tools could not save panel position:", err);
+    }
+  }
+
+  function clampPanelPosition(panel, position) {
+    const margin = 8;
+    const width = Number(panel.offsetWidth || 205);
+    const height = Number(panel.offsetHeight || 320);
+
+    const maxLeft = Math.max(margin, window.innerWidth - width - margin);
+    const maxTop = Math.max(margin, window.innerHeight - height - margin);
+
+    return {
+      left: Math.min(Math.max(Number(position.left || 0), margin), maxLeft),
+      top: Math.min(Math.max(Number(position.top || 0), margin), maxTop)
+    };
+  }
+
+  function applyPanelPosition(panel) {
+    const position = clampPanelPosition(panel, loadPanelPosition());
+    panel.style.left = `${position.left}px`;
+    panel.style.top = `${position.top}px`;
+  }
+
+  function resetPanelPosition(panel) {
+    const position = getDefaultPanelPosition();
+    savePanelPosition(position.left, position.top);
+    applyPanelPosition(panel);
+    ui.notifications.info("Crown Overview panel position reset.");
+  }
+
+  function makePanelDraggable(panel) {
+    if (!panel) return;
+
+    const handle = panel.querySelector(".coa-panel-drag-handle");
+    if (!handle) return;
+
+    let dragging = false;
+    let startMouseX = 0;
+    let startMouseY = 0;
+    let startLeft = 0;
+    let startTop = 0;
+
+    function onMouseMove(event) {
+      if (!dragging) return;
+
+      event.preventDefault();
+
+      const nextPosition = clampPanelPosition(panel, {
+        left: startLeft + event.clientX - startMouseX,
+        top: startTop + event.clientY - startMouseY
+      });
+
+      panel.style.left = `${nextPosition.left}px`;
+      panel.style.top = `${nextPosition.top}px`;
+    }
+
+    function onMouseUp() {
+      if (!dragging) return;
+
+      dragging = false;
+      panel.classList.remove("coa-dragging");
+      document.removeEventListener("mousemove", onMouseMove);
+      document.removeEventListener("mouseup", onMouseUp);
+
+      savePanelPosition(parseInt(panel.style.left || "0", 10), parseInt(panel.style.top || "0", 10));
+    }
+
+    handle.addEventListener("mousedown", event => {
+      if (event.button !== 0) return;
+      if (event.target?.closest?.("button")) return;
+
+      dragging = true;
+      startMouseX = event.clientX;
+      startMouseY = event.clientY;
+      startLeft = parseInt(panel.style.left || "0", 10) || panel.getBoundingClientRect().left;
+      startTop = parseInt(panel.style.top || "0", 10) || panel.getBoundingClientRect().top;
+
+      panel.classList.add("coa-dragging");
+      document.addEventListener("mousemove", onMouseMove);
+      document.addEventListener("mouseup", onMouseUp);
+
+      event.preventDefault();
+      event.stopPropagation();
+    });
+
+    panel.querySelector("[data-coa-panel-reset]")?.addEventListener("click", event => {
+      event.preventDefault();
+      event.stopPropagation();
+      resetPanelPosition(panel);
+    });
+  }
+
   function getOrCreatePanel() {
     let panel = document.getElementById(PANEL_ID);
     if (panel) return panel;
@@ -570,8 +700,13 @@
       </div>
     ` : "";
     panel.innerHTML = `
-      <h2>Crown Overview</h2>
-      <div class="coa-muted">${escapeHtml(canvas.scene?.name || "")}</div>
+      <div class="coa-panel-drag-handle" title="Drag to move this panel">
+        <div>
+          <h2>Crown Overview</h2>
+          <div class="coa-muted">${escapeHtml(canvas.scene?.name || "")}</div>
+        </div>
+        <button type="button" class="coa-panel-reset" data-coa-panel-reset title="Reset panel position">↺</button>
+      </div>
       <div class="coa-panel-section">
         <button data-coa-action="pathMove">Move Piece</button>
         <button data-coa-action="portCrossing">Port Crossing</button>
@@ -580,6 +715,10 @@
       </div>
       ${gmButtons}
     `;
+
+    applyPanelPosition(panel);
+    makePanelDraggable(panel);
+
     for (const button of panel.querySelectorAll("[data-coa-action]")) {
       button.addEventListener("click", async event => {
         event.preventDefault();

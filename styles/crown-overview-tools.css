@@ -4,8 +4,8 @@
 
 #coa-overview-panel {
   position: fixed;
-  left: 58px;
-  top: 84px;
+  left: 86px;
+  top: 96px;
   z-index: 999990;
   width: 205px;
   max-height: calc(100vh - 130px);
@@ -19,11 +19,45 @@
 }
 
 #coa-overview-panel h2 {
-  margin: 0 0 8px 0;
+  margin: 0;
   font-size: 16px;
   color: #f7e2b5;
   border-bottom: 1px solid rgba(180,145,90,0.45);
   padding-bottom: 5px;
+}
+
+
+#coa-overview-panel .coa-panel-drag-handle {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  cursor: move;
+  user-select: none;
+  border-bottom: 1px solid rgba(180,145,90,0.45);
+  padding-bottom: 6px;
+  margin-bottom: 8px;
+}
+
+#coa-overview-panel .coa-panel-drag-handle h2 {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+#coa-overview-panel .coa-panel-reset {
+  width: 26px;
+  min-width: 26px;
+  height: 24px;
+  min-height: 24px;
+  margin: 0;
+  padding: 0;
+  font-size: 14px;
+  line-height: 1;
+}
+
+#coa-overview-panel.coa-dragging {
+  opacity: 0.88;
+  box-shadow: 0 6px 22px rgba(0,0,0,0.75);
 }
 
 #coa-overview-panel .coa-panel-section {

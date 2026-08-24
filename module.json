@@ -1,8 +1,8 @@
 {
   "id": "crown-overview-tools",
   "title": "Crown Overview Tools",
-  "description": "Scene-gated strategic overview map tools for Crown of Ashes. v0.1.1 moves the overview panel away from the Foundry left toolbar.",
-  "version": "0.1.1",
+  "description": "Scene-gated strategic overview map tools for Crown of Ashes. v0.1.2 adds draggable, saved Crown Overview panel positioning.",
+  "version": "0.1.2",
   "authors": [
     {
       "name": "Beyond Fandome"
@@ -20,5 +20,5 @@
   ],
   "url": "https://github.com/beyondfandome/crown-overview-tools",
   "manifest": "https://raw.githubusercontent.com/beyondfandome/crown-overview-tools/main/module.json",
-  "download": "https://github.com/beyondfandome/crown-overview-tools/releases/download/v0.1.1/crown-overview-tools-v0.1.1.zip"
+  "download": "https://github.com/beyondfandome/crown-overview-tools/releases/download/v0.1.2/crown-overview-tools-v0.1.2.zip"
 }
