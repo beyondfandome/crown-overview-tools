@@ -1,6 +1,6 @@
 (() => {
   const MODULE_ID = "crown-overview-tools";
-  const MODULE_VERSION = "0.2.0";
+  const MODULE_VERSION = "0.2.1";
   const FLAG_SCOPE = "world";
   const WORLD_TILE_KEY = "worldTile";
   const WORLD_PIECE_KEY = "worldPiece";
@@ -21,6 +21,7 @@
   const CLICK_MOVE_KEY = "COA_WORLD_CLICK_MOVE";
   const HOVER_KEY = "COA_WORLD_TILE_HOVER";
   const VISIBILITY_KEY = "COA_WORLD_TILE_VISIBILITY";
+  const VISIBILITY_DIMMER_KEY = "COA_WORLD_TILE_VISIBILITY_DIMMER";
   const LINK_VIEWER_KEY = "COA_WORLD_TILE_LINK_VIEWER";
   const BUILD_LEDGER_KEY = "worldBuildLedger";
   const PENDING_BUILD_STATUS_PENDING = "pending";
@@ -708,6 +709,7 @@
         <button data-coa-action="togglePort">Make / Edit Port</button>
         <button data-coa-action="assignTileOwner">Assign Tile Owner</button>
         <button data-coa-action="assignPieceOwner">Assign Piece Owner</button>
+        <button data-coa-action="editWorldPiece">Edit World Piece</button>
         <button data-coa-action="assignHouse">Assign House Data</button>
         <button data-coa-action="importRealm">Import CSV</button>
         <button data-coa-action="exportRealm">Export CSV</button>
@@ -777,7 +779,7 @@
     el.style.left = "16px";
     el.style.bottom = "24px";
     el.style.width = "420px";
-    el.style.maxHeight = "70vh";
+    el.style.maxHeight = "240px";
     el.style.overflowY = "auto";
     el.style.zIndex = "100000";
     el.style.padding = "10px 12px";
@@ -1230,6 +1232,84 @@
     return canvas?.visibility?.vision?.sight || canvas?.visibility?.vision?.light?.preview || null;
   }
 
+  function getSceneRect() {
+    const dims = canvas?.dimensions || {};
+    return {
+      x: Number(dims.sceneX ?? dims.rect?.x ?? 0),
+      y: Number(dims.sceneY ?? dims.rect?.y ?? 0),
+      width: Number(dims.sceneWidth ?? dims.rect?.width ?? canvas?.scene?.width ?? 4000),
+      height: Number(dims.sceneHeight ?? dims.rect?.height ?? canvas?.scene?.height ?? 4000)
+    };
+  }
+
+  function getOrCreateVisionDimmer() {
+    let overlay = globalThis[VISIBILITY_DIMMER_KEY];
+    if (overlay && !overlay.destroyed) return overlay;
+
+    overlay = new PIXI.Graphics();
+    overlay.name = VISIBILITY_DIMMER_KEY;
+    overlay.zIndex = 999990;
+    overlay.eventMode = "none";
+    overlay.interactive = false;
+    overlay.alpha = 1;
+    canvas.stage.sortableChildren = true;
+    canvas.stage.addChild(overlay);
+    globalThis[VISIBILITY_DIMMER_KEY] = overlay;
+    return overlay;
+  }
+
+  function drawTilePath(graphics, drawing) {
+    const doc = drawing.document;
+    const shape = doc.shape || {};
+    const type = normalizeShapeType(shape.type);
+    const x = Number(doc.x || 0);
+    const y = Number(doc.y || 0);
+    const width = Number(shape.width || 0);
+    const height = Number(shape.height || 0);
+
+    if (type === "rectangle") graphics.drawRect(x, y, width, height);
+    else if (type === "ellipse") graphics.drawEllipse(x + width / 2, y + height / 2, width / 2, height / 2);
+    else {
+      const points = normalizePoints(shape.points || doc.points || []);
+      const flat = [];
+      for (const point of points) flat.push(x + point.x, y + point.y);
+      if (flat.length >= 6) graphics.drawPolygon(flat);
+    }
+  }
+
+  function redrawVisibilityDimmer(revealedEntries = []) {
+    const overlay = getOrCreateVisionDimmer();
+    overlay.clear();
+
+    if (!isOverviewScene() || game.user.isGM) {
+      overlay.visible = false;
+      return;
+    }
+
+    const rect = getSceneRect();
+    overlay.visible = true;
+    overlay.beginFill(0x000000, 0.48);
+    overlay.drawRect(rect.x, rect.y, rect.width, rect.height);
+
+    if (revealedEntries.length && typeof overlay.beginHole === "function") {
+      overlay.beginHole();
+      for (const entry of revealedEntries) drawTilePath(overlay, entry.drawing);
+      overlay.endHole();
+    }
+
+    overlay.endFill();
+  }
+
+  function removeVisibilityDimmer() {
+    const overlay = globalThis[VISIBILITY_DIMMER_KEY];
+    if (overlay) {
+      overlay.clear?.();
+      overlay.parent?.removeChild?.(overlay);
+      overlay.destroy?.();
+    }
+    globalThis[VISIBILITY_DIMMER_KEY] = null;
+  }
+
   function findCurrentTileForToken(token) {
     return findTileAtPoint(getTokenCenter(token));
   }
@@ -1256,6 +1336,7 @@
     manager.revealedEntries = [];
     manager.graphics?.clear();
     if (manager.graphics) manager.graphics.visible = false;
+    redrawVisibilityDimmer([]);
     canvas.visibility?.refreshVisibility?.();
     refreshTokenVisibility();
   }
@@ -1316,6 +1397,7 @@
 
     if (!manager.revealedEntries.length) {
       manager.graphics.visible = false;
+      redrawVisibilityDimmer([]);
       canvas.visibility?.refreshVisibility?.();
       refreshTokenVisibility();
       return;
@@ -1323,6 +1405,7 @@
 
     manager.graphics.visible = true;
     for (const entry of manager.revealedEntries) drawTileIntoVision(manager.graphics, entry.drawing);
+    redrawVisibilityDimmer(manager.revealedEntries);
     canvas.visibility?.refreshVisibility?.();
     refreshTokenVisibility();
   }
@@ -1369,6 +1452,9 @@
       configurable: true,
       get: function () {
         const manager = globalThis[VISIBILITY_KEY];
+        if (manager && isOverviewScene() && !game.user.isGM && getWorldPiece(this)) {
+          return isWorldPieceRevealed(this);
+        }
         if (manager && isOverviewScene() && isWorldPieceRevealed(this)) return true;
         return originalIsVisibleGetter.call(this);
       }
@@ -1389,6 +1475,7 @@
     manager.graphics?.parent?.removeChild(manager.graphics);
     manager.graphics?.destroy();
     globalThis[VISIBILITY_KEY] = null;
+    removeVisibilityDimmer();
     canvas.visibility?.refreshVisibility?.();
     refreshTokenVisibility();
   }
@@ -1645,10 +1732,10 @@
     el = document.createElement("div");
     el.id = PIECE_TOOLTIP_ID;
     el.style.position = "fixed";
-    el.style.right = "84px";
-    el.style.bottom = "132px";
-    el.style.width = "330px";
-    el.style.maxHeight = "45vh";
+    el.style.left = "16px";
+    el.style.bottom = "292px";
+    el.style.width = "420px";
+    el.style.maxHeight = "220px";
     el.style.overflowY = "auto";
     el.style.zIndex = "100001";
     el.style.padding = "10px 12px";
@@ -1836,6 +1923,116 @@
     });
 
     ui.notifications.info(`Assigned owner for ${updated} world piece(s): ${ownerUser?.name || "Unassigned"}.`);
+  }
+
+  async function editWorldPiece() {
+    if (!requireOverviewScene()) return;
+    if (!game.user.isGM) { ui.notifications.warn("Only the GM can edit world pieces."); return; }
+
+    const selected = canvas.tokens.controlled.filter(token => Boolean(getWorldPiece(token)));
+    if (selected.length !== 1) { ui.notifications.warn("Select exactly one World Piece token to edit."); return; }
+
+    const token = selected[0];
+    const piece = foundry.utils.deepClone(getWorldPiece(token));
+    const currentOwnerId = piece.ownerUserId || piece.playerOwnerUserId || "";
+    const ownerOptions = [
+      `<option value="" ${!currentOwnerId ? "selected" : ""}>Unassigned / GM only</option>`,
+      ...getPlayerUsers().map(user => `<option value="${escapeHtml(user.id)}" ${String(user.id) === String(currentOwnerId) ? "selected" : ""}>${escapeHtml(user.name)}</option>`)
+    ].join("");
+
+    const typeOptions = ["character", "army", "fleet", "dragon"].map(type => {
+      const label = type === "dragon" ? "Dragon / Flying Unit" : titleCase(type);
+      return `<option value="${escapeHtml(type)}" ${normalize(piece.pieceType || "army") === type ? "selected" : ""}>${escapeHtml(label)}</option>`;
+    }).join("");
+
+    const result = await new Promise(resolve => {
+      new Dialog({
+        title: `Edit World Piece — ${piece.name || token.document.name}`,
+        content: `<form>
+          <div style="padding:8px;margin-bottom:10px;border:1px solid #777;border-radius:6px;">
+            <strong>Token:</strong> ${escapeHtml(token.document.name)}<br>
+            <strong>Current Tile:</strong> ${escapeHtml(piece.currentTileName || getCurrentTileEntryForToken(token, piece)?.tile?.name || "Unknown")}
+          </div>
+          <div class="form-group"><label>Piece Name</label><input type="text" name="pieceName" value="${escapeHtml(piece.name || token.document.name)}" style="width:100%;" /></div>
+          <div class="form-group"><label>Piece Type</label><select name="pieceType" style="width:100%;">${typeOptions}</select></div>
+          <div class="form-group"><label>Movement Points Per Turn</label><input type="number" name="movementMax" value="${escapeHtml(piece.movementMax ?? 3)}" min="0" step="1" style="width:100%;" /></div>
+          <div class="form-group"><label>Movement Used</label><input type="number" name="movementUsed" value="${escapeHtml(piece.movementUsed ?? 0)}" min="0" step="1" style="width:100%;" /></div>
+          <div class="form-group"><label>Faction / Owner</label><input type="text" name="faction" value="${escapeHtml(piece.faction || "")}" style="width:100%;" /></div>
+          <div class="form-group"><label>Player Owner / Controller</label><select name="ownerUserId" style="width:100%;">${ownerOptions}</select></div>
+          <div class="form-group"><label>Token Image Path</label><input type="text" name="imagePath" value="${escapeHtml(token.document.texture?.src || token.actor?.img || "")}" style="width:100%;" /></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+            <div class="form-group"><label>Token Width</label><input type="number" name="tokenWidth" value="${escapeHtml(token.document.width || 1)}" min="0.25" step="0.25" style="width:100%;" /></div>
+            <div class="form-group"><label>Token Height</label><input type="number" name="tokenHeight" value="${escapeHtml(token.document.height || 1)}" min="0.25" step="0.25" style="width:100%;" /></div>
+          </div>
+          <div class="form-group"><label><input type="checkbox" name="syncCurrentTile" checked /> Sync current tile from token position</label></div>
+          <div class="form-group"><label><input type="checkbox" name="resetMovement" /> Reset movement used to 0</label></div>
+        </form>`,
+        buttons: {
+          save: { label: "Save", callback: html => {
+            const form = html[0].querySelector("form");
+            resolve({
+              name: String(form.pieceName.value || token.document.name).trim(),
+              pieceType: normalize(form.pieceType.value || "army"),
+              movementMax: Math.max(0, Number(form.movementMax.value || 0)),
+              movementUsed: Math.max(0, Number(form.movementUsed.value || 0)),
+              faction: String(form.faction.value || "").trim(),
+              ownerUserId: String(form.ownerUserId.value || ""),
+              imagePath: String(form.imagePath.value || "").trim(),
+              width: Math.max(0.25, Number(form.tokenWidth.value || 1)),
+              height: Math.max(0.25, Number(form.tokenHeight.value || 1)),
+              syncCurrentTile: form.syncCurrentTile.checked,
+              resetMovement: form.resetMovement.checked
+            });
+          }},
+          cancel: { label: "Cancel", callback: () => resolve(null) }
+        },
+        default: "save"
+      }, { width: 620, height: 720, resizable: true }).render(true);
+    });
+
+    if (!result) return;
+
+    const ownerUser = result.ownerUserId ? game.users.get(result.ownerUserId) : null;
+    const updatedPiece = foundry.utils.deepClone(piece);
+    updatedPiece.name = result.name || token.document.name;
+    updatedPiece.pieceType = result.pieceType;
+    updatedPiece.faction = result.faction;
+    updatedPiece.movementMax = result.movementMax;
+    updatedPiece.movementUsed = result.resetMovement ? 0 : Math.min(result.movementUsed, result.movementMax);
+    updatedPiece.allowedTileTypes = getAllowedTileTypes(result.pieceType);
+
+    if (result.syncCurrentTile) {
+      const entry = getCurrentTileEntryForToken(token, updatedPiece);
+      if (entry?.tile) {
+        updatedPiece.currentTileId = entry.tile.id || entry.drawing.document.id;
+        updatedPiece.currentTileName = entry.tile.name || "Unnamed Tile";
+      }
+    }
+
+    updatedPiece.editedAt = new Date().toISOString();
+    updatedPiece.editedBy = game.user.name;
+    updatedPiece.editedSource = `Crown Overview Tools ${MODULE_VERSION}`;
+
+    await saveWorldPiece(token, updatedPiece);
+    const ownedPiece = await applyWorldPieceOwner(token, updatedPiece, ownerUser, true);
+
+    const tokenUpdate = { name: ownedPiece.name, width: result.width, height: result.height };
+    if (result.imagePath) tokenUpdate.texture = { src: result.imagePath };
+    await token.document.update(tokenUpdate);
+
+    if (token.actor) {
+      const actorUpdate = { name: ownedPiece.name };
+      if (result.imagePath) actorUpdate.img = result.imagePath;
+      await token.actor.update(actorUpdate);
+    }
+
+    await ChatMessage.create({
+      speaker: ChatMessage.getSpeaker({ alias: "Crown Piece" }),
+      content: `<h2>World Piece Updated</h2><p><strong>Piece:</strong> ${escapeHtml(ownedPiece.name)}</p><p><strong>Type:</strong> ${escapeHtml(ownedPiece.pieceType)}</p><p><strong>Faction:</strong> ${escapeHtml(ownedPiece.faction || "None")}</p><p><strong>Player Owner:</strong> ${escapeHtml(ownerUser?.name || "Unassigned")}</p><p><strong>Movement:</strong> ${escapeHtml(ownedPiece.movementUsed || 0)} / ${escapeHtml(ownedPiece.movementMax || 0)} used</p>`
+    });
+
+    ui.notifications.info(`Updated world piece: ${ownedPiece.name}.`);
+    revealForCurrentPlayerPieces();
   }
 
   async function createWorldPiece() {
@@ -2645,7 +2842,14 @@
       throw new Error(`${builderUserName} has already built this turn: ${existingBuildThisRound.building} at ${existingBuildThisRound.tileName}.`);
     }
 
-    if (!builderIsGm && piece.lastBuildRoundKey === roundKey) {
+    const hasMatchingPendingBuild = getPendingBuildRequestsFromPiece(piece).some(request =>
+      request?.status === PENDING_BUILD_STATUS_PENDING &&
+      String(request.roundKey || "") === String(roundKey || "") &&
+      String(request.requesterUserId || "") === String(builderUserId || "") &&
+      String(request.building || "") === String(building || "")
+    );
+
+    if (!builderIsGm && piece.lastBuildRoundKey === roundKey && !hasMatchingPendingBuild) {
       throw new Error(`${piece.name || token.document.name} has already built this turn.`);
     }
 
@@ -2945,12 +3149,21 @@
     const clock = getClock();
     const roundKey = getRoundKey(clock);
     const currentLabel = clock ? getDateLabel(clock) : "Current Round";
+    const players = getPlayerUsers();
+    const playerOptions = [
+      `<option value="all" selected>All players</option>`,
+      ...players.map(user => `<option value="${escapeHtml(user.id)}">${escapeHtml(user.name)}</option>`)
+    ].join("");
 
     const result = await new Promise(resolve => {
       new Dialog({
         title: "Reset Build Uses",
         content: `<form>
-          <p>Clear the one-build-per-round tracking. This does not remove buildings from tiles.</p>
+          <p>Clear one-build-per-round tracking. This does not remove buildings from tiles.</p>
+          <div class="form-group">
+            <label>Player</label>
+            <select name="playerId" style="width:100%;">${playerOptions}</select>
+          </div>
           <div class="form-group">
             <label>Reset Scope</label>
             <select name="scope" style="width:100%;">
@@ -2958,79 +3171,125 @@
               <option value="all">All rounds / full build ledger</option>
             </select>
           </div>
-          <div class="form-group">
-            <label><input type="checkbox" name="clearPieceFlags" checked> Also clear matching world piece build locks</label>
-          </div>
+          <div class="form-group"><label><input type="checkbox" name="clearPieceFlags" checked> Clear world piece build locks</label></div>
+          <div class="form-group"><label><input type="checkbox" name="clearPending" checked> Clear pending build requests for the selected scope</label></div>
         </form>`,
         buttons: {
-          reset: {
-            label: "Reset Build Uses",
-            callback: html => {
-              const form = html[0].querySelector("form");
-              resolve({ scope: String(form.scope.value || "current"), clearPieceFlags: form.clearPieceFlags.checked });
-            }
-          },
+          reset: { label: "Reset Build Uses", callback: html => {
+            const form = html[0].querySelector("form");
+            resolve({
+              playerId: String(form.playerId.value || "all"),
+              scope: String(form.scope.value || "current"),
+              clearPieceFlags: form.clearPieceFlags.checked,
+              clearPending: form.clearPending.checked
+            });
+          }},
           cancel: { label: "Cancel", callback: () => resolve(null) }
         },
         default: "reset"
-      }, { width: 520, height: 300, resizable: true }).render(true);
+      }, { width: 560, height: 380, resizable: true }).render(true);
     });
 
     if (!result) return;
+    if (result.scope === "current" && !roundKey) {
+      ui.notifications.warn("The World Round Clock is not initialized, so there is no current round to reset.");
+      return;
+    }
+
+    const targetAllPlayers = result.playerId === "all";
+    const targetUser = targetAllPlayers ? null : game.users.get(result.playerId);
+    const targetName = targetAllPlayers ? "All players" : (targetUser?.name || result.playerId);
 
     const ledger = foundry.utils.deepClone(getBuildLedger());
     let ledgerCleared = 0;
 
-    if (result.scope === "all") {
-      ledgerCleared = Object.keys(ledger || {}).length;
-      await saveBuildLedger({});
-    } else {
-      if (!roundKey) {
-        ui.notifications.warn("The World Round Clock is not initialized, so there is no current round to reset.");
+    function clearLedgerRound(key) {
+      if (!ledger?.[key]) return;
+      if (targetAllPlayers) {
+        ledgerCleared += Object.keys(ledger[key].users || {}).length;
+        delete ledger[key];
         return;
       }
-      if (ledger?.[roundKey]) ledgerCleared = 1;
-      delete ledger[roundKey];
-      await saveBuildLedger(ledger);
+      if (ledger[key].users?.[result.playerId]) {
+        delete ledger[key].users[result.playerId];
+        ledgerCleared++;
+      }
+      if (Array.isArray(ledger[key].builds)) {
+        ledger[key].builds = ledger[key].builds.filter(build => String(build.userId || "") !== String(result.playerId));
+      }
+      if (!Object.keys(ledger[key].users || {}).length && !ledger[key].builds?.length) delete ledger[key];
     }
 
+    if (result.scope === "all") {
+      for (const key of Object.keys(ledger || {})) clearLedgerRound(key);
+    } else {
+      clearLedgerRound(roundKey);
+    }
+    await saveBuildLedger(ledger || {});
+
     let piecesCleared = 0;
-    if (result.clearPieceFlags) {
+    if (result.clearPieceFlags || result.clearPending) {
       for (const token of canvas.tokens.placeables) {
         const piece = getWorldPiece(token);
         if (!piece) continue;
 
-        if (result.scope !== "all" && piece.lastBuildRoundKey !== roundKey) continue;
+        const belongsToTarget = targetAllPlayers ||
+          String(piece.ownerUserId || piece.playerOwnerUserId || "") === String(result.playerId) ||
+          normalize(piece.ownerUserName || piece.playerOwnerUserName || "") === normalize(targetUser?.name || "");
+
+        if (!belongsToTarget) continue;
 
         const updatedPiece = foundry.utils.deepClone(piece);
-        delete updatedPiece.lastBuildRoundKey;
-        delete updatedPiece.lastBuiltBuilding;
-        delete updatedPiece.lastBuiltTileId;
-        delete updatedPiece.lastBuiltTileName;
-        delete updatedPiece.pendingBuildRoundKey;
-        delete updatedPiece.pendingBuildBuilding;
-        delete updatedPiece.pendingBuildTileId;
-        delete updatedPiece.pendingBuildTileName;
-        delete updatedPiece.pendingBuildRequestedAt;
-        if (Array.isArray(updatedPiece.pendingBuildRequests)) {
-          if (result.scope === "all") updatedPiece.pendingBuildRequests = [];
-          else updatedPiece.pendingBuildRequests = updatedPiece.pendingBuildRequests.filter(request => String(request.roundKey || "") !== String(roundKey || ""));
+        let changed = false;
+
+        const lockMatchesScope = result.scope === "all" || String(updatedPiece.lastBuildRoundKey || "") === String(roundKey || "");
+        if (result.clearPieceFlags && lockMatchesScope) {
+          delete updatedPiece.lastBuildRoundKey;
+          delete updatedPiece.lastBuiltBuilding;
+          delete updatedPiece.lastBuiltTileId;
+          delete updatedPiece.lastBuiltTileName;
+          delete updatedPiece.lastBuiltAt;
+          delete updatedPiece.lastBuiltBy;
+          delete updatedPiece.lastBuildStatus;
+          changed = true;
         }
-        delete updatedPiece.lastBuildStatus;
-        updatedPiece.lastBuildResetAt = new Date().toISOString();
-        updatedPiece.lastBuildResetBy = game.user.name;
-        updatedPiece.lastBuildResetSource = `Crown Overview Tools ${MODULE_VERSION}`;
-        await saveWorldPiece(token, updatedPiece);
-        piecesCleared++;
+
+        if (result.clearPending && Array.isArray(updatedPiece.pendingBuildRequests)) {
+          const before = updatedPiece.pendingBuildRequests.length;
+          updatedPiece.pendingBuildRequests = updatedPiece.pendingBuildRequests.filter(request => {
+            const requestMatchesScope = result.scope === "all" || String(request.roundKey || "") === String(roundKey || "");
+            if (!requestMatchesScope) return true;
+            if (targetAllPlayers) return false;
+            return String(request.requesterUserId || "") !== String(result.playerId);
+          });
+          if (updatedPiece.pendingBuildRequests.length !== before) changed = true;
+        }
+
+        const pendingStillActive = Array.isArray(updatedPiece.pendingBuildRequests) && updatedPiece.pendingBuildRequests.some(request => request?.status === PENDING_BUILD_STATUS_PENDING);
+        if (!pendingStillActive) {
+          delete updatedPiece.pendingBuildRoundKey;
+          delete updatedPiece.pendingBuildBuilding;
+          delete updatedPiece.pendingBuildTileId;
+          delete updatedPiece.pendingBuildTileName;
+          delete updatedPiece.pendingBuildRequestedAt;
+        }
+
+        if (changed) {
+          updatedPiece.lastBuildResetAt = new Date().toISOString();
+          updatedPiece.lastBuildResetBy = game.user.name;
+          updatedPiece.lastBuildResetSource = `Crown Overview Tools ${MODULE_VERSION}`;
+          await saveWorldPiece(token, updatedPiece);
+          piecesCleared++;
+        }
       }
     }
 
     await ChatMessage.create({
       speaker: ChatMessage.getSpeaker({ alias: "Crown Build" }),
-      content: `<h2>Build Uses Reset</h2><p><strong>Scope:</strong> ${escapeHtml(result.scope === "all" ? "All rounds" : currentLabel)}</p><p><strong>Ledger entries cleared:</strong> ${escapeHtml(ledgerCleared)}</p><p><strong>World pieces unlocked:</strong> ${escapeHtml(piecesCleared)}</p>`
+      content: `<h2>Build Uses Reset</h2><p><strong>Player:</strong> ${escapeHtml(targetName)}</p><p><strong>Scope:</strong> ${escapeHtml(result.scope === "all" ? "All rounds" : currentLabel)}</p><p><strong>Ledger entries cleared:</strong> ${escapeHtml(ledgerCleared)}</p><p><strong>World pieces unlocked:</strong> ${escapeHtml(piecesCleared)}</p>`
     });
 
-    ui.notifications.info(`Build uses reset. World pieces unlocked: ${piecesCleared}.`);
+    ui.notifications.info(`Build uses reset for ${targetName}. World pieces unlocked: ${piecesCleared}.`);
   }
 
   async function buildOnCurrentTile() {
@@ -3729,6 +3988,7 @@
     togglePort,
     assignTileOwner,
     assignPieceOwner,
+    editWorldPiece,
     assignHouse,
     exportRealm,
     importRealm,

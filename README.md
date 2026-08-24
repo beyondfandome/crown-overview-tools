@@ -1,38 +1,24 @@
-# Crown Overview Tools v0.2.0
+# Crown Overview Tools v0.2.1
 
-Scene-gated strategic overview map tools for Foundry VTT.
+Strategic overview map tools for Crown of Ashes.
 
-## Included in v0.2.0
+## Included in v0.2.1
 
-- Sticky player map vision
-  - selecting one world piece shows that piece's current tile and linked tiles
-  - deselecting now falls back to the combined vision of all world pieces controlled by that player
-  - players should no longer see the whole map simply because no token is selected
-- My Holdings button
-  - players can view their assigned tiles
-  - shows buildings, development, population, treasury, and exports
-  - GMs can choose a player from a dropdown and inspect their holdings
-- Includes v0.1.9 pending build support
-  - player builds go to an active GM if online
-  - if no GM is online, builds are queued as pending requests
-  - GM can process pending builds later
-- Includes previous tools
-  - draggable overview panel
-  - click-to-move
-  - route tooltip
-  - piece tooltip
-  - build button
-  - assign tile owner
-  - assign piece owner
-  - port crossing
-  - round clock
-  - CSV import/export
+- Compatibility metadata updated for Foundry VTT v14.
+- World piece tooltip is positioned above the tile/location tooltip.
+- Player vision is stricter on overview scenes: world-piece tokens outside revealed tiles are hidden from non-GM users.
+- Non-GM overview maps receive a darkened strategic fog overlay with holes over revealed tiles.
+- Edit World Piece tool added for GMs.
+- Edit World Piece can update name, type, movement, faction, controller, token image, and token size.
+- Reset Build Uses now supports all players or a selected player.
+- Reset Build Uses now clears current round or all round history.
+- Reset Build Uses now clears pending build locks more reliably.
+- Pending build processing no longer falsely blocks itself because the player had a pending build lock.
 
-## Scene activation
+## Overview scenes
 
-This module activates only on scenes named:
+This module activates on:
 
 - Crown of Ashes
 - Crown of Ashes (Copy)
 
-or scenes explicitly flagged as overview scenes.
