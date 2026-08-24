@@ -1,8 +1,8 @@
-# Crown Overview Tools v0.2.2
+# Crown Overview Tools v0.2.3
 
 Strategic overview map tools for Crown of Ashes.
 
-## Included in v0.2.2
+## Included in v0.2.3
 
 - Adds GM-only **Repair Build Locks**.
 - Hard-clears the scene build ledger, pending build requests, and world-piece build locks without deleting buildings from tiles.
@@ -27,3 +27,9 @@ If a player is stuck with “already built this turn” during testing:
 4. Confirm.
 
 This does not remove existing buildings from holdings.
+
+
+## v0.2.3
+
+- Fixes the Repair Build Locks button so it actually opens/runs from the Crown Overview panel.
+- Keeps hard build-lock clearing for stuck player build ledgers, pending build requests, and world-piece build flags.
