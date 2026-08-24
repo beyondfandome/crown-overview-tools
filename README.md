@@ -1,66 +1,39 @@
-# Crown Overview Tools v0.1.2
+# Crown Overview Tools v0.1.4
 
-Scene-gated strategic overview tools for the **Crown of Ashes** and **Crown of Ashes (Copy)** scenes.
+Strategic overview map helpers for Foundry VTT.
 
-## Scene gating
-
-This module activates only on scenes named:
+This module is scene-gated and activates on:
 
 - Crown of Ashes
 - Crown of Ashes (Copy)
 
-It can also be enabled manually on a scene with:
+## Included in v0.1.4
 
-```js
-await canvas.scene.setFlag("world", "overviewMapMode", true);
-```
-
-And disabled manually with:
-
-```js
-await canvas.scene.setFlag("world", "overviewMapMode", false);
-```
-
-## Included systems
-
+- Draggable Crown Overview panel with saved position
 - World date banner
-- Round clock and movement reset
-- World piece creator
-- World path move with region selector
+- World round clock
+- World piece movement reset
+- World piece creation
+- World path movement through linked tiles
+- Route tooltip toggle
+- Click Move toggle
+  - Select one world piece
+  - Click a destination tile
+  - Confirm route and movement cost
+  - Animate along the selected route
+- Automatic destination spacing when multiple world pieces occupy the same tile
 - Port crossing
-- Link / unlink world tiles
-- View world tile links
-- Make / edit ports
-- Assign house data
-- Export CSV
-- Import CSV
-- World tile hover highlight and tooltip
-- World piece visibility by current + linked tiles
-- Safe hide original tile text
+- Tile linking and unlinking
+- Tile link viewer
+- Port editor
+- House data editor
+- CSV export/import
+- Hover highlight and tooltip
+- World map visibility helpers
+- Safe original tile label hiding
 
-## Data flags used
+## Click Move
 
-- `world.worldTile`
-- `world.worldPiece`
-- `world.houseData`
-- `world.worldRoundClock`
-- `world.overviewMapMode`
+Turn on **Click Move**, select one world piece, then click a destination tile. The module shows a confirmation dialog with route options and cost before moving the token.
 
-## Important
-
-Foundry modules load at world level, but this module is scene-gated. It should stay quiet on ordinary scenes and tactical battle scenes.
-
-
-
-## v0.1.1
-
-- Moves the Crown Overview panel to the right of Foundry's left-side toolbar.
-- Slightly narrows the panel and buttons so it takes up less screen space.
-
-
-## v0.1.2
-
-- Adds draggable Crown Overview panel positioning.
-- Saves the panel position per browser/client using localStorage.
-- Adds a reset-position button in the panel header.
-- Moves the default panel position further right and down from the Foundry left toolbar.
+If another world piece is already in the destination tile, the moved token is placed in an open nearby slot so pieces do not overlap directly.

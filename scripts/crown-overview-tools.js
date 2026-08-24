@@ -1,6 +1,6 @@
 (() => {
   const MODULE_ID = "crown-overview-tools";
-  const MODULE_VERSION = "0.1.2";
+  const MODULE_VERSION = "0.1.4";
   const FLAG_SCOPE = "world";
   const WORLD_TILE_KEY = "worldTile";
   const WORLD_PIECE_KEY = "worldPiece";
@@ -15,6 +15,8 @@
   const PANEL_POSITION_KEY = "COA_OVERVIEW_PANEL_POSITION_V1";
   const HOVER_TOOLTIP_ID = "world-tile-hover-tooltip";
   const ROUTE_TOOLTIP_ID = "coa-route-tooltip";
+  const ROUTE_TOOLTIP_KEY = "COA_WORLD_ROUTE_TOOLTIP";
+  const CLICK_MOVE_KEY = "COA_WORLD_CLICK_MOVE";
   const HOVER_KEY = "COA_WORLD_TILE_HOVER";
   const VISIBILITY_KEY = "COA_WORLD_TILE_VISIBILITY";
   const LINK_VIEWER_KEY = "COA_WORLD_TILE_LINK_VIEWER";
@@ -709,6 +711,8 @@
       </div>
       <div class="coa-panel-section">
         <button data-coa-action="pathMove">Move Piece</button>
+        <button data-coa-action="toggleClickMove">Click Move: ${globalThis[CLICK_MOVE_KEY] ? "On" : "Off"}</button>
+        <button data-coa-action="toggleRouteTooltip">Route Tooltip: ${globalThis[ROUTE_TOOLTIP_KEY] ? "On" : "Off"}</button>
         <button data-coa-action="portCrossing">Port Crossing</button>
         <button data-coa-action="resetMovement">Reset Movement</button>
         <button data-coa-action="exportRealm">Export CSV</button>
@@ -893,6 +897,313 @@
     globalThis[HOVER_KEY] = null;
   }
 
+  function getOrCreateRouteTooltip() {
+    let el = document.getElementById(ROUTE_TOOLTIP_ID);
+    if (el) return el;
+
+    el = document.createElement("div");
+    el.id = ROUTE_TOOLTIP_ID;
+    el.style.position = "fixed";
+    el.style.left = "315px";
+    el.style.top = "112px";
+    el.style.width = "420px";
+    el.style.maxHeight = "calc(100vh - 150px)";
+    el.style.overflowY = "auto";
+    el.style.zIndex = "100000";
+    el.style.padding = "10px";
+    el.style.border = "1px solid rgba(180,145,90,0.85)";
+    el.style.borderRadius = "8px";
+    el.style.background = "rgba(20,20,20,0.94)";
+    el.style.color = "#f2e4c4";
+    el.style.fontSize = "12px";
+    el.style.lineHeight = "1.35";
+    el.style.pointerEvents = "none";
+    el.style.boxShadow = "0 4px 18px rgba(0,0,0,0.55)";
+    el.style.display = "none";
+    document.body.appendChild(el);
+    return el;
+  }
+
+  function hideRouteTooltip() {
+    const el = document.getElementById(ROUTE_TOOLTIP_ID);
+    if (el) el.style.display = "none";
+  }
+
+  function removeRouteTooltipElement() {
+    document.getElementById(ROUTE_TOOLTIP_ID)?.remove();
+  }
+
+  function routeTooltipStatusHtml(route, remaining) {
+    if (!route) return '<span style="color:#ff9999;font-weight:bold;">No route</span>';
+    if (route.cost > remaining) return '<span style="color:#ffd166;font-weight:bold;">Costs ' + escapeHtml(route.cost) + ' / not enough movement</span>';
+    return '<span style="color:#9ee493;font-weight:bold;">Costs ' + escapeHtml(route.cost) + '</span>';
+  }
+
+  function routeTooltipPathHtml(route) {
+    if (!route) return '<div style="opacity:0.75;margin-top:4px;">No linked route found.</div>';
+    return '<div style="margin-top:4px;padding:6px;border-radius:5px;background:rgba(255,255,255,0.08);">' + route.tileNames.map(escapeHtml).join(" → ") + '</div>';
+  }
+
+  function getBestRouteOption(routeOptions) {
+    const valid = routeOptions.filter(option => Boolean(option.path));
+    if (!valid.length) return null;
+    valid.sort((a, b) => {
+      if (a.path.cost !== b.path.cost) return a.path.cost - b.path.cost;
+      const priority = { sea: 1, land: 2, default: 3 };
+      return (priority[a.path.mode] || 99) - (priority[b.path.mode] || 99);
+    });
+    return valid[0];
+  }
+
+  function buildRouteTooltipBlock(title, route, remaining, isBest) {
+    return '<div style="margin-top:8px;padding:8px;border-radius:6px;background:' +
+      (isBest ? 'rgba(158,228,147,0.14)' : 'rgba(255,255,255,0.055)') +
+      ';">' +
+        '<div style="font-weight:bold;font-size:13px;margin-bottom:4px;color:#f7e2b5;">' +
+          escapeHtml(title) +
+          (isBest ? ' <span style="color:#9ee493;">★ Best</span>' : '') +
+        '</div>' +
+        '<div><strong>Status:</strong> ' + routeTooltipStatusHtml(route, remaining) + '</div>' +
+        '<div style="margin-top:4px;"><strong>Route:</strong></div>' +
+        routeTooltipPathHtml(route) +
+      '</div>';
+  }
+
+  function buildRouteTooltipHtml(piece, startTile, destinationTile, landPath, seaPath, defaultPath) {
+    const remaining = getMovementRemaining(piece);
+    const options = [
+      { label: "Sea / Port Route", path: seaPath },
+      { label: "Land Route", path: landPath },
+      { label: "Piece Default Route", path: defaultPath }
+    ];
+    const best = getBestRouteOption(options);
+    const bestMode = best?.path?.mode || null;
+
+    return '<div>' +
+      '<h2 style="margin:0 0 8px 0;font-size:16px;color:#f7e2b5;">World Route</h2>' +
+      '<div style="margin-bottom:8px;">' +
+        '<strong>Piece:</strong> ' + escapeHtml(piece.name || "World Piece") + '<br>' +
+        '<strong>From:</strong> ' + escapeHtml(startTile?.name || "Unknown") + ' <span style="opacity:0.7;">[' + escapeHtml(getTileType(startTile)) + ']</span><br>' +
+        '<strong>To:</strong> ' + escapeHtml(destinationTile?.name || "Unknown") + ' <span style="opacity:0.7;">[' + escapeHtml(getTileType(destinationTile)) + ']</span>' +
+      '</div>' +
+      '<div style="margin-bottom:8px;">' +
+        '<strong>Movement:</strong> ' + escapeHtml(Number(piece.movementUsed || 0)) + ' / ' + escapeHtml(Number(piece.movementMax || 0)) + ' used — <strong>' + escapeHtml(remaining) + '</strong> remaining' +
+      '</div>' +
+      buildRouteTooltipBlock("Sea / Port Route", seaPath, remaining, bestMode === "sea") +
+      buildRouteTooltipBlock("Land Route", landPath, remaining, bestMode === "land") +
+      buildRouteTooltipBlock("Piece Default Route", defaultPath, remaining, bestMode === "default") +
+      '<div style="opacity:0.75;font-size:11px;margin-top:10px;">Select one world piece, then hover a tile. Turn on Click Move to click a destination and confirm movement.</div>' +
+    '</div>';
+  }
+
+  function updateRouteTooltip() {
+    if (!isOverviewScene() || !canvas?.ready) { hideRouteTooltip(); return; }
+
+    const selected = canvas.tokens.controlled;
+    if (selected.length !== 1) { hideRouteTooltip(); return; }
+
+    const token = selected[0];
+    const piece = getWorldPiece(token);
+    if (!piece) { hideRouteTooltip(); return; }
+
+    const mousePoint = getMouseWorldPoint();
+    if (!mousePoint) { hideRouteTooltip(); return; }
+
+    const destinationEntry = findTileAtPoint(mousePoint);
+    if (!destinationEntry) { hideRouteTooltip(); return; }
+
+    let startEntry = findTileAtPoint(getTokenCenter(token));
+    if (!startEntry && piece.currentTileId) startEntry = getTileById(piece.currentTileId);
+
+    if (!startEntry) {
+      const el = getOrCreateRouteTooltip();
+      el.innerHTML = '<h2 style="margin:0 0 8px 0;font-size:16px;color:#f7e2b5;">World Route</h2>' +
+        '<p><strong>Piece:</strong> ' + escapeHtml(piece.name || token.document.name) + '</p>' +
+        '<p>Selected piece is not currently inside a world tile.</p>';
+      el.style.display = "block";
+      return;
+    }
+
+    const startTile = startEntry.tile;
+    const destinationTile = destinationEntry.tile;
+    const landPath = findPath(startTile, destinationTile, piece, "land");
+    const seaPath = findPath(startTile, destinationTile, piece, "sea");
+    const defaultPath = findPath(startTile, destinationTile, piece, "default");
+
+    const el = getOrCreateRouteTooltip();
+    el.innerHTML = buildRouteTooltipHtml(piece, startTile, destinationTile, landPath, seaPath, defaultPath);
+    el.style.display = "block";
+  }
+
+  function startRouteTooltip() {
+    stopRouteTooltip(false);
+    globalThis[ROUTE_TOOLTIP_KEY] = {
+      version: MODULE_VERSION,
+      interval: setInterval(updateRouteTooltip, 150),
+      startedAt: new Date().toISOString()
+    };
+    updateRouteTooltip();
+    renderPanel();
+    ui.notifications.info("World route tooltip enabled.");
+  }
+
+  function stopRouteTooltip(showNotification = true) {
+    const manager = globalThis[ROUTE_TOOLTIP_KEY];
+    if (manager?.interval) clearInterval(manager.interval);
+    removeRouteTooltipElement();
+    globalThis[ROUTE_TOOLTIP_KEY] = null;
+    renderPanel();
+    if (showNotification) ui.notifications.info("World route tooltip disabled.");
+  }
+
+  async function toggleRouteTooltip() {
+    if (!requireOverviewScene()) return;
+    if (globalThis[ROUTE_TOOLTIP_KEY]) stopRouteTooltip(true);
+    else startRouteTooltip();
+  }
+
+  function getClickMoveRouteSelectHtml(comparisons) {
+    const items = [];
+    if (comparisons.bestPath) items.push(["best", `Best Available Route — ${routeModeLabel(comparisons.bestPath.mode)} / Cost ${comparisons.bestPath.cost}`]);
+    if (comparisons.landPath) items.push(["land", `Land Route — Cost ${comparisons.landPath.cost}`]);
+    if (comparisons.seaPath) items.push(["sea", `Sea / Port Route — Cost ${comparisons.seaPath.cost}`]);
+    if (comparisons.defaultPath) items.push(["default", `Piece Default Route — Cost ${comparisons.defaultPath.cost}`]);
+
+    return items
+      .map(([value, label], index) => `<option value="${escapeHtml(value)}" ${index === 0 ? "selected" : ""}>${escapeHtml(label)}</option>`)
+      .join("");
+  }
+
+  async function askClickMoveConfirmation(token, piece, startTile, destinationTile, comparisons) {
+    const remaining = getMovementRemaining(piece);
+    const bestMode = comparisons.bestPath?.mode || null;
+
+    return await new Promise(resolve => {
+      new Dialog({
+        title: "Confirm World Move",
+        content: `<form>
+          <div style="padding:8px;margin-bottom:10px;border:1px solid #777;border-radius:6px;">
+            <strong>Piece:</strong> ${escapeHtml(piece.name || token.document.name)}<br>
+            <strong>From:</strong> ${escapeHtml(startTile.name)}<br>
+            <strong>To:</strong> ${escapeHtml(destinationTile.name)}<br>
+            <strong>Movement:</strong> ${escapeHtml(Number(piece.movementUsed || 0))} / ${escapeHtml(Number(piece.movementMax || 0))} used — ${escapeHtml(remaining)} remaining
+          </div>
+
+          <div class="form-group">
+            <label><strong>Route to use</strong></label>
+            <select name="routeMode" style="width:100%;">
+              ${getClickMoveRouteSelectHtml(comparisons)}
+            </select>
+          </div>
+
+          <div style="max-height:260px;overflow-y:auto;border:1px solid #777;border-radius:6px;padding:8px;">
+            <ul style="margin:0 0 0 18px;padding:0;">
+              ${routeSummaryLine("Sea / Port Route", comparisons.seaPath, remaining, bestMode === "sea")}
+              ${routeSummaryLine("Land Route", comparisons.landPath, remaining, bestMode === "land")}
+              ${routeSummaryLine("Piece Default Route", comparisons.defaultPath, remaining, bestMode === "default")}
+            </ul>
+          </div>
+
+          <p class="notes">If another world piece is already in the destination tile, this piece will be placed in an open slot nearby instead of directly on top of it.</p>
+        </form>`,
+        buttons: {
+          move: { label: "Move", callback: html => {
+            const form = html[0].querySelector("form");
+            resolve({ routeMode: String(form.routeMode.value || "best") });
+          }},
+          cancel: { label: "Cancel", callback: () => resolve(null) }
+        },
+        default: "move"
+      }, { width: 640, height: 520, resizable: true }).render(true);
+    });
+  }
+
+  async function handleClickMove(event) {
+    const manager = globalThis[CLICK_MOVE_KEY];
+    if (!manager || !isOverviewScene() || !canvas?.ready) return;
+
+    if (event?.target?.tagName && String(event.target.tagName).toLowerCase() !== "canvas") return;
+
+    const selected = canvas.tokens.controlled;
+    if (selected.length !== 1) return;
+
+    const token = selected[0];
+    const piece = getWorldPiece(token);
+    if (!piece) return;
+
+    const mousePoint = getMouseWorldPoint();
+    if (!mousePoint) return;
+
+    const destinationEntry = findTileAtPoint(mousePoint);
+    if (!destinationEntry) return;
+
+    let startEntry = findTileAtPoint(getTokenCenter(token));
+    if (!startEntry && piece.currentTileId) startEntry = getTileById(piece.currentTileId);
+    if (!startEntry) return;
+
+    const startTile = startEntry.tile;
+    const destinationTile = destinationEntry.tile;
+
+    if (String(startTile.id) === String(destinationTile.id)) return;
+
+    event.preventDefault?.();
+    event.stopPropagation?.();
+
+    if (!canUserControlWorldPiece(token, piece)) {
+      ui.notifications.warn("You can only move world pieces you control.");
+      return;
+    }
+
+    if (!isTileAllowedForPiece(piece, destinationTile)) {
+      ui.notifications.warn(`${piece.name || token.document.name} cannot enter ${destinationTile.name}.`);
+      return;
+    }
+
+    const comparisons = getRouteComparisons(startTile, destinationTile, piece);
+    if (!comparisons.bestPath && !comparisons.landPath && !comparisons.seaPath && !comparisons.defaultPath) {
+      ui.notifications.warn(`No valid route from ${startTile.name} to ${destinationTile.name}.`);
+      return;
+    }
+
+    const choice = await askClickMoveConfirmation(token, piece, startTile, destinationTile, comparisons);
+    if (!choice) return;
+
+    const path = getPathForMode(startTile, destinationTile, piece, choice.routeMode);
+    if (!path) { ui.notifications.warn(`No valid ${routeModeLabel(choice.routeMode)} from ${startTile.name} to ${destinationTile.name}.`); return; }
+
+    const remaining = getMovementRemaining(piece);
+    if (path.cost > remaining) { ui.notifications.warn(`Move blocked: needs ${path.cost} movement, but only has ${remaining} remaining.`); return; }
+
+    await executeWorldPathMove(token, piece, startTile, destinationTile, path, 350, "Click World Move");
+  }
+
+  function startClickMove() {
+    stopClickMove(false);
+    const clickHandler = event => handleClickMove(event);
+    document.addEventListener("click", clickHandler, true);
+    globalThis[CLICK_MOVE_KEY] = {
+      version: MODULE_VERSION,
+      clickHandler,
+      startedAt: new Date().toISOString()
+    };
+    renderPanel();
+    ui.notifications.info("Click Move enabled. Select a world piece, then click a destination tile.");
+  }
+
+  function stopClickMove(showNotification = true) {
+    const manager = globalThis[CLICK_MOVE_KEY];
+    if (manager?.clickHandler) document.removeEventListener("click", manager.clickHandler, true);
+    globalThis[CLICK_MOVE_KEY] = null;
+    renderPanel();
+    if (showNotification) ui.notifications.info("Click Move disabled.");
+  }
+
+  async function toggleClickMove() {
+    if (!requireOverviewScene()) return;
+    if (globalThis[CLICK_MOVE_KEY]) stopClickMove(true);
+    else startClickMove();
+  }
+
   function refreshTokenVisibility() {
     for (const token of canvas.tokens.placeables) {
       try { token.renderFlags?.set?.({ refreshVisibility: true }); }
@@ -1049,6 +1360,130 @@
       try { await token.actor.setFlag(FLAG_SCOPE, WORLD_PIECE_KEY, foundry.utils.deepClone(piece)); }
       catch (error) { console.warn("Could not update Actor worldPiece flag:", error); }
     }
+  }
+
+  function canUserControlWorldPiece(token, piece = getWorldPiece(token)) {
+    if (game.user.isGM) return true;
+    if (!token || !piece) return false;
+    if (token.isOwner) return true;
+    if (piece.ownerUserId && String(piece.ownerUserId) === String(game.user.id)) return true;
+    if (piece.ownerUserName && normalize(piece.ownerUserName) === normalize(game.user.name)) return true;
+    return false;
+  }
+
+  function getOccupantsForTile(tile, movingToken = null) {
+    if (!tile) return [];
+    const tileId = String(tile.id || "");
+    const occupants = [];
+
+    for (const other of canvas.tokens.placeables) {
+      if (movingToken && other.document.id === movingToken.document.id) continue;
+      const otherPiece = getWorldPiece(other);
+      if (!otherPiece) continue;
+
+      let inTile = false;
+      if (otherPiece.currentTileId && String(otherPiece.currentTileId) === tileId) inTile = true;
+      if (!inTile) {
+        const entry = findTileAtPoint(getTokenCenter(other));
+        if (entry?.tile?.id && String(entry.tile.id) === tileId) inTile = true;
+      }
+
+      if (inTile) occupants.push(other);
+    }
+
+    return occupants.sort((a, b) => String(a.document.id).localeCompare(String(b.document.id)));
+  }
+
+  function getSlotOffset(index, gridSize) {
+    if (index <= 0) return { x: 0, y: 0 };
+
+    const radius = gridSize * 0.42 * Math.ceil(index / 8);
+    const angle = ((index - 1) % 8) * (Math.PI / 4);
+
+    return {
+      x: Math.cos(angle) * radius,
+      y: Math.sin(angle) * radius
+    };
+  }
+
+  function getTokenTopLeftForTileSlot(token, entry) {
+    const center = getDrawingCenter(entry);
+    const gridSize = getGridSize();
+    const occupants = getOccupantsForTile(entry.tile, token);
+    const slotIndex = occupants.length;
+    const offset = getSlotOffset(slotIndex, gridSize);
+
+    return getTokenTopLeftForPoint(token, {
+      x: center.x + offset.x,
+      y: center.y + offset.y
+    });
+  }
+
+  function getRouteComparisons(startTile, destinationTile, piece) {
+    const landPath = findPath(startTile, destinationTile, piece, "land");
+    const seaPath = findPath(startTile, destinationTile, piece, "sea");
+    const defaultPath = findPath(startTile, destinationTile, piece, "default");
+    const bestPath = findBestPath(startTile, destinationTile, piece);
+
+    return { landPath, seaPath, defaultPath, bestPath };
+  }
+
+  function getPathForMode(startTile, destinationTile, piece, routeMode) {
+    if (routeMode === "best") return findBestPath(startTile, destinationTile, piece);
+    return findPath(startTile, destinationTile, piece, routeMode);
+  }
+
+  function routeSummaryLine(label, path, remaining, isBest = false) {
+    if (!path) return `<li><strong>${escapeHtml(label)}:</strong> No route</li>`;
+    const status = path.cost > remaining ? `Costs ${path.cost} / not enough movement` : `Costs ${path.cost}`;
+    return `<li><strong>${escapeHtml(label)}${isBest ? " ★ Best" : ""}:</strong> ${escapeHtml(status)}<br><span style="opacity:0.85;">${path.tileNames.map(escapeHtml).join(" → ")}</span></li>`;
+  }
+
+  async function executeWorldPathMove(token, piece, startTile, destinationTile, path, pauseMs = 350, sourceLabel = "World Path Move") {
+    if (!path) return null;
+
+    let currentPiece = foundry.utils.deepClone(piece);
+    let spentThisMove = 0;
+
+    for (let i = 1; i < path.tileIds.length; i++) {
+      const entry = getTileById(path.tileIds[i]);
+      if (!entry) continue;
+
+      const tile = entry.tile;
+      if (!isTileAllowedForPiece(currentPiece, tile)) {
+        ui.notifications.error(`Movement stopped: ${currentPiece.name || token.document.name} cannot enter ${tile.name}.`);
+        return null;
+      }
+
+      const position = getTokenTopLeftForTileSlot(token, entry);
+      const stepCost = getTileMovementCost(tile);
+
+      currentPiece.previousTileId = currentPiece.currentTileId || path.tileIds[i - 1];
+      currentPiece.previousTileName = currentPiece.currentTileName || path.tileNames[i - 1];
+      currentPiece.currentTileId = tile.id;
+      currentPiece.currentTileName = tile.name;
+      currentPiece.movementUsed = Number(currentPiece.movementUsed || 0) + stepCost;
+      currentPiece.lastMoveCost = stepCost;
+      currentPiece.lastMovePath = path.tileNames.slice(0, i + 1);
+      currentPiece.lastRouteMode = path.mode;
+      currentPiece.lastMovedAt = new Date().toISOString();
+      currentPiece.lastMovedBy = game.user.name;
+      currentPiece.lastMovedSource = `Crown Overview Tools ${MODULE_VERSION} - ${sourceLabel}`;
+
+      spentThisMove += stepCost;
+
+      await saveWorldPiece(token, currentPiece);
+      await token.document.update({ x: position.x, y: position.y }, { animate: true, worldMovementBypass: true, bypassWorldMovementWatcher: true, clickMoveBypass: true });
+
+      if (pauseMs > 0) await new Promise(resolve => setTimeout(resolve, pauseMs));
+    }
+
+    await ChatMessage.create({
+      speaker: ChatMessage.getSpeaker({ alias: sourceLabel }),
+      content: `<h2>${escapeHtml(sourceLabel)}</h2><p><strong>Piece:</strong> ${escapeHtml(currentPiece.name || token.document.name)}</p><p><strong>Type:</strong> ${escapeHtml(currentPiece.pieceType || "Unknown")}</p><p><strong>Route Mode:</strong> ${escapeHtml(routeModeLabel(path.mode))}</p><p><strong>From:</strong> ${escapeHtml(startTile.name)}</p><p><strong>To:</strong> ${escapeHtml(destinationTile.name)}</p><p><strong>Path:</strong> ${path.tileNames.map(escapeHtml).join(" → ")}</p><p><strong>Movement spent:</strong> ${escapeHtml(spentThisMove)}</p><p><strong>Total movement used:</strong> ${escapeHtml(currentPiece.movementUsed)} / ${escapeHtml(currentPiece.movementMax || 0)}</p>`
+    });
+
+    return { piece: currentPiece, spentThisMove };
   }
 
   async function createWorldPiece() {
@@ -1290,52 +1725,34 @@
     if (!requireOverviewScene()) return;
     const selected = canvas.tokens.controlled;
     if (selected.length !== 1) { ui.notifications.warn("Select exactly one world-map piece token."); return; }
+
     const token = selected[0];
     const piece = getWorldPiece(token);
     if (!piece) { ui.notifications.warn("Selected token is not a world piece."); return; }
+    if (!canUserControlWorldPiece(token, piece)) { ui.notifications.warn("You can only move world pieces you control."); return; }
+
     let startEntry = findTileAtPoint(getTokenCenter(token));
     if (!startEntry && piece.currentTileId) startEntry = getTileById(piece.currentTileId);
     if (!startEntry) { ui.notifications.warn("The selected piece is not currently inside a world tile."); return; }
+
     const startTile = startEntry.tile;
     const options = await askDestination(piece, startTile);
     if (!options || !options.destinationTileId) return;
+
     const destinationEntry = getTileById(options.destinationTileId);
     if (!destinationEntry) { ui.notifications.error("Could not find destination tile."); return; }
+
     const destinationTile = destinationEntry.tile;
     if (!isTileAllowedForPiece(piece, destinationTile)) { ui.notifications.warn(`${piece.name || token.document.name} cannot enter ${destinationTile.name}.`); return; }
-    const path = options.routeMode === "best" ? findBestPath(startTile, destinationTile, piece) : findPath(startTile, destinationTile, piece, options.routeMode);
+
+    const path = getPathForMode(startTile, destinationTile, piece, options.routeMode);
     if (!path) { ui.notifications.warn(`No valid ${routeModeLabel(options.routeMode)} from ${startTile.name} to ${destinationTile.name}.`); return; }
+
     const remaining = getMovementRemaining(piece);
     if (path.cost > remaining) { ui.notifications.warn(`Move blocked: needs ${path.cost} movement, but only has ${remaining} remaining.`); return; }
     if (path.cost === 0) { ui.notifications.info(`Already in ${destinationTile.name}.`); return; }
 
-    let currentPiece = foundry.utils.deepClone(piece);
-    let spentThisMove = 0;
-    for (let i = 1; i < path.tileIds.length; i++) {
-      const entry = getTileById(path.tileIds[i]);
-      if (!entry) continue;
-      const tile = entry.tile;
-      if (!isTileAllowedForPiece(currentPiece, tile)) { ui.notifications.error(`Movement stopped: ${currentPiece.name || token.document.name} cannot enter ${tile.name}.`); return; }
-      const center = getDrawingCenter(entry);
-      const position = getTokenTopLeftForPoint(token, center);
-      const stepCost = getTileMovementCost(tile);
-      currentPiece.previousTileId = currentPiece.currentTileId || path.tileIds[i - 1];
-      currentPiece.previousTileName = currentPiece.currentTileName || path.tileNames[i - 1];
-      currentPiece.currentTileId = tile.id;
-      currentPiece.currentTileName = tile.name;
-      currentPiece.movementUsed = Number(currentPiece.movementUsed || 0) + stepCost;
-      currentPiece.lastMoveCost = stepCost;
-      currentPiece.lastMovePath = path.tileNames.slice(0, i + 1);
-      currentPiece.lastRouteMode = path.mode;
-      currentPiece.lastMovedAt = new Date().toISOString();
-      currentPiece.lastMovedBy = game.user.name;
-      currentPiece.lastMovedSource = `Crown Overview Tools ${MODULE_VERSION}`;
-      spentThisMove += stepCost;
-      await saveWorldPiece(token, currentPiece);
-      await token.document.update({ x: position.x, y: position.y }, { animate: true, worldMovementBypass: true, bypassWorldMovementWatcher: true });
-      await new Promise(resolve => setTimeout(resolve, options.pauseMs));
-    }
-    await ChatMessage.create({ speaker: ChatMessage.getSpeaker({ alias: "World Path Move" }), content: `<h2>World Path Move</h2><p><strong>Piece:</strong> ${escapeHtml(currentPiece.name || token.document.name)}</p><p><strong>Type:</strong> ${escapeHtml(currentPiece.pieceType || "Unknown")}</p><p><strong>Route Mode:</strong> ${escapeHtml(routeModeLabel(path.mode))}</p><p><strong>From:</strong> ${escapeHtml(startTile.name)}</p><p><strong>To:</strong> ${escapeHtml(destinationTile.name)}</p><p><strong>Path:</strong> ${path.tileNames.map(escapeHtml).join(" → ")}</p><p><strong>Movement spent:</strong> ${escapeHtml(spentThisMove)}</p><p><strong>Total movement used:</strong> ${escapeHtml(currentPiece.movementUsed)} / ${escapeHtml(currentPiece.movementMax || 0)}</p>` });
+    await executeWorldPathMove(token, piece, startTile, destinationTile, path, options.pauseMs, "World Path Move");
   }
 
   function getAdjacentIds(tile) { return Array.isArray(tile?.adjacentTileIds) ? [...tile.adjacentTileIds] : []; }
@@ -1580,6 +1997,7 @@
     const token = selected[0];
     const originalPiece = getWorldPiece(token);
     if (!originalPiece) { ui.notifications.warn("The selected token is not a World Piece."); return; }
+    if (!canUserControlWorldPiece(token, originalPiece)) { ui.notifications.warn("You can only use Port Crossing with world pieces you control."); return; }
     const pieceType = normalize(originalPiece.pieceType);
     if (pieceType !== "army" && pieceType !== "character") { ui.notifications.warn("Port Crossing is only used by Armies and Characters."); return; }
     let sourcePort = findCurrentTileForToken(token);
@@ -1648,7 +2066,7 @@
     piece.lastMovedAt = new Date().toISOString();
     piece.lastMovedBy = game.user.name;
     piece.lastMovedSource = `Crown Overview Tools ${MODULE_VERSION}`;
-    const position = getTokenTopLeftForPoint(token, getDrawingCenter(destinationPort));
+    const position = getTokenTopLeftForTileSlot(token, destinationPort);
     await saveWorldPiece(token, piece);
     await token.document.update({ x: position.x, y: position.y }, { animate: true, worldMovementBypass: true, bypassWorldMovementWatcher: true, portCrossingBypass: true });
     let resultText = "";
@@ -1877,6 +2295,8 @@
     removeDateBanner();
     removePanel();
     stopHover();
+    stopRouteTooltip(false);
+    stopClickMove(false);
     clearLinkOverlay();
     stopVisibility();
   }
@@ -1893,6 +2313,8 @@
     start: startSceneFeatures,
     stop: stopSceneFeatures,
     pathMove,
+    toggleClickMove,
+    toggleRouteTooltip,
     portCrossing,
     resetMovement,
     roundClock,
