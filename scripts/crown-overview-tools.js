@@ -1,6 +1,6 @@
 (() => {
   const MODULE_ID = "crown-overview-tools";
-  const MODULE_VERSION = "0.2.3";
+  const MODULE_VERSION = "0.2.5";
   const FLAG_SCOPE = "world";
   const WORLD_TILE_KEY = "worldTile";
   const WORLD_PIECE_KEY = "worldPiece";
@@ -778,9 +778,10 @@
     el.id = HOVER_TOOLTIP_ID;
     el.style.position = "fixed";
     el.style.left = "16px";
-    el.style.bottom = "24px";
-    el.style.width = "420px";
-    el.style.maxHeight = "240px";
+    el.style.bottom = "104px";
+    el.style.width = "460px";
+    el.style.maxWidth = "calc(100vw - 32px)";
+    el.style.maxHeight = "calc(100vh - 170px)";
     el.style.overflowY = "auto";
     el.style.zIndex = "100000";
     el.style.padding = "10px 12px";
@@ -790,11 +791,31 @@
     el.style.color = "#f0f0f0";
     el.style.fontSize = "13px";
     el.style.lineHeight = "1.4";
-    el.style.pointerEvents = "none";
+    el.style.pointerEvents = "auto";
     el.style.boxShadow = "0 4px 18px rgba(0,0,0,0.45)";
     el.style.display = "none";
     document.body.appendChild(el);
     return el;
+  }
+
+  function fitFixedTooltipToViewport(el) {
+    if (!el) return;
+
+    const margin = 12;
+    const rect = el.getBoundingClientRect();
+
+    if (rect.left < margin) {
+      el.style.left = `${margin}px`;
+    }
+
+    if (rect.right > window.innerWidth - margin) {
+      el.style.left = `${Math.max(margin, window.innerWidth - rect.width - margin)}px`;
+    }
+
+    if (rect.top < margin) {
+      el.style.top = `${margin}px`;
+      el.style.bottom = "auto";
+    }
   }
 
   function hideHoverTooltip() {
@@ -849,10 +870,24 @@
       if (!isSea && buildings) html += `<div style="margin-top:7px;padding-top:6px;border-top:1px solid rgba(255,255,255,0.15);"><strong>Buildings:</strong><br><span style="opacity:0.9;">${escapeHtml(buildings)}</span></div>`;
       html += `</div>`;
     }
-    if (adjacentNames) html += `<div style="margin-top:9px;padding-top:6px;border-top:1px solid rgba(255,255,255,0.15);opacity:0.8;"><strong>Links:</strong> ${escapeHtml(adjacentNames)}</div>`;
+    if (adjacentNames) {
+      const linkedTiles = adjacentNames
+        .split(",")
+        .map(value => value.trim())
+        .filter(Boolean);
+
+      html += `<div style="margin-top:9px;padding-top:6px;border-top:1px solid rgba(255,255,255,0.15);">
+        <strong>Links:</strong>
+        <div class="coa-hover-links">
+          ${linkedTiles.map(name => `<span>${escapeHtml(name)}</span>`).join("")}
+        </div>
+      </div>`;
+    }
+
     html += `</div>`;
     el.innerHTML = html;
     el.style.display = "block";
+    fitFixedTooltipToViewport(el);
   }
 
   function drawTileShapeOnGraphics(graphics, drawing, fillColor = 0xffcc33, fillAlpha = 0.18, strokeColor = 0xffcc33, strokeAlpha = 0.95, strokeWidth = 4) {
@@ -2850,9 +2885,9 @@
       String(request.building || "") === String(building || "")
     );
 
-    if (!builderIsGm && piece.lastBuildRoundKey === roundKey && !hasMatchingPendingBuild) {
-      throw new Error(`${piece.name || token.document.name} has already built this turn.`);
-    }
+    // v0.2.4: the scene build ledger and pending-build queue are the source of truth for one-build-per-round.
+    // Older piece-level lastBuildRoundKey flags can become stale when a GM rewinds the round clock or edits test data,
+    // so they are no longer used as a hard blocker here.
 
     const updatedBuildings = [...existingBuildings, building].slice(0, 4);
     const developmentLevel = updatedBuildings.length;
@@ -3277,6 +3312,60 @@
     return { ledgerCleared, piecesCleared, pendingCleared, roundKey };
   }
 
+  async function clearSelectedWorldPieceBuildLocks({ scope = "current", roundKey = null } = {}) {
+    const selectedTokens = canvas.tokens.controlled.filter(token => Boolean(getWorldPiece(token)));
+    let piecesCleared = 0;
+    let pendingCleared = 0;
+
+    for (const token of selectedTokens) {
+      const piece = getWorldPiece(token);
+      if (!piece) continue;
+
+      const updatedPiece = foundry.utils.deepClone(piece);
+      let changed = false;
+      const lockMatchesScope = scope === "all" || String(updatedPiece.lastBuildRoundKey || "") === String(roundKey || "");
+
+      if (lockMatchesScope) {
+        for (const key of [
+          "lastBuildRoundKey", "lastBuiltBuilding", "lastBuiltTileId", "lastBuiltTileName", "lastBuiltAt", "lastBuiltBy",
+          "lastBuiltByUserId", "lastBuiltByUserName", "lastBuildStatus", "pendingBuildRoundKey", "pendingBuildBuilding",
+          "pendingBuildTileId", "pendingBuildTileName", "pendingBuildRequestedAt", "pendingBuildRequesterUserId"
+        ]) delete updatedPiece[key];
+        changed = true;
+      }
+
+      if (Array.isArray(updatedPiece.pendingBuildRequests)) {
+        const before = updatedPiece.pendingBuildRequests.length;
+        updatedPiece.pendingBuildRequests = updatedPiece.pendingBuildRequests.filter(request => {
+          const requestMatchesScope = scope === "all" || String(request.roundKey || "") === String(roundKey || "");
+          return !requestMatchesScope;
+        });
+        pendingCleared += before - updatedPiece.pendingBuildRequests.length;
+        if (updatedPiece.pendingBuildRequests.length !== before) changed = true;
+      }
+
+      const pendingStillActive = Array.isArray(updatedPiece.pendingBuildRequests) && updatedPiece.pendingBuildRequests.some(request => request?.status === PENDING_BUILD_STATUS_PENDING);
+      if (!pendingStillActive) {
+        delete updatedPiece.pendingBuildRoundKey;
+        delete updatedPiece.pendingBuildBuilding;
+        delete updatedPiece.pendingBuildTileId;
+        delete updatedPiece.pendingBuildTileName;
+        delete updatedPiece.pendingBuildRequestedAt;
+        delete updatedPiece.pendingBuildRequesterUserId;
+      }
+
+      if (changed) {
+        updatedPiece.lastBuildResetAt = new Date().toISOString();
+        updatedPiece.lastBuildResetBy = game.user.name;
+        updatedPiece.lastBuildResetSource = `Crown Overview Tools ${MODULE_VERSION} selected-piece reset`;
+        await saveWorldPiece(token, updatedPiece);
+        piecesCleared++;
+      }
+    }
+
+    return { piecesCleared, pendingCleared, selectedCount: selectedTokens.length };
+  }
+
   async function resetBuildCapacity() {
     if (!requireOverviewScene()) return;
 
@@ -3288,6 +3377,7 @@
     const clock = getClock();
     const roundKey = getRoundKey(clock);
     const currentLabel = clock ? getDateLabel(clock) : "Current Round";
+    const selectedWorldPieces = canvas.tokens.controlled.filter(token => Boolean(getWorldPiece(token)));
     const players = getPlayerUsers();
     const playerOptions = [
       `<option value="all" selected>All players</option>`,
@@ -3312,7 +3402,8 @@
           </div>
           <div class="form-group"><label><input type="checkbox" name="clearPieceFlags" checked> Clear world piece build locks</label></div>
           <div class="form-group"><label><input type="checkbox" name="clearPending" checked> Clear pending build requests for the selected scope</label></div>
-          <p class="notes">If a player is stuck, choose All players + All rounds, or use Repair Build Locks.</p>
+          ${selectedWorldPieces.length ? `<div class="form-group"><label><input type="checkbox" name="clearSelectedPieces" checked> Force-clear selected world piece token(s): ${escapeHtml(selectedWorldPieces.length)}</label></div>` : ""}
+          <p class="notes">If a player is stuck, select their world piece and use Current round, or choose All players + All rounds / Repair Build Locks.</p>
         </form>`,
         buttons: {
           reset: { label: "Reset Build Uses", callback: html => {
@@ -3321,7 +3412,8 @@
               playerId: String(form.playerId.value || "all"),
               scope: String(form.scope.value || "current"),
               clearPieceFlags: form.clearPieceFlags.checked,
-              clearPending: form.clearPending.checked
+              clearPending: form.clearPending.checked,
+              clearSelectedPieces: Boolean(form.clearSelectedPieces?.checked)
             });
           }},
           cancel: { label: "Cancel", callback: () => resolve(null) }
@@ -3339,9 +3431,16 @@
     const targetName = result.playerId === "all" ? "All players" : (game.users.get(result.playerId)?.name || result.playerId);
     const summary = await clearBuildTracking(result);
 
+    if (result.clearSelectedPieces) {
+      const selectedSummary = await clearSelectedWorldPieceBuildLocks({ scope: result.scope, roundKey });
+      summary.piecesCleared += selectedSummary.piecesCleared;
+      summary.pendingCleared += selectedSummary.pendingCleared;
+      summary.selectedPiecesChecked = selectedSummary.selectedCount;
+    }
+
     await ChatMessage.create({
       speaker: ChatMessage.getSpeaker({ alias: "Crown Build" }),
-      content: `<h2>Build Uses Reset</h2><p><strong>Player:</strong> ${escapeHtml(targetName)}</p><p><strong>Scope:</strong> ${escapeHtml(result.scope === "all" ? "All rounds" : currentLabel)}</p><p><strong>Ledger entries cleared:</strong> ${escapeHtml(summary.ledgerCleared)}</p><p><strong>Pending requests cleared:</strong> ${escapeHtml(summary.pendingCleared)}</p><p><strong>World pieces unlocked:</strong> ${escapeHtml(summary.piecesCleared)}</p>`
+      content: `<h2>Build Uses Reset</h2><p><strong>Player:</strong> ${escapeHtml(targetName)}</p><p><strong>Scope:</strong> ${escapeHtml(result.scope === "all" ? "All rounds" : currentLabel)}</p><p><strong>Ledger entries cleared:</strong> ${escapeHtml(summary.ledgerCleared)}</p><p><strong>Pending requests cleared:</strong> ${escapeHtml(summary.pendingCleared)}</p><p><strong>World pieces unlocked:</strong> ${escapeHtml(summary.piecesCleared)}</p>${summary.selectedPiecesChecked ? `<p><strong>Selected pieces force-checked:</strong> ${escapeHtml(summary.selectedPiecesChecked)}</p>` : ""}`
     });
 
     ui.notifications.info(`Build uses reset for ${targetName}. World pieces unlocked: ${summary.piecesCleared}.`);
@@ -3445,10 +3544,9 @@
       return;
     }
 
-    if (!game.user.isGM && piece.lastBuildRoundKey === roundKey) {
-      ui.notifications.warn(`${piece.name || token.document.name} has already built this turn.`);
-      return;
-    }
+    // v0.2.4: do not block on piece.lastBuildRoundKey.
+    // The player build ledger and pending-build queue handle one-build-per-round.
+    // This avoids stale token locks after GM testing, rollback, or manual house edits.
 
     const buildingOptions = buildBuildingOptions(existingBuildings);
     if (!buildingOptions) {
@@ -3698,13 +3796,20 @@
     const cultureSection = isSea ? "" : `<div class="form-group"><label>Culture</label><select name="culture" style="width:100%;"><option value="">Select Culture</option>${cultureOptions}</select></div>`;
     const developmentSection = isSea ? `<hr><h2>Sea Tile</h2><div style="padding:10px;border:1px solid #777;border-radius:6px;margin-bottom:10px;"><strong>Sea Terrain</strong><br><span style="font-size:12px;opacity:0.85;">Development, population, culture, and built buildings do not apply to sea tiles.</span></div>` : `<hr><h2>Development</h2><div style="padding:8px;border:1px solid #777;border-radius:6px;margin-bottom:10px;"><strong>Current Development:</strong> ${escapeHtml(currentBuildingCount + " — " + currentDevelopment.label)}<br><strong>Built Buildings:</strong> ${escapeHtml(currentBuildingCount)} / 4</div><div class="form-group"><label>Population</label><input type="number" name="population" value="${escapeHtml(existing.population ?? "")}" style="width:100%;" /><p class="notes">Population rerolls automatically whenever the number of built buildings changes.</p></div>`;
     const buildingsSection = isSea ? "" : `<hr><h2>Built Buildings</h2><p>A tile may have a maximum of <strong>4 buildings</strong>.</p><div style="display:grid;grid-template-columns:1fr 1fr;gap:2px 16px;">${buildingOptions}</div>`;
+    const currentOwnerId = getTileOwnerUserId(worldTile, existing) || "";
+    const ownerOptions = [
+      `<option value="" ${!currentOwnerId ? "selected" : ""}>Unassigned / clear owner</option>`,
+      ...getPlayerUsers().map(user => `<option value="${escapeHtml(user.id)}" ${String(user.id) === String(currentOwnerId) ? "selected" : ""}>${escapeHtml(user.name)}</option>`)
+    ].join("");
 
     new Dialog({
       title: `House Data — ${worldTile.name || "Unnamed World Tile"}`,
-      content: `<form><div style="padding:8px;margin-bottom:10px;border:1px solid #777;border-radius:6px;"><strong>World Tile:</strong> ${escapeHtml(worldTile.name || "Unnamed Tile")}<br><strong>Region:</strong> ${escapeHtml(worldTile.region || "None")}<br><strong>Terrain:</strong> ${escapeHtml(worldTile.terrainLabel || worldTile.terrainKey || "None")}</div><h2>House</h2><div class="form-group"><label>House Name</label><input type="text" name="house" value="${escapeHtml(existing.house ?? worldTile.owner ?? "")}" style="width:100%;" /></div><div class="form-group"><label>Lord / Ruler</label><input type="text" name="lord" value="${escapeHtml(existing.lord ?? "")}" style="width:100%;" /></div><div class="form-group"><label>Region</label><input type="text" name="region" value="${escapeHtml(existing.region ?? worldTile.region ?? "")}" style="width:100%;" /></div>${cultureSection}${developmentSection}<hr><h2>Economy</h2><div class="form-group"><label>Primary Export</label><input type="text" name="primaryExport" value="${escapeHtml(existing.primaryExport ?? existing.exports ?? "")}" style="width:100%;" /></div><div class="form-group"><label>Secondary Export</label><input type="text" name="secondaryExport" value="${escapeHtml(existing.secondaryExport ?? "")}" style="width:100%;" /></div><div class="form-group"><label>Treasury</label><input type="number" name="treasury" value="${escapeHtml(existing.treasury ?? "")}" style="width:100%;" /></div><div class="form-group"><label>Allegiance</label><input type="text" name="allegiance" value="${escapeHtml(existing.allegiance ?? "")}" style="width:100%;" /></div>${buildingsSection}</form>`,
+      content: `<form><div style="padding:8px;margin-bottom:10px;border:1px solid #777;border-radius:6px;"><strong>World Tile:</strong> ${escapeHtml(worldTile.name || "Unnamed Tile")}<br><strong>Region:</strong> ${escapeHtml(worldTile.region || "None")}<br><strong>Terrain:</strong> ${escapeHtml(worldTile.terrainLabel || worldTile.terrainKey || "None")}</div><h2>House</h2><div class="form-group"><label>House Name</label><input type="text" name="house" value="${escapeHtml(existing.house ?? worldTile.owner ?? "")}" style="width:100%;" /></div><div class="form-group"><label>Player Owner</label><select name="ownerUserId" style="width:100%;">${ownerOptions}</select><p class="notes">This controls which Foundry player can build on this tile. This is separate from the visible Lord / Ruler text.</p></div><div class="form-group"><label>Lord / Ruler</label><input type="text" name="lord" value="${escapeHtml(existing.lord ?? "")}" style="width:100%;" /></div><div class="form-group"><label>Region</label><input type="text" name="region" value="${escapeHtml(existing.region ?? worldTile.region ?? "")}" style="width:100%;" /></div>${cultureSection}${developmentSection}<hr><h2>Economy</h2><div class="form-group"><label>Primary Export</label><input type="text" name="primaryExport" value="${escapeHtml(existing.primaryExport ?? existing.exports ?? "")}" style="width:100%;" /></div><div class="form-group"><label>Secondary Export</label><input type="text" name="secondaryExport" value="${escapeHtml(existing.secondaryExport ?? "")}" style="width:100%;" /></div><div class="form-group"><label>Treasury</label><input type="number" name="treasury" value="${escapeHtml(existing.treasury ?? "")}" style="width:100%;" /></div><div class="form-group"><label>Allegiance</label><input type="text" name="allegiance" value="${escapeHtml(existing.allegiance ?? "")}" style="width:100%;" /></div>${buildingsSection}</form>`,
       buttons: { save: { label: "Save House Data", callback: async html => {
         const form = html[0].querySelector("form");
         const buildings = isSea ? [] : Array.from(form.querySelectorAll('input[name="building"]:checked')).map(input => input.value);
+        const ownerUserId = String(form.ownerUserId.value || "");
+        const ownerUser = ownerUserId ? game.users.get(ownerUserId) : null;
         if (!isSea && buildings.length > 4) { ui.notifications.error("A world tile may have no more than 4 built buildings."); return; }
         let developmentLevel = null, developmentLabel = null, population = null;
         if (!isSea) {
@@ -3715,6 +3820,8 @@
           population = populationRaw === "" ? "" : Number(populationRaw);
           if (oldBuildingCount !== buildings.length || population === "" || Number.isNaN(Number(population))) population = randomPopulation(developmentLevel);
         }
+        const now = new Date().toISOString();
+        const updatedWorldTile = foundry.utils.deepClone(worldTile || {});
         const houseData = {
           house: String(form.house.value || "").trim(),
           lord: String(form.lord.value || "").trim(),
@@ -3725,16 +3832,39 @@
           allegiance: String(form.allegiance.value || "").trim(),
           worldTileId: doc.id,
           worldTileName: worldTile.name,
-          ownerUserId: existing.ownerUserId || worldTile.ownerUserId || "",
-          ownerUserName: existing.ownerUserName || worldTile.ownerUserName || "",
-          playerOwnerUserId: existing.playerOwnerUserId || worldTile.playerOwnerUserId || existing.ownerUserId || worldTile.ownerUserId || "",
-          playerOwnerUserName: existing.playerOwnerUserName || worldTile.playerOwnerUserName || existing.ownerUserName || worldTile.ownerUserName || "",
           ownerAssignedAt: existing.ownerAssignedAt || worldTile.ownerAssignedAt || "",
           ownerAssignedBy: existing.ownerAssignedBy || worldTile.ownerAssignedBy || "",
           version: `Crown Overview Tools ${MODULE_VERSION}`,
-          updatedAt: new Date().toISOString(),
+          updatedAt: now,
           updatedBy: game.user.name
         };
+
+        if (ownerUser) {
+          updatedWorldTile.ownerUserId = ownerUser.id;
+          updatedWorldTile.ownerUserName = ownerUser.name;
+          updatedWorldTile.playerOwnerUserId = ownerUser.id;
+          updatedWorldTile.playerOwnerUserName = ownerUser.name;
+          updatedWorldTile.ownerAssignedAt = now;
+          updatedWorldTile.ownerAssignedBy = game.user.name;
+          updatedWorldTile.ownerAssignedSource = `Crown Overview Tools ${MODULE_VERSION} House Data`;
+
+          houseData.ownerUserId = ownerUser.id;
+          houseData.ownerUserName = ownerUser.name;
+          houseData.playerOwnerUserId = ownerUser.id;
+          houseData.playerOwnerUserName = ownerUser.name;
+          houseData.ownerAssignedAt = now;
+          houseData.ownerAssignedBy = game.user.name;
+        } else {
+          delete updatedWorldTile.ownerUserId;
+          delete updatedWorldTile.ownerUserName;
+          delete updatedWorldTile.playerOwnerUserId;
+          delete updatedWorldTile.playerOwnerUserName;
+          houseData.ownerUserId = "";
+          houseData.ownerUserName = "";
+          houseData.playerOwnerUserId = "";
+          houseData.playerOwnerUserName = "";
+        }
+
         if (!isSea) {
           houseData.culture = String(form.culture.value || "").trim();
           houseData.developmentLevel = developmentLevel;
@@ -3742,9 +3872,10 @@
           houseData.population = population;
           houseData.builtBuildings = buildings;
         }
+        await doc.setFlag(FLAG_SCOPE, WORLD_TILE_KEY, updatedWorldTile);
         await doc.unsetFlag(FLAG_SCOPE, HOUSE_KEY);
         await doc.setFlag(FLAG_SCOPE, HOUSE_KEY, houseData);
-        ui.notifications.info(isSea ? `Saved ${houseData.house || worldTile.name} — Sea Tile` : `Saved ${houseData.house || worldTile.name} — ${developmentLabel} (${developmentLevel} buildings) — Population ${Number(population).toLocaleString()}`);
+        ui.notifications.info(isSea ? `Saved ${houseData.house || worldTile.name} — Sea Tile` : `Saved ${houseData.house || worldTile.name} — ${developmentLabel} (${developmentLevel} buildings) — Population ${Number(population).toLocaleString()}${ownerUser ? " — Owner " + ownerUser.name : ""}`);
       } }, cancel: { label: "Cancel" } },
       default: "save"
     }, { width: 680, height: 820, resizable: true }).render(true);
