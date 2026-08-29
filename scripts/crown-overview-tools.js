@@ -1,6 +1,6 @@
 (() => {
   const MODULE_ID = "crown-overview-tools";
-  const MODULE_VERSION = "0.2.6";
+  const MODULE_VERSION = "0.2.7";
   const FLAG_SCOPE = "world";
   const WORLD_TILE_KEY = "worldTile";
   const WORLD_PIECE_KEY = "worldPiece";
@@ -744,6 +744,7 @@
         <button data-coa-action="assignHouse">Assign House Data</button>
         <button data-coa-action="manageTileEconomy">Manage Tile Economy</button>
         <button data-coa-action="collectEconomy">Collect Economy</button>
+        <button data-coa-action="repairEconomyData">Repair Economy Data</button>
         <button data-coa-action="importRealm">Import CSV</button>
         <button data-coa-action="exportRealm">Export CSV</button>
         <button data-coa-action="hideTileText">Hide Original Tile Text</button>
@@ -2773,8 +2774,19 @@
   }
 
   function resourceKey(value) {
-    const text = String(value ?? "").trim();
+    let text = String(value ?? "")
+      .trim()
+      .replace(/[：]/g, ":")
+      .replace(/[=:\s]+$/g, "")
+      .replace(/^[:=\s]+/g, "")
+      .replace(/\s+/g, " ");
+
+    // Legacy v0.2.6 could accidentally store keys like "Gold:".
+    // Normalise those back to "Gold" so old bad keys do not survive forever.
+    text = text.replace(/[=:]+$/g, "").trim();
+
     if (!text) return "";
+
     const lower = text.toLowerCase();
     const known = DEFAULT_RESOURCE_NAMES.find(name => name.toLowerCase() === lower);
     return known || titleCase(text);
@@ -2787,11 +2799,12 @@
     if (typeof value === "string") {
       const parts = value.split(/[;,\n]/).map(part => part.trim()).filter(Boolean);
       for (const part of parts) {
-        const match = part.match(/^(.+?)(?:[:=]|\s+)([-+]?\d+(?:\.\d+)?)$/);
+        // Accept Gold: 6, Gold:: 6, Gold = 6, Gold 6.
+        const match = part.match(/^(.+?)(?:[:=]+|\s+)\s*([-+]?\d+(?:\.\d+)?)$/);
         if (!match) continue;
         const key = resourceKey(match[1]);
         const amount = Number(match[2]);
-        if (key && Number.isFinite(amount)) output[key] = (output[key] || 0) + amount;
+        if (key && Number.isFinite(amount)) output[key] = Number(output[key] || 0) + amount;
       }
       return output;
     }
@@ -2801,16 +2814,32 @@
         if (!entry) continue;
         const key = resourceKey(entry.name ?? entry.resource ?? entry.key);
         const amount = Number(entry.amount ?? entry.value ?? entry.qty ?? 0);
-        if (key && Number.isFinite(amount)) output[key] = (output[key] || 0) + amount;
+        if (key && Number.isFinite(amount)) output[key] = Number(output[key] || 0) + amount;
       }
       return output;
     }
 
     if (typeof value === "object") {
+      const canonicalSeen = new Set();
       for (const [rawKey, rawValue] of Object.entries(value)) {
         const key = resourceKey(rawKey);
         const amount = Number(rawValue);
-        if (key && Number.isFinite(amount)) output[key] = amount;
+        if (!key || !Number.isFinite(amount)) continue;
+
+        const rawClean = String(rawKey ?? "").trim().replace(/[=:\s]+$/g, "").replace(/^[:=\s]+/g, "").replace(/\s+/g, " ");
+        const canonical = normalize(rawClean) === normalize(key);
+
+        // If both a clean key (Gold) and a legacy malformed key (Gold:) exist,
+        // keep the clean one rather than adding a phantom duplicate.
+        if (!Object.prototype.hasOwnProperty.call(output, key)) {
+          output[key] = amount;
+          if (canonical) canonicalSeen.add(key);
+        } else if (canonical) {
+          output[key] = amount;
+          canonicalSeen.add(key);
+        } else if (!canonicalSeen.has(key)) {
+          output[key] = amount;
+        }
       }
     }
 
@@ -4309,6 +4338,77 @@
     }, { width: 900, height: "auto", resizable: true }).render(true);
   }
 
+
+  async function repairEconomyData() {
+    if (!requireOverviewScene()) return;
+    if (!game.user.isGM) {
+      ui.notifications.warn("Only the GM can repair economy data.");
+      return;
+    }
+
+    const confirmed = await Dialog.confirm({
+      title: "Repair Economy Data?",
+      content: `<p>This will clean malformed resource keys on every world tile in this scene.</p><p>Example: <strong>Gold:: 6</strong> becomes <strong>Gold: 6</strong>.</p><p><strong>It will not delete buildings or change tile ownership.</strong></p>`,
+      yes: () => true,
+      no: () => false,
+      defaultYes: false
+    });
+
+    if (!confirmed) return;
+
+    let checked = 0;
+    let repaired = 0;
+    const rows = [];
+
+    for (const entry of getWorldTileEntries()) {
+      const doc = entry.drawing.document;
+      const house = doc.getFlag(FLAG_SCOPE, HOUSE_KEY) ?? {};
+      checked++;
+
+      const oldIncomeText = resourceMapToText(house.resourceIncome ?? house.resourcesIncome ?? house.naturalResources ?? house.resourceProduction, "");
+      const oldStockText = resourceMapToText(house.resourceStockpile ?? house.resources ?? house.stockpile, "");
+
+      const cleanIncome = getHouseResourceIncome(house);
+      const cleanStockpile = getHouseResourceStockpile(house);
+      const cleanIncomeText = resourceMapToText(cleanIncome, "");
+      const cleanStockText = resourceMapToText(cleanStockpile, "");
+
+      const hasLegacyKeys = Object.keys(house.resourceIncome ?? {}).some(key => resourceKey(key) !== key) ||
+        Object.keys(house.resourceStockpile ?? {}).some(key => resourceKey(key) !== key) ||
+        Object.keys(house.resources ?? {}).some(key => resourceKey(key) !== key) ||
+        Object.keys(house.stockpile ?? {}).some(key => resourceKey(key) !== key);
+
+      if (!hasLegacyKeys && oldIncomeText === cleanIncomeText && oldStockText === cleanStockText) continue;
+
+      const updatedHouse = {
+        ...house,
+        resourceIncome: cleanIncome,
+        resourceStockpile: cleanStockpile,
+        treasury: cleanStockpile.Gold ?? house.treasury ?? "",
+        resourceRepairedAt: new Date().toISOString(),
+        resourceRepairedBy: game.user.name,
+        resourceRepairedSource: `Crown Overview Tools ${MODULE_VERSION}`
+      };
+
+      delete updatedHouse.resources;
+      delete updatedHouse.stockpile;
+      delete updatedHouse.resourcesIncome;
+      delete updatedHouse.naturalResources;
+      delete updatedHouse.resourceProduction;
+
+      await doc.setFlag(FLAG_SCOPE, HOUSE_KEY, updatedHouse);
+      repaired++;
+      rows.push(`<li><strong>${escapeHtml(entry.tile.name || "Unnamed Tile")}</strong>: ${escapeHtml(cleanStockText || "No stockpile")}</li>`);
+    }
+
+    await ChatMessage.create({
+      speaker: ChatMessage.getSpeaker({ alias: "Crown Economy" }),
+      content: `<h2>Economy Data Repaired</h2><p><strong>Tiles checked:</strong> ${escapeHtml(checked)}</p><p><strong>Tiles repaired:</strong> ${escapeHtml(repaired)}</p><ul>${rows.join("") || "<li>No malformed resource records found.</li>"}</ul>`
+    });
+
+    ui.notifications.info(`Economy repair complete. Tiles repaired: ${repaired}.`);
+  }
+
   async function manageTileEconomy() {
     if (!requireOverviewScene()) return;
     if (!game.user.isGM) { ui.notifications.warn("Only the GM can manage tile economy data."); return; }
@@ -4379,6 +4479,7 @@
     updatedHouse.economyEnabled = result.economyEnabled;
     updatedHouse.resourceIncome = normalizeResourceMap(result.resourceIncome);
     updatedHouse.resourceStockpile = addResourceMaps(normalizeResourceMap(result.resourceStockpile), normalizeResourceMap(result.resourceDelta));
+    if (updatedHouse.resourceStockpile.Gold !== undefined) updatedHouse.treasury = updatedHouse.resourceStockpile.Gold;
     updatedHouse.resourceUpdatedAt = new Date().toISOString();
     updatedHouse.resourceUpdatedBy = game.user.name;
     updatedHouse.version = `Crown Overview Tools ${MODULE_VERSION}`;
@@ -4595,8 +4696,12 @@
       const row = csvRows[i];
       const drawingId = String(getColumn(row, "Drawing ID")).trim();
       if (!drawingId) { skipped.push(i + 1); continue; }
-      const drawing = canvas.drawings.placeables.find(drawing => drawing.document.id === drawingId);
-      if (!drawing) { missing.push(drawingId); continue; }
+      let drawing = canvas.drawings.placeables.find(drawing => drawing.document.id === drawingId);
+      if (!drawing) {
+        const provinceName = normalize(getColumn(row, "Province / Tile"));
+        drawing = canvas.drawings.placeables.find(drawing => normalize(drawing.document.getFlag(FLAG_SCOPE, WORLD_TILE_KEY)?.name) === provinceName);
+      }
+      if (!drawing) { missing.push(drawingId || getColumn(row, "Province / Tile")); continue; }
       const doc = drawing.document;
       const existingWorld = doc.getFlag(FLAG_SCOPE, WORLD_TILE_KEY) ?? {};
       const existingHouse = doc.getFlag(FLAG_SCOPE, HOUSE_KEY) ?? {};
@@ -4726,6 +4831,7 @@
     assignHouse,
     manageTileEconomy,
     collectEconomy,
+    repairEconomyData,
     collectEconomyForRound,
     exportRealm,
     importRealm,
