@@ -1,20 +1,20 @@
-# Crown Overview Tools v0.2.5
+# Crown Overview Tools v0.2.6
 
-Scene-gated strategic overview map tools for Crown of Ashes.
+Scene-gated strategic overview map tools for the Crown of Ashes campaign.
 
-## v0.2.5
+Included in v0.2.6:
+- Piece tooltip repositioned above the tile/location tooltip to reduce overlap.
+- Manage Tile Economy button for GM setup of resource income and stockpiles.
+- Arbitrary resources are supported, for example Gold, Wool, Grain, Wood, Stone, Iron, Fish, and Horses.
+- Resource stockpiles support direct add/subtract adjustments.
+- Collect Economy button for GM income collection.
+- Round Clock advance now collects economy for the new round.
+- Seasonal income multipliers are supported: Spring/Summer/Fall normal income, Winter half income.
+- Building costs are checked when economy is enabled for a tile.
+- Building income starts on the next world round after construction.
+- My Holdings now shows resource stockpiles and round income.
+- CSV export/import includes Resource Income, Resource Stockpile, Economy Enabled, and Building Data.
 
-- Tile hover tooltip has been moved higher so it does not get cut off by the bottom UI.
-- Tile hover tooltip is taller and scrollable when there is a lot of data.
-- Linked tiles now display as wrapped link chips instead of one long cut-off line.
-- Keeps all v0.2.4 ownership and build-lock improvements.
-
-## Core tools
-
-- Crown Overview draggable panel
-- World date banner and round clock
-- World piece creation/editing/ownership
-- Tile ownership and house data
-- Player build support with pending build queue
-- Strategic player vision and holdings viewer
-- Route tooltip, piece tooltip, click-to-move, path movement, ports, and CSV import/export
+Scene-gated to:
+- Crown of Ashes
+- Crown of Ashes (Copy)

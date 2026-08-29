@@ -1,6 +1,6 @@
 (() => {
   const MODULE_ID = "crown-overview-tools";
-  const MODULE_VERSION = "0.2.5";
+  const MODULE_VERSION = "0.2.6";
   const FLAG_SCOPE = "world";
   const WORLD_TILE_KEY = "worldTile";
   const WORLD_PIECE_KEY = "worldPiece";
@@ -24,6 +24,7 @@
   const VISIBILITY_DIMMER_KEY = "COA_WORLD_TILE_VISIBILITY_DIMMER";
   const LINK_VIEWER_KEY = "COA_WORLD_TILE_LINK_VIEWER";
   const BUILD_LEDGER_KEY = "worldBuildLedger";
+  const ECONOMY_LEDGER_KEY = "worldEconomyLedger";
   const PENDING_BUILD_STATUS_PENDING = "pending";
   const PENDING_BUILD_STATUS_APPLIED = "applied";
   const PENDING_BUILD_STATUS_FAILED = "failed";
@@ -60,6 +61,35 @@
     "Great Hall", "Keep", "Barracks", "Stable", "Smithy", "Market", "Temple", "Shipyard",
     "Whaling Dock", "Smokehouse", "Workshop", "Granary", "Mill", "Watchtower", "Harbor"
   ];
+
+  const DEFAULT_RESOURCE_NAMES = ["Gold", "Grain", "Wood", "Stone", "Iron", "Wool", "Fish", "Horses"];
+
+  // Costs are intentionally light/default. A tile only enforces costs once its economy is enabled
+  // by Manage Tile Economy or CSV import. This keeps existing playtest tiles backwards compatible.
+  const BUILDING_RULES = {
+    "Great Hall": { cost: { Gold: 4 }, income: { Gold: 1 } },
+    "Keep": { cost: { Gold: 5, Stone: 1 }, income: { Gold: 1 } },
+    "Barracks": { cost: { Gold: 3, Wood: 1 }, income: {} },
+    "Stable": { cost: { Gold: 3, Wood: 1 }, income: { Horses: 1 } },
+    "Smithy": { cost: { Gold: 3, Iron: 1 }, income: { Gold: 1, Iron: 1 } },
+    "Market": { cost: { Gold: 4 }, income: { Gold: 2 } },
+    "Temple": { cost: { Gold: 3, Stone: 1 }, income: { Gold: 1 } },
+    "Shipyard": { cost: { Gold: 4, Wood: 2 }, income: { Wood: 1 } },
+    "Whaling Dock": { cost: { Gold: 3, Wood: 1 }, income: { Fish: 2, Gold: 1 } },
+    "Smokehouse": { cost: { Gold: 2, Wood: 1 }, income: { Fish: 1 } },
+    "Workshop": { cost: { Gold: 3, Wood: 1 }, income: { Gold: 1 } },
+    "Granary": { cost: { Gold: 2, Wood: 1 }, income: { Grain: 2 } },
+    "Mill": { cost: { Gold: 2, Wood: 1 }, income: { Grain: 1, Gold: 1 } },
+    "Watchtower": { cost: { Gold: 2, Wood: 1 }, income: {} },
+    "Harbor": { cost: { Gold: 5, Wood: 2 }, income: { Gold: 2, Fish: 1 } }
+  };
+
+  const SEASON_INCOME_MULTIPLIERS = {
+    Spring: 1,
+    Summer: 1,
+    Fall: 1,
+    Winter: 0.5
+  };
 
   function escapeHtml(value) {
     return String(value ?? "")
@@ -712,6 +742,8 @@
         <button data-coa-action="assignPieceOwner">Assign Piece Owner</button>
         <button data-coa-action="editWorldPiece">Edit World Piece</button>
         <button data-coa-action="assignHouse">Assign House Data</button>
+        <button data-coa-action="manageTileEconomy">Manage Tile Economy</button>
+        <button data-coa-action="collectEconomy">Collect Economy</button>
         <button data-coa-action="importRealm">Import CSV</button>
         <button data-coa-action="exportRealm">Export CSV</button>
         <button data-coa-action="hideTileText">Hide Original Tile Text</button>
@@ -862,6 +894,10 @@
       if (house.treasury !== "" && house.treasury !== undefined && house.treasury !== null) {
         const treasury = Number(house.treasury);
         html += `<strong>Treasury:</strong> ${escapeHtml(Number.isNaN(treasury) ? house.treasury : treasury.toLocaleString())}<br>`;
+      }
+      if (isEconomyEnabled(house)) {
+        html += `<strong>Stockpile:</strong> ${escapeHtml(resourceMapToText(getHouseResourceStockpile(house)))}<br>`;
+        html += `<strong>Round Income:</strong> ${escapeHtml(resourceMapToText(getTileTotalIncome(house, getClock())))}<br>`;
       }
       if (house.primaryExport || house.exports) html += `<strong>Primary Export:</strong> ${escapeHtml(house.primaryExport || house.exports)}<br>`;
       if (house.secondaryExport) html += `<strong>Secondary Export:</strong> ${escapeHtml(house.secondaryExport)}<br>`;
@@ -1827,6 +1863,28 @@
       </div>
     `;
     el.style.display = "block";
+    positionPieceTooltipAboveTileTooltip(el);
+  }
+
+  function positionPieceTooltipAboveTileTooltip(el) {
+    if (!el) return;
+    const margin = 12;
+    const hover = document.getElementById(HOVER_TOOLTIP_ID);
+
+    if (hover && hover.style.display !== "none") {
+      const hoverRect = hover.getBoundingClientRect();
+      const ownRect = el.getBoundingClientRect();
+      const preferredBottom = Math.max(104, window.innerHeight - hoverRect.top + 12);
+      const maxBottom = Math.max(104, window.innerHeight - ownRect.height - margin);
+      el.style.left = `${Math.max(margin, hoverRect.left)}px`;
+      el.style.bottom = `${Math.min(preferredBottom, maxBottom)}px`;
+      el.style.top = "auto";
+      return;
+    }
+
+    el.style.left = "16px";
+    el.style.bottom = "470px";
+    el.style.top = "auto";
   }
 
   function updatePieceTooltip() {
@@ -2267,7 +2325,8 @@
       const newClock = advanceClockData(clock);
       await saveClock(newClock);
       await resetMovement();
-      await ChatMessage.create({ speaker: ChatMessage.getSpeaker({ alias: "World Round Clock" }), content: `<h2>Round Advanced</h2><p><strong>Previous:</strong> ${escapeHtml(getDateLabel(oldClock))}</p><p><strong>Current:</strong> ${escapeHtml(getDateLabel(newClock))}</p><p>All World Pieces now have their full movement available.</p>` });
+      const economySummary = await collectEconomyForRound(newClock, { scope: "all", force: false, silent: false });
+      await ChatMessage.create({ speaker: ChatMessage.getSpeaker({ alias: "World Round Clock" }), content: `<h2>Round Advanced</h2><p><strong>Previous:</strong> ${escapeHtml(getDateLabel(oldClock))}</p><p><strong>Current:</strong> ${escapeHtml(getDateLabel(newClock))}</p><p>All World Pieces now have their full movement available.</p><p><strong>Economy:</strong> ${economySummary.skipped ? "Already collected" : `${escapeHtml(economySummary.applied)} tile(s) paid ${escapeHtml(resourceMapToText(economySummary.totals))}`}</p>` });
     }
   }
 
@@ -2713,6 +2772,203 @@
       .join("");
   }
 
+  function resourceKey(value) {
+    const text = String(value ?? "").trim();
+    if (!text) return "";
+    const lower = text.toLowerCase();
+    const known = DEFAULT_RESOURCE_NAMES.find(name => name.toLowerCase() === lower);
+    return known || titleCase(text);
+  }
+
+  function normalizeResourceMap(value) {
+    if (!value) return {};
+    const output = {};
+
+    if (typeof value === "string") {
+      const parts = value.split(/[;,\n]/).map(part => part.trim()).filter(Boolean);
+      for (const part of parts) {
+        const match = part.match(/^(.+?)(?:[:=]|\s+)([-+]?\d+(?:\.\d+)?)$/);
+        if (!match) continue;
+        const key = resourceKey(match[1]);
+        const amount = Number(match[2]);
+        if (key && Number.isFinite(amount)) output[key] = (output[key] || 0) + amount;
+      }
+      return output;
+    }
+
+    if (Array.isArray(value)) {
+      for (const entry of value) {
+        if (!entry) continue;
+        const key = resourceKey(entry.name ?? entry.resource ?? entry.key);
+        const amount = Number(entry.amount ?? entry.value ?? entry.qty ?? 0);
+        if (key && Number.isFinite(amount)) output[key] = (output[key] || 0) + amount;
+      }
+      return output;
+    }
+
+    if (typeof value === "object") {
+      for (const [rawKey, rawValue] of Object.entries(value)) {
+        const key = resourceKey(rawKey);
+        const amount = Number(rawValue);
+        if (key && Number.isFinite(amount)) output[key] = amount;
+      }
+    }
+
+    return output;
+  }
+
+  function resourceMapToText(map, emptyText = "None") {
+    const normalized = normalizeResourceMap(map);
+    const parts = Object.entries(normalized)
+      .filter(([, value]) => Number(value) !== 0)
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([key, value]) => `${key}: ${Number(value).toLocaleString(undefined, { maximumFractionDigits: 2 })}`);
+    return parts.length ? parts.join("; ") : emptyText;
+  }
+
+  function addResourceMaps(...maps) {
+    const output = {};
+    for (const map of maps) {
+      const normalized = normalizeResourceMap(map);
+      for (const [key, value] of Object.entries(normalized)) {
+        output[key] = Number(output[key] || 0) + Number(value || 0);
+      }
+    }
+    return output;
+  }
+
+  function scaleResourceMap(map, multiplier = 1) {
+    const output = {};
+    for (const [key, value] of Object.entries(normalizeResourceMap(map))) {
+      const result = Number(value || 0) * Number(multiplier || 0);
+      output[key] = Number.isInteger(result) ? result : Math.round(result * 100) / 100;
+    }
+    return output;
+  }
+
+  function hasAnyResources(map) {
+    return Object.values(normalizeResourceMap(map)).some(value => Number(value) !== 0);
+  }
+
+  function getHouseResourceIncome(house = {}) {
+    return normalizeResourceMap(house.resourceIncome ?? house.resourcesIncome ?? house.naturalResources ?? house.resourceProduction);
+  }
+
+  function getHouseResourceStockpile(house = {}) {
+    const stockpile = normalizeResourceMap(house.resourceStockpile ?? house.resources ?? house.stockpile);
+    if (house.treasury !== "" && house.treasury !== undefined && house.treasury !== null) {
+      const treasury = Number(house.treasury);
+      if (Number.isFinite(treasury) && stockpile.Gold === undefined) stockpile.Gold = treasury;
+    }
+    return stockpile;
+  }
+
+  function isEconomyEnabled(house = {}) {
+    return house.economyEnabled === true || hasAnyResources(getHouseResourceIncome(house)) || hasAnyResources(getHouseResourceStockpile(house));
+  }
+
+  function getSeasonMultiplier(clock = getClock()) {
+    const season = String(clock?.season ?? "Spring");
+    const value = SEASON_INCOME_MULTIPLIERS[season];
+    return Number.isFinite(Number(value)) ? Number(value) : 1;
+  }
+
+  function getNextClockData(clock = getClock()) {
+    if (!clock) return null;
+    return advanceClockData(clock);
+  }
+
+  function roundSortValueFromParts(year, roundIndex) {
+    return Number(year ?? 100) * ROUND_ORDER.length + Number(roundIndex ?? 0);
+  }
+
+  function roundSortValue(clock = getClock()) {
+    if (!clock) return 0;
+    return roundSortValueFromParts(clock.year ?? 100, clock.roundIndex ?? 0);
+  }
+
+  function roundSortValueFromBuildMeta(meta = {}) {
+    if (meta.activeFromSort !== undefined) return Number(meta.activeFromSort || 0);
+    if (meta.activeFromYear !== undefined || meta.activeFromRoundIndex !== undefined) return roundSortValueFromParts(meta.activeFromYear ?? 100, meta.activeFromRoundIndex ?? 0);
+    return 0;
+  }
+
+  function getBuildingRule(building) {
+    return BUILDING_RULES[building] || { cost: {}, income: {} };
+  }
+
+  function getActiveBuildingIncome(house = {}, clock = getClock()) {
+    const built = Array.isArray(house.builtBuildings) ? house.builtBuildings : [];
+    const details = Array.isArray(house.buildingData) ? house.buildingData : [];
+    const detailsByName = new Map(details.map(item => [String(item.name || item.building || ""), item]));
+    const currentSort = roundSortValue(clock);
+    let total = {};
+
+    for (const building of built) {
+      const meta = detailsByName.get(String(building));
+      const isActive = !meta || roundSortValueFromBuildMeta(meta) <= currentSort;
+      if (!isActive) continue;
+      total = addResourceMaps(total, getBuildingRule(building).income);
+    }
+
+    return total;
+  }
+
+  function getTileTotalIncome(house = {}, clock = getClock()) {
+    const base = getHouseResourceIncome(house);
+    const buildingIncome = getActiveBuildingIncome(house, clock);
+    const combined = addResourceMaps(base, buildingIncome);
+    return scaleResourceMap(combined, getSeasonMultiplier(clock));
+  }
+
+  function getMissingResources(stockpile, cost) {
+    const have = normalizeResourceMap(stockpile);
+    const need = normalizeResourceMap(cost);
+    const missing = {};
+    for (const [key, amount] of Object.entries(need)) {
+      const deficit = Number(amount || 0) - Number(have[key] || 0);
+      if (deficit > 0) missing[key] = deficit;
+    }
+    return missing;
+  }
+
+  function spendResources(stockpile, cost) {
+    const result = normalizeResourceMap(stockpile);
+    for (const [key, amount] of Object.entries(normalizeResourceMap(cost))) {
+      result[key] = Number(result[key] || 0) - Number(amount || 0);
+    }
+    return result;
+  }
+
+  function addResourceIncomeToStockpile(stockpile, income) {
+    return addResourceMaps(stockpile, income);
+  }
+
+  function syncTreasuryFromResources(house) {
+    const stockpile = getHouseResourceStockpile(house);
+    if (stockpile.Gold !== undefined) house.treasury = stockpile.Gold;
+    return house;
+  }
+
+  function getEconomyLedger() {
+    return canvas.scene?.getFlag(FLAG_SCOPE, ECONOMY_LEDGER_KEY) ?? {};
+  }
+
+  async function saveEconomyLedger(ledger) {
+    await canvas.scene.setFlag(FLAG_SCOPE, ECONOMY_LEDGER_KEY, ledger);
+  }
+
+  function getNextRoundActivation(clock = getClock()) {
+    const next = getNextClockData(clock) || getDefaultClock();
+    return {
+      activeFromRoundKey: getRoundKey(next),
+      activeFromDateLabel: getDateLabel(next),
+      activeFromYear: Number(next.year ?? 100),
+      activeFromRoundIndex: Number(next.roundIndex ?? 0),
+      activeFromSort: roundSortValue(next)
+    };
+  }
+
   function canUserBuildOnTileForUser(worldTile, house = null, user = game.user) {
     if (!user) return false;
     if (user.isGM) return true;
@@ -2889,6 +3145,19 @@
     // Older piece-level lastBuildRoundKey flags can become stale when a GM rewinds the round clock or edits test data,
     // so they are no longer used as a hard blocker here.
 
+    const economyActive = isEconomyEnabled(house);
+    const rule = getBuildingRule(building);
+    const currentStockpile = getHouseResourceStockpile(house);
+    const buildingCost = normalizeResourceMap(rule.cost);
+    const missingResources = economyActive ? getMissingResources(currentStockpile, buildingCost) : {};
+
+    if (economyActive && hasAnyResources(missingResources)) {
+      throw new Error(`${worldTile.name || "This tile"} lacks the resources for ${building}. Missing: ${resourceMapToText(missingResources)}.`);
+    }
+
+    const stockpileAfterCost = economyActive ? spendResources(currentStockpile, buildingCost) : currentStockpile;
+    const activation = getNextRoundActivation(clock);
+
     const updatedBuildings = [...existingBuildings, building].slice(0, 4);
     const developmentLevel = updatedBuildings.length;
     const developmentLabel = DEVELOPMENT_LEVELS[developmentLevel]?.label || "City";
@@ -2907,6 +3176,22 @@
       developmentLabel,
       population,
       builtBuildings: updatedBuildings,
+      economyEnabled: economyActive || house.economyEnabled === true,
+      resourceStockpile: stockpileAfterCost,
+      resourceIncome: getHouseResourceIncome(house),
+      buildingData: [
+        ...(Array.isArray(house.buildingData) ? house.buildingData : []).filter(item => String(item.name || item.building || "") !== String(building)),
+        {
+          name: building,
+          cost: buildingCost,
+          income: normalizeResourceMap(rule.income),
+          builtRoundKey: roundKey,
+          builtDateLabel: dateLabel,
+          builtByUserId: builderUserId,
+          builtByUserName: builderUserName,
+          ...activation
+        }
+      ],
       worldTileId: doc.id,
       worldTileName: worldTile.name || "Unnamed Tile",
       lastBuiltBuilding: building,
@@ -2934,6 +3219,8 @@
       updatedAt: now,
       updatedBy: game.user.name
     };
+
+    syncTreasuryFromResources(updatedHouse);
 
     await doc.setFlag(FLAG_SCOPE, HOUSE_KEY, updatedHouse);
 
@@ -2970,6 +3257,7 @@
         <p><strong>Tile:</strong> ${escapeHtml(worldTile.name || "Unnamed Tile")}</p>
         <p><strong>Tile Owner:</strong> ${escapeHtml(getTileOwnerUserName(worldTile, updatedHouse) || "Unassigned")}</p>
         <p><strong>Building:</strong> ${escapeHtml(building)}</p>
+        ${economyActive ? `<p><strong>Cost Paid:</strong> ${escapeHtml(resourceMapToText(buildingCost))}</p><p><strong>Tile Stockpile:</strong> ${escapeHtml(resourceMapToText(stockpileAfterCost))}</p><p><strong>Building Income Starts:</strong> ${escapeHtml(activation.activeFromDateLabel)} — ${escapeHtml(resourceMapToText(rule.income))}</p>` : `<p><strong>Economy:</strong> Not enabled for this tile, so no resource cost was charged.</p>`}
         <p><strong>Development:</strong> ${escapeHtml(developmentLabel)} (${escapeHtml(developmentLevel)} / 4)</p>
         <p><strong>Population:</strong> ${escapeHtml(Number(population).toLocaleString())}${oldPopulation !== undefined && oldPopulation !== "" ? ` <span style="opacity:0.75;">previously ${escapeHtml(oldPopulation)}</span>` : ""}</p>
         <p><strong>Date:</strong> ${escapeHtml(dateLabel)}</p>`
@@ -3571,7 +3859,8 @@
             <strong>Player Owner:</strong> ${escapeHtml(getTileOwnerUserName(worldTile, house) || (game.user.isGM ? "GM Override" : "Unassigned"))}<br>
             <strong>Date:</strong> ${escapeHtml(dateLabel)}<br>
             <strong>Buildings:</strong> ${escapeHtml(existingBuildings.length)} / 4<br>
-            <strong>Development:</strong> ${escapeHtml(currentDevelopment)} → ${escapeHtml(nextDevelopment)}
+            <strong>Development:</strong> ${escapeHtml(currentDevelopment)} → ${escapeHtml(nextDevelopment)}<br>
+            <strong>Resources:</strong> ${escapeHtml(resourceMapToText(getHouseResourceStockpile(house)))}
           </div>
 
           <div class="form-group">
@@ -3586,7 +3875,12 @@
             ${existingBuildings.length ? escapeHtml(existingBuildings.join(", ")) : "None"}
           </div>
 
-          <p class="notes">Players may place one building per world round. Each tile can hold a maximum of four buildings.</p>
+          <div style="padding:8px;margin-top:10px;border:1px solid #777;border-radius:6px;">
+            <strong>Building costs/income:</strong><br>
+            ${BUILDINGS.filter(name => !existingBuildings.includes(name)).map(name => `${escapeHtml(name)} — Cost: ${escapeHtml(resourceMapToText(getBuildingRule(name).cost))}; Income next round: ${escapeHtml(resourceMapToText(getBuildingRule(name).income))}`).join("<br>")}
+          </div>
+
+          <p class="notes">Players may place one building per world round. Each tile can hold a maximum of four buildings. Resource costs are enforced once economy is enabled for this tile.</p>
         </form>`,
         buttons: {
           build: {
@@ -3910,6 +4204,8 @@
     let population = 0;
     let treasury = 0;
     let buildings = 0;
+    let stockpile = {};
+    let income = {};
     for (const entry of entries) {
       const house = entry.house || {};
       const pop = Number(house.population || 0);
@@ -3917,8 +4213,10 @@
       if (Number.isFinite(pop)) population += pop;
       if (Number.isFinite(cash)) treasury += cash;
       buildings += Array.isArray(house.builtBuildings) ? house.builtBuildings.length : 0;
+      stockpile = addResourceMaps(stockpile, getHouseResourceStockpile(house));
+      income = addResourceMaps(income, getTileTotalIncome(house, getClock()));
     }
-    return { population, treasury, buildings };
+    return { population, treasury, buildings, stockpile, income };
   }
 
   async function chooseHoldingsUser() {
@@ -3966,12 +4264,14 @@
       const developmentLevel = built.length;
       const developmentLabel = house.developmentLabel || DEVELOPMENT_LEVELS[developmentLevel]?.label || "Ruins";
       const resources = [house.primaryExport || house.exports, house.secondaryExport].filter(Boolean).join(", ") || "None";
+      const stockpileText = resourceMapToText(getHouseResourceStockpile(house));
+      const incomeText = resourceMapToText(getTileTotalIncome(house, getClock()));
       return `
         <tr>
           <td style="padding:5px 7px;border:1px solid #777;"><strong>${escapeHtml(tile.name || "Unnamed Tile")}</strong><br><span style="opacity:0.75;">${escapeHtml(house.region || tile.region || "Unassigned")}</span></td>
           <td style="padding:5px 7px;border:1px solid #777;">${escapeHtml(house.house || tile.owner || "None")}<br><span style="opacity:0.75;">Ruler: ${escapeHtml(house.lord || "None")}</span></td>
           <td style="padding:5px 7px;border:1px solid #777;">${escapeHtml(developmentLabel)} (${escapeHtml(developmentLevel)}/4)<br><span style="opacity:0.75;">${escapeHtml(built.length ? built.join(", ") : "No buildings")}</span></td>
-          <td style="padding:5px 7px;border:1px solid #777;">Pop: ${escapeHtml(numberText(house.population))}<br>Treasury: ${escapeHtml(numberText(house.treasury))}</td>
+          <td style="padding:5px 7px;border:1px solid #777;">Pop: ${escapeHtml(numberText(house.population))}<br>Treasury: ${escapeHtml(numberText(house.treasury))}<br>Stockpile: ${escapeHtml(stockpileText)}<br>Income: ${escapeHtml(incomeText)}</td>
           <td style="padding:5px 7px;border:1px solid #777;">${escapeHtml(resources)}</td>
         </tr>
       `;
@@ -3982,12 +4282,14 @@
       content: `
         <div style="max-height:70vh;overflow:auto;">
           <h2 style="margin-top:0;">${escapeHtml(user.name)} Holdings</h2>
-          <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-bottom:10px;">
+          <div style="display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin-bottom:10px;">
             <div style="padding:8px;border:1px solid #777;border-radius:6px;"><strong>Tiles</strong><br>${escapeHtml(entries.length)}</div>
             <div style="padding:8px;border:1px solid #777;border-radius:6px;"><strong>Buildings</strong><br>${escapeHtml(summary.buildings)}</div>
             <div style="padding:8px;border:1px solid #777;border-radius:6px;"><strong>Population</strong><br>${escapeHtml(summary.population.toLocaleString())}</div>
             <div style="padding:8px;border:1px solid #777;border-radius:6px;"><strong>Treasury</strong><br>${escapeHtml(summary.treasury.toLocaleString())}</div>
+            <div style="padding:8px;border:1px solid #777;border-radius:6px;"><strong>Round Income</strong><br>${escapeHtml(resourceMapToText(summary.income))}</div>
           </div>
+          <p><strong>Total Stockpile:</strong> ${escapeHtml(resourceMapToText(summary.stockpile))}</p>
           <table style="border-collapse:collapse;width:100%;font-size:13px;">
             <thead>
               <tr>
@@ -4005,6 +4307,218 @@
       buttons: { close: { label: "Close" } },
       default: "close"
     }, { width: 900, height: "auto", resizable: true }).render(true);
+  }
+
+  async function manageTileEconomy() {
+    if (!requireOverviewScene()) return;
+    if (!game.user.isGM) { ui.notifications.warn("Only the GM can manage tile economy data."); return; }
+
+    const selected = canvas.drawings.controlled;
+    if (selected.length !== 1) { ui.notifications.warn("Select one world tile drawing first."); return; }
+
+    const drawing = selected[0];
+    const doc = drawing.document;
+    const worldTile = getWorldTile(drawing);
+    if (!worldTile) { ui.notifications.warn("This drawing is not a World Tile."); return; }
+
+    const house = foundry.utils.deepClone(doc.getFlag(FLAG_SCOPE, HOUSE_KEY) ?? {});
+    const stockpile = getHouseResourceStockpile(house);
+    const income = getHouseResourceIncome(house);
+    const activeIncome = getTileTotalIncome(house, getClock());
+
+    const result = await new Promise(resolve => {
+      new Dialog({
+        title: `Economy — ${worldTile.name || "World Tile"}`,
+        content: `<form>
+          <div style="padding:8px;margin-bottom:10px;border:1px solid #777;border-radius:6px;">
+            <strong>Tile:</strong> ${escapeHtml(worldTile.name || "Unnamed Tile")}<br>
+            <strong>House:</strong> ${escapeHtml(house.house || worldTile.owner || "None")}<br>
+            <strong>Current round income estimate:</strong> ${escapeHtml(resourceMapToText(activeIncome))}
+          </div>
+
+          <div class="form-group">
+            <label><input type="checkbox" name="economyEnabled" ${isEconomyEnabled(house) ? "checked" : ""}> Enable resource costs for building on this tile</label>
+          </div>
+
+          <div class="form-group">
+            <label><strong>Base Resource Income Each Round</strong></label>
+            <textarea name="resourceIncome" rows="4" style="width:100%;">${escapeHtml(resourceMapToText(income, ""))}</textarea>
+            <p class="notes">Format: Gold: 2; Wool: 1. Buildings add extra income after their first active round.</p>
+          </div>
+
+          <div class="form-group">
+            <label><strong>Current Resource Stockpile</strong></label>
+            <textarea name="resourceStockpile" rows="4" style="width:100%;">${escapeHtml(resourceMapToText(stockpile, ""))}</textarea>
+            <p class="notes">Gold is mirrored into the old Treasury field for compatibility.</p>
+          </div>
+
+          <div class="form-group">
+            <label><strong>Add / Subtract Stockpile Now</strong></label>
+            <input type="text" name="resourceDelta" style="width:100%;" placeholder="Gold: -2; Wool: 3" />
+          </div>
+        </form>`,
+        buttons: {
+          save: { label: "Save Economy", callback: html => {
+            const form = html[0].querySelector("form");
+            resolve({
+              economyEnabled: form.economyEnabled.checked,
+              resourceIncome: String(form.resourceIncome.value || ""),
+              resourceStockpile: String(form.resourceStockpile.value || ""),
+              resourceDelta: String(form.resourceDelta.value || "")
+            });
+          } },
+          cancel: { label: "Cancel", callback: () => resolve(null) }
+        },
+        default: "save"
+      }, { width: 640, height: 560, resizable: true }).render(true);
+    });
+
+    if (!result) return;
+
+    const updatedHouse = foundry.utils.deepClone(house);
+    updatedHouse.economyEnabled = result.economyEnabled;
+    updatedHouse.resourceIncome = normalizeResourceMap(result.resourceIncome);
+    updatedHouse.resourceStockpile = addResourceMaps(normalizeResourceMap(result.resourceStockpile), normalizeResourceMap(result.resourceDelta));
+    updatedHouse.resourceUpdatedAt = new Date().toISOString();
+    updatedHouse.resourceUpdatedBy = game.user.name;
+    updatedHouse.version = `Crown Overview Tools ${MODULE_VERSION}`;
+    syncTreasuryFromResources(updatedHouse);
+
+    await doc.setFlag(FLAG_SCOPE, HOUSE_KEY, updatedHouse);
+
+    await ChatMessage.create({
+      speaker: ChatMessage.getSpeaker({ alias: "Crown Economy" }),
+      content: `<h2>Tile Economy Updated</h2><p><strong>Tile:</strong> ${escapeHtml(worldTile.name || "Unnamed Tile")}</p><p><strong>Base Income:</strong> ${escapeHtml(resourceMapToText(updatedHouse.resourceIncome))}</p><p><strong>Stockpile:</strong> ${escapeHtml(resourceMapToText(updatedHouse.resourceStockpile))}</p><p><strong>Economy Enabled:</strong> ${updatedHouse.economyEnabled ? "Yes" : "No"}</p>`
+    });
+
+    ui.notifications.info(`Economy updated for ${worldTile.name || "selected tile"}.`);
+  }
+
+  function getEconomyTilesForScope(scope, userId = "") {
+    let entries = getWorldTileEntries().map(entry => ({ ...entry, house: getHouseData(entry.drawing) ?? {} }));
+
+    if (scope === "selected") {
+      const selectedIds = new Set(canvas.drawings.controlled.map(d => d.document.id));
+      entries = entries.filter(entry => selectedIds.has(entry.drawing.document.id));
+    }
+
+    if (scope === "player") {
+      entries = entries.filter(entry => String(getTileOwnerUserId(entry.tile, entry.house) || "") === String(userId || ""));
+    }
+
+    return entries;
+  }
+
+  async function collectEconomyForRound(clock = getClock(), { scope = "all", userId = "", force = false, silent = false } = {}) {
+    if (!clock) throw new Error("World Round Clock is not initialized.");
+
+    const roundKey = getRoundKey(clock);
+    const dateLabel = getDateLabel(clock);
+    const ledger = foundry.utils.deepClone(getEconomyLedger());
+    const ledgerKey = `${roundKey}|${scope}|${userId || "all"}`;
+
+    if (!force && ledger[ledgerKey]?.collected) {
+      if (!silent) ui.notifications.warn(`Economy has already been collected for ${dateLabel}. Use Force collect if this is a test/correction.`);
+      return { applied: 0, skipped: true, totals: {}, dateLabel };
+    }
+
+    const entries = getEconomyTilesForScope(scope, userId);
+    const seasonMultiplier = getSeasonMultiplier(clock);
+    let applied = 0;
+    let totals = {};
+    const lines = [];
+
+    for (const entry of entries) {
+      const doc = entry.drawing.document;
+      const house = foundry.utils.deepClone(doc.getFlag(FLAG_SCOPE, HOUSE_KEY) ?? {});
+      if (!isEconomyEnabled(house)) continue;
+
+      const income = getTileTotalIncome(house, clock);
+      if (!hasAnyResources(income)) continue;
+
+      const stockpile = addResourceIncomeToStockpile(getHouseResourceStockpile(house), income);
+      house.resourceStockpile = stockpile;
+      house.resourceIncome = getHouseResourceIncome(house);
+      house.lastEconomyCollectedRoundKey = roundKey;
+      house.lastEconomyCollectedDateLabel = dateLabel;
+      house.lastEconomyCollectedAt = new Date().toISOString();
+      house.lastEconomyCollectedBy = game.user.name;
+      syncTreasuryFromResources(house);
+
+      await doc.setFlag(FLAG_SCOPE, HOUSE_KEY, house);
+
+      totals = addResourceMaps(totals, income);
+      applied++;
+      lines.push(`<li><strong>${escapeHtml(entry.tile.name || "Unnamed Tile")}</strong>: +${escapeHtml(resourceMapToText(income))}</li>`);
+    }
+
+    ledger[ledgerKey] = {
+      collected: true,
+      scope,
+      userId: userId || "",
+      roundKey,
+      dateLabel,
+      season: clock.season || "Spring",
+      seasonMultiplier,
+      applied,
+      totals,
+      collectedAt: new Date().toISOString(),
+      collectedBy: game.user.name
+    };
+    await saveEconomyLedger(ledger);
+
+    if (!silent) {
+      await ChatMessage.create({
+        speaker: ChatMessage.getSpeaker({ alias: "Crown Economy" }),
+        content: `<h2>Economy Collected</h2><p><strong>Date:</strong> ${escapeHtml(dateLabel)}</p><p><strong>Season Multiplier:</strong> ${escapeHtml(seasonMultiplier)}</p><p><strong>Tiles Paid:</strong> ${escapeHtml(applied)}</p><p><strong>Total Income:</strong> ${escapeHtml(resourceMapToText(totals))}</p><ul>${lines.join("") || "<li>No economy-enabled tiles produced resources.</li>"}</ul>`
+      });
+      ui.notifications.info(`Economy collected for ${dateLabel}: ${resourceMapToText(totals)}.`);
+    }
+
+    return { applied, skipped: false, totals, dateLabel };
+  }
+
+  async function collectEconomy() {
+    if (!requireOverviewScene()) return;
+    if (!game.user.isGM) { ui.notifications.warn("Only the GM can collect economy."); return; }
+
+    const players = getPlayerUsers();
+    const playerOptions = players.map(user => `<option value="${escapeHtml(user.id)}">${escapeHtml(user.name)}</option>`).join("");
+
+    const result = await new Promise(resolve => {
+      new Dialog({
+        title: "Collect Economy",
+        content: `<form>
+          <p>Collect resource income into tile stockpiles for the current world round.</p>
+          <div class="form-group">
+            <label>Scope</label>
+            <select name="scope" style="width:100%;">
+              <option value="all">All economy-enabled tiles</option>
+              <option value="selected">Selected tile drawings only</option>
+              <option value="player">One player's holdings</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Player, if using player scope</label>
+            <select name="userId" style="width:100%;">${playerOptions}</select>
+          </div>
+          <div class="form-group">
+            <label><input type="checkbox" name="force"> Force collect again for this round</label>
+          </div>
+        </form>`,
+        buttons: {
+          collect: { label: "Collect", callback: html => {
+            const form = html[0].querySelector("form");
+            resolve({ scope: String(form.scope.value || "all"), userId: String(form.userId.value || ""), force: form.force.checked });
+          } },
+          cancel: { label: "Cancel", callback: () => resolve(null) }
+        },
+        default: "collect"
+      }, { width: 560, height: 370, resizable: true }).render(true);
+    });
+
+    if (!result) return;
+    await collectEconomyForRound(getClock(), result);
   }
 
   async function exportRealm() {
@@ -4031,6 +4545,10 @@
         developmentType: DEVELOPMENT_LEVELS[developmentLevel]?.label ?? "Ruins",
         population: house.population ?? "",
         treasury: house.treasury ?? "",
+        resourceIncome: resourceMapToText(getHouseResourceIncome(house), ""),
+        resourceStockpile: resourceMapToText(getHouseResourceStockpile(house), ""),
+        economyEnabled: isEconomyEnabled(house) ? "Yes" : "No",
+        buildingData: JSON.stringify(Array.isArray(house.buildingData) ? house.buildingData : []),
         primaryExport: house.primaryExport || house.exports || "",
         secondaryExport: house.secondaryExport ?? "",
         allegiance: house.allegiance ?? "",
@@ -4046,7 +4564,7 @@
     if (!rows.length) { ui.notifications.warn("No World Tiles were found on this scene."); return; }
     rows.sort((a, b) => String(a.region).localeCompare(String(b.region)) || String(a.province).localeCompare(String(b.province)));
     const columns = [
-      ["Province / Tile", "province"], ["Drawing ID", "drawingId"], ["Region / Kingdom", "region"], ["Tile Type", "tileType"], ["Terrain", "terrain"], ["Movement Cost", "movementCost"], ["House", "house"], ["Lord / Ruler", "lord"], ["Culture", "culture"], ["Development Level", "developmentLevel"], ["Development Type", "developmentType"], ["Population", "population"], ["Treasury", "treasury"], ["Primary Export", "primaryExport"], ["Secondary Export", "secondaryExport"], ["Allegiance", "allegiance"], ["Built Buildings", "builtBuildings"], ["Building Count", "buildingCount"], ["Adjacent Tiles", "adjacentTiles"], ["World Tile Owner", "worldTileOwner"], ["Tile Assigned By", "tileAssignedBy"], ["House Updated By", "houseUpdatedBy"], ["House Updated At", "houseUpdatedAt"]
+      ["Province / Tile", "province"], ["Drawing ID", "drawingId"], ["Region / Kingdom", "region"], ["Tile Type", "tileType"], ["Terrain", "terrain"], ["Movement Cost", "movementCost"], ["House", "house"], ["Lord / Ruler", "lord"], ["Culture", "culture"], ["Development Level", "developmentLevel"], ["Development Type", "developmentType"], ["Population", "population"], ["Treasury", "treasury"], ["Resource Income", "resourceIncome"], ["Resource Stockpile", "resourceStockpile"], ["Economy Enabled", "economyEnabled"], ["Building Data", "buildingData"], ["Primary Export", "primaryExport"], ["Secondary Export", "secondaryExport"], ["Allegiance", "allegiance"], ["Built Buildings", "builtBuildings"], ["Building Count", "buildingCount"], ["Adjacent Tiles", "adjacentTiles"], ["World Tile Owner", "worldTileOwner"], ["Tile Assigned By", "tileAssignedBy"], ["House Updated By", "houseUpdatedBy"], ["House Updated At", "houseUpdatedAt"]
     ];
     let csv = "\uFEFF" + columns.map(column => csvEscape(column[0])).join(",") + "\r\n";
     for (const row of rows) csv += columns.map(column => csvEscape(row[column[1]])).join(",") + "\r\n";
@@ -4108,6 +4626,10 @@
         developmentLabel,
         population,
         treasury: cleanNumber(getColumn(row, "Treasury")),
+        resourceIncome: normalizeResourceMap(getColumn(row, "Resource Income")),
+        resourceStockpile: normalizeResourceMap(getColumn(row, "Resource Stockpile")),
+        economyEnabled: normalize(getColumn(row, "Economy Enabled")) === "yes" || normalize(getColumn(row, "Economy Enabled")) === "true",
+        buildingData: (() => { try { const value = getColumn(row, "Building Data"); return value ? JSON.parse(value) : (Array.isArray(existingHouse.buildingData) ? existingHouse.buildingData : []); } catch (_) { return Array.isArray(existingHouse.buildingData) ? existingHouse.buildingData : []; } })(),
         primaryExport: String(getColumn(row, "Primary Export")).trim(),
         secondaryExport: String(getColumn(row, "Secondary Export")).trim(),
         allegiance: String(getColumn(row, "Allegiance")).trim(),
@@ -4202,6 +4724,9 @@
     assignPieceOwner,
     editWorldPiece,
     assignHouse,
+    manageTileEconomy,
+    collectEconomy,
+    collectEconomyForRound,
     exportRealm,
     importRealm,
     hideTileText,
