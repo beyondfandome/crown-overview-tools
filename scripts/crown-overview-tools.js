@@ -1,6 +1,6 @@
 (() => {
   const MODULE_ID = "crown-overview-tools";
-  const MODULE_VERSION = "0.3.0";
+  const MODULE_VERSION = "0.3.1";
   const FLAG_SCOPE = "world";
   const WORLD_TILE_KEY = "worldTile";
   const WORLD_PIECE_KEY = "worldPiece";
@@ -3607,7 +3607,8 @@
     const forces = normalizeMarketForces(existing);
     const lines = String(text || "").split(/\n|;/).map(line => line.trim()).filter(Boolean);
     for (const line of lines) {
-      const match = line.match(/^(.+?)(?:[:=]+)\s*([-+]?\d+(?:\.\d+)?)(?:\s*[,/]\s*([-+]?\d+(?:\.\d+)?))?$/);
+      // Accept both 0.5 and .5 so quick spreadsheet-style values do not silently reset to 1.
+      const match = line.match(/^(.+?)(?:[:=]+)\s*([-+]?(?:\d+(?:\.\d+)?|\.\d+))(?:\s*[,/]\s*([-+]?(?:\d+(?:\.\d+)?|\.\d+)))?$/);
       if (!match) continue;
       const category = TRADE_GOOD_CATEGORIES.find(cat => normalize(cat) === normalize(match[1]));
       if (!category) continue;
@@ -3651,7 +3652,17 @@
       rows.push({ ...good, finalGoldValue: goldValue, finalFoodValue: foodValue, goldMultiplier: force.gold, foodMultiplier: force.food });
     }
 
-    const dev = getDevelopmentEconomyBonus(house);
+    const rawDev = getDevelopmentEconomyBonus(house);
+    const developmentSeasonMultiplier = getSeasonMultiplier(clock);
+    const dev = {
+      ...rawDev,
+      rawGold: Number(rawDev.gold || 0),
+      rawFood: Number(rawDev.food || 0),
+      seasonMultiplier: developmentSeasonMultiplier,
+      gold: Math.round(Number(rawDev.gold || 0) * developmentSeasonMultiplier * 100) / 100,
+      food: Math.round(Number(rawDev.food || 0) * developmentSeasonMultiplier * 100) / 100
+    };
+
     gold += Number(dev.gold || 0);
     food += Number(dev.food || 0);
 
