@@ -1,15 +1,15 @@
-# Crown Overview Tools v0.3.2
+# Crown Overview Tools v0.3.3
 
 Scene-gated strategic overview map tools for Crown of Ashes.
 
-## Included in v0.3.2
+## Included in v0.3.3
 
-- Fixes Manual Base Resource Income refilling itself after being cleared.
-- Manual base income is now stored separately from calculated trade-good/building income.
-- Clearing Manual Base Resource Income now stays cleared.
-- Legacy fields such as `naturalResources`, `resourcesIncome`, and `resourceProduction` are removed when saving tile economy data.
-- Repair Economy Data also cleans legacy manual-income fields.
-- Keeps v0.3.1 winter economy scaling, trade goods, market forces, holdings, player vision, build queue, ownership, CSV import/export, and economy tools.
+- Standardizes resource display order across economy, holdings, tooltips, chat cards, and CSV-facing text helpers.
+- Gold now appears before Food wherever resource maps are displayed.
+- Other resources continue to display after Gold/Food in alphabetical order.
+- Holdings summary replaces the old Treasury-only top box with a Stockpile box showing Gold and Food together.
+- Round Income now displays Gold first, then Food, matching trade-good layout.
+- Keeps v0.3.2 manual base income clearing, trade goods, market forces, winter scaling, holdings, player vision, build queue, ownership, CSV import/export, and economy tools.
 
 ## Install
 

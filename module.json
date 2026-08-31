@@ -1,8 +1,8 @@
 {
   "id": "crown-overview-tools",
   "title": "Crown Overview Tools",
-  "description": "Scene-gated strategic overview map tools for Crown of Ashes. v0.3.2 fixes Manual Base Resource Income clearing and legacy economy refill issues.",
-  "version": "0.3.2",
+  "description": "Scene-gated strategic overview map tools for Crown of Ashes. v0.3.3 standardizes resource display order and improves Holdings summary stockpile display.",
+  "version": "0.3.3",
   "authors": [
     {
       "name": "Beyond Fandome"
@@ -20,6 +20,6 @@
   ],
   "url": "https://github.com/beyondfandome/crown-overview-tools",
   "manifest": "https://raw.githubusercontent.com/beyondfandome/crown-overview-tools/main/module.json",
-  "download": "https://github.com/beyondfandome/crown-overview-tools/releases/download/v0.3.2/crown-overview-tools-v0.3.2.zip",
+  "download": "https://github.com/beyondfandome/crown-overview-tools/releases/download/v0.3.3/crown-overview-tools-v0.3.3.zip",
   "socket": true
 }

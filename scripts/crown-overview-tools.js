@@ -1,6 +1,6 @@
 (() => {
   const MODULE_ID = "crown-overview-tools";
-  const MODULE_VERSION = "0.3.2";
+  const MODULE_VERSION = "0.3.3";
   const FLAG_SCOPE = "world";
   const WORLD_TILE_KEY = "worldTile";
   const WORLD_PIECE_KEY = "worldPiece";
@@ -3506,11 +3506,23 @@
     return output;
   }
 
+  function resourceDisplayRank(resourceName) {
+    const key = resourceKey(resourceName);
+    if (key === "Gold") return 0;
+    if (key === "Food") return 1;
+    return 10;
+  }
+
   function resourceMapToText(map, emptyText = "None") {
     const normalized = normalizeResourceMap(map);
     const parts = Object.entries(normalized)
       .filter(([, value]) => Number(value) !== 0)
-      .sort((a, b) => a[0].localeCompare(b[0]))
+      .sort((a, b) => {
+        const rankA = resourceDisplayRank(a[0]);
+        const rankB = resourceDisplayRank(b[0]);
+        if (rankA !== rankB) return rankA - rankB;
+        return a[0].localeCompare(b[0]);
+      })
       .map(([key, value]) => `${key}: ${Number(value).toLocaleString(undefined, { maximumFractionDigits: 2 })}`);
     return parts.length ? parts.join("; ") : emptyText;
   }
@@ -3727,7 +3739,7 @@
   }
 
   function getHouseResourceIncome(house = {}) {
-    // v0.3.2: Manual base income must stay separate from calculated trade-good/building income.
+    // v0.3.2+: Manual base income must stay separate from calculated trade-good/building income.
     // If the user deliberately clears Manual Base Resource Income, an empty object should be respected.
     // Older versions sometimes left values in legacy fields like naturalResources/resourceProduction,
     // which made the Manage Tile Economy dialog refill after the manual field was cleared.
@@ -5109,6 +5121,14 @@
     return { population, treasury, buildings, stockpile, income };
   }
 
+  function goldFoodOnlyText(resourceMap, emptyText = "None") {
+    const resources = normalizeResourceMap(resourceMap);
+    const filtered = {};
+    if (resources.Gold !== undefined) filtered.Gold = resources.Gold;
+    if (resources.Food !== undefined) filtered.Food = resources.Food;
+    return resourceMapToText(filtered, emptyText);
+  }
+
   async function chooseHoldingsUser() {
     if (!game.user.isGM) return game.user;
     const users = getPlayerUsers();
@@ -5176,7 +5196,7 @@
             <div style="padding:8px;border:1px solid #777;border-radius:6px;"><strong>Tiles</strong><br>${escapeHtml(entries.length)}</div>
             <div style="padding:8px;border:1px solid #777;border-radius:6px;"><strong>Buildings</strong><br>${escapeHtml(summary.buildings)}</div>
             <div style="padding:8px;border:1px solid #777;border-radius:6px;"><strong>Population</strong><br>${escapeHtml(summary.population.toLocaleString())}</div>
-            <div style="padding:8px;border:1px solid #777;border-radius:6px;"><strong>Treasury</strong><br>${escapeHtml(summary.treasury.toLocaleString())}</div>
+            <div style="padding:8px;border:1px solid #777;border-radius:6px;"><strong>Stockpile</strong><br>${escapeHtml(goldFoodOnlyText(summary.stockpile))}</div>
             <div style="padding:8px;border:1px solid #777;border-radius:6px;"><strong>Round Income</strong><br>${escapeHtml(resourceMapToText(summary.income))}</div>
           </div>
           <p><strong>Total Stockpile:</strong> ${escapeHtml(resourceMapToText(summary.stockpile))}</p>
