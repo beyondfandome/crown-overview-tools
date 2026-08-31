@@ -1,6 +1,6 @@
 (() => {
   const MODULE_ID = "crown-overview-tools";
-  const MODULE_VERSION = "0.3.1";
+  const MODULE_VERSION = "0.3.2";
   const FLAG_SCOPE = "world";
   const WORLD_TILE_KEY = "worldTile";
   const WORLD_PIECE_KEY = "worldPiece";
@@ -3460,7 +3460,7 @@
       const parts = value.split(/[;,\n]/).map(part => part.trim()).filter(Boolean);
       for (const part of parts) {
         // Accept Gold: 6, Gold:: 6, Gold = 6, Gold 6.
-        const match = part.match(/^(.+?)(?:[:=]+|\s+)\s*([-+]?\d+(?:\.\d+)?)$/);
+        const match = part.match(/^(.+?)(?:[:=]+|\s+)\s*([-+]?(?:\d+(?:\.\d+)?|\.\d+))$/);
         if (!match) continue;
         const key = resourceKey(match[1]);
         const amount = Number(match[2]);
@@ -3727,7 +3727,19 @@
   }
 
   function getHouseResourceIncome(house = {}) {
-    return normalizeResourceMap(house.resourceIncome ?? house.resourcesIncome ?? house.naturalResources ?? house.resourceProduction);
+    // v0.3.2: Manual base income must stay separate from calculated trade-good/building income.
+    // If the user deliberately clears Manual Base Resource Income, an empty object should be respected.
+    // Older versions sometimes left values in legacy fields like naturalResources/resourceProduction,
+    // which made the Manage Tile Economy dialog refill after the manual field was cleared.
+    if (Object.prototype.hasOwnProperty.call(house, "manualResourceIncome")) {
+      return normalizeResourceMap(house.manualResourceIncome);
+    }
+
+    if (Object.prototype.hasOwnProperty.call(house, "resourceIncome")) {
+      return normalizeResourceMap(house.resourceIncome);
+    }
+
+    return normalizeResourceMap(house.resourcesIncome ?? house.naturalResources ?? house.resourceProduction);
   }
 
   function getHouseResourceStockpile(house = {}) {
@@ -4055,6 +4067,7 @@
       builtBuildings: updatedBuildings,
       economyEnabled: economyActive || house.economyEnabled === true,
       resourceStockpile: stockpileAfterCost,
+      manualResourceIncome: getHouseResourceIncome(house),
       resourceIncome: getHouseResourceIncome(house),
       buildingData: [
         ...(Array.isArray(house.buildingData) ? house.buildingData : []).filter(item => String(item.name || item.building || "") !== String(building)),
@@ -5213,7 +5226,7 @@
       const house = doc.getFlag(FLAG_SCOPE, HOUSE_KEY) ?? {};
       checked++;
 
-      const oldIncomeText = resourceMapToText(house.resourceIncome ?? house.resourcesIncome ?? house.naturalResources ?? house.resourceProduction, "");
+      const oldIncomeText = resourceMapToText(house.manualResourceIncome ?? house.resourceIncome ?? house.resourcesIncome ?? house.naturalResources ?? house.resourceProduction, "");
       const oldStockText = resourceMapToText(house.resourceStockpile ?? house.resources ?? house.stockpile, "");
 
       const cleanIncome = getHouseResourceIncome(house);
@@ -5221,15 +5234,20 @@
       const cleanIncomeText = resourceMapToText(cleanIncome, "");
       const cleanStockText = resourceMapToText(cleanStockpile, "");
 
-      const hasLegacyKeys = Object.keys(house.resourceIncome ?? {}).some(key => resourceKey(key) !== key) ||
+      const hasLegacyKeys = Object.keys(house.manualResourceIncome ?? {}).some(key => resourceKey(key) !== key) ||
+        Object.keys(house.resourceIncome ?? {}).some(key => resourceKey(key) !== key) ||
         Object.keys(house.resourceStockpile ?? {}).some(key => resourceKey(key) !== key) ||
         Object.keys(house.resources ?? {}).some(key => resourceKey(key) !== key) ||
-        Object.keys(house.stockpile ?? {}).some(key => resourceKey(key) !== key);
+        Object.keys(house.stockpile ?? {}).some(key => resourceKey(key) !== key) ||
+        Object.prototype.hasOwnProperty.call(house, "resourcesIncome") ||
+        Object.prototype.hasOwnProperty.call(house, "naturalResources") ||
+        Object.prototype.hasOwnProperty.call(house, "resourceProduction");
 
       if (!hasLegacyKeys && oldIncomeText === cleanIncomeText && oldStockText === cleanStockText) continue;
 
       const updatedHouse = {
         ...house,
+        manualResourceIncome: cleanIncome,
         resourceIncome: cleanIncome,
         resourceStockpile: cleanStockpile,
         treasury: cleanStockpile.Gold ?? house.treasury ?? "",
@@ -5404,7 +5422,13 @@
     const updatedHouse = foundry.utils.deepClone(house);
     updatedHouse.economyEnabled = result.economyEnabled;
     setHouseTradeGoods(updatedHouse, result.primaryTradeGood, result.secondaryTradeGood);
-    updatedHouse.resourceIncome = normalizeResourceMap(result.resourceIncome);
+    const cleanManualIncome = normalizeResourceMap(result.resourceIncome);
+    updatedHouse.manualResourceIncome = cleanManualIncome;
+    updatedHouse.resourceIncome = cleanManualIncome;
+    // Remove old legacy/manual fields that can refill the dialog after the user clears Manual Base Income.
+    delete updatedHouse.resourcesIncome;
+    delete updatedHouse.naturalResources;
+    delete updatedHouse.resourceProduction;
     updatedHouse.resourceStockpile = addResourceMaps(normalizeResourceMap(result.resourceStockpile), normalizeResourceMap(result.resourceDelta));
     if (updatedHouse.resourceStockpile.Gold !== undefined) updatedHouse.treasury = updatedHouse.resourceStockpile.Gold;
     updatedHouse.resourceUpdatedAt = new Date().toISOString();
@@ -5467,6 +5491,7 @@
 
       const stockpile = addResourceIncomeToStockpile(getHouseResourceStockpile(house), income);
       house.resourceStockpile = stockpile;
+      house.manualResourceIncome = getHouseResourceIncome(house);
       house.resourceIncome = getHouseResourceIncome(house);
       house.lastEconomyCollectedRoundKey = roundKey;
       house.lastEconomyCollectedDateLabel = dateLabel;
@@ -5671,6 +5696,7 @@
         developmentLabel,
         population,
         treasury: cleanNumber(getColumn(row, "Treasury")),
+        manualResourceIncome: normalizeResourceMap(getColumn(row, "Resource Income")),
         resourceIncome: normalizeResourceMap(getColumn(row, "Resource Income")),
         resourceStockpile: normalizeResourceMap(getColumn(row, "Resource Stockpile")),
         economyEnabled: normalize(getColumn(row, "Economy Enabled")) === "yes" || normalize(getColumn(row, "Economy Enabled")) === "true",
@@ -5686,6 +5712,9 @@
         updatedBy: game.user.name
       };
       setHouseTradeGoods(updatedHouse, getColumn(row, "Primary Trade Good") || updatedHouse.primaryExport, getColumn(row, "Secondary Trade Good") || updatedHouse.secondaryExport);
+      delete updatedHouse.resourcesIncome;
+      delete updatedHouse.naturalResources;
+      delete updatedHouse.resourceProduction;
       syncTreasuryFromResources(updatedHouse);
       updates.push({ doc, world: updatedWorld, house: updatedHouse });
     }

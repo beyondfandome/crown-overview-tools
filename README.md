@@ -1,33 +1,15 @@
-# Crown Overview Tools v0.3.1
+# Crown Overview Tools v0.3.2
 
 Scene-gated strategic overview map tools for Crown of Ashes.
 
-## Included in v0.3.1
+## Included in v0.3.2
 
-- Fixes Winter economy scaling for development bonuses.
-- Development Gold/Food bonuses are now affected by the seasonal income multiplier.
-- This fixes the issue where Winter correctly halved trade-good Gold but left each Ruins tile's +1 Food unhalved.
-- Market Forces now accepts both `0.5` and `.5` values.
-- Keeps v0.3.0 trade goods, category market forces, holdings, player vision, build queue, ownership, CSV import/export, and economy tools.
-
-## Winter example
-
-If Winter category market forces are set to:
-
-```text
-Grains & Field Crops: 0.5, 0.5
-Fruits & Orchard Crops: 0.5, 0.5
-Livestock & Mounts: 0.5, 0.5
-Game & Animal Products: 0.5, 0.5
-Fish & Aquatic Resources: 0.5, 0.5
-Metals & Ores: 0.5, 0.5
-Stone & Minerals: 0.5, 0.5
-Timber & Natural Materials: 0.5, 0.5
-Crafted & Manufactured Goods: 0.5, 0.5
-Trade & Industry: 0.5, 0.5
-```
-
-then trade-good output is halved. Development bonuses are also seasonally scaled, so Ruins +1 Food becomes +0.5 Food in Winter.
+- Fixes Manual Base Resource Income refilling itself after being cleared.
+- Manual base income is now stored separately from calculated trade-good/building income.
+- Clearing Manual Base Resource Income now stays cleared.
+- Legacy fields such as `naturalResources`, `resourcesIncome`, and `resourceProduction` are removed when saving tile economy data.
+- Repair Economy Data also cleans legacy manual-income fields.
+- Keeps v0.3.1 winter economy scaling, trade goods, market forces, holdings, player vision, build queue, ownership, CSV import/export, and economy tools.
 
 ## Install
 
