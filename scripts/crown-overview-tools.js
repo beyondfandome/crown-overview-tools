@@ -1,6 +1,6 @@
 (() => {
   const MODULE_ID = "crown-overview-tools";
-  const MODULE_VERSION = "0.3.3";
+  const MODULE_VERSION = "0.3.4";
   const FLAG_SCOPE = "world";
   const WORLD_TILE_KEY = "worldTile";
   const WORLD_PIECE_KEY = "worldPiece";
@@ -85,11 +85,14 @@
     "Harbor": { cost: { Gold: 5, Wood: 2 }, income: { Gold: 2, Fish: 1 } }
   };
 
+  // v0.3.4: Market Forces are now the source of truth for seasonal scaling.
+  // Keep this legacy constant neutral so Winter does not half some income twice while
+  // Market Forces half trade goods separately.
   const SEASON_INCOME_MULTIPLIERS = {
     Spring: 1,
     Summer: 1,
     Fall: 1,
-    Winter: 0.5
+    Winter: 1
   };
 
   const TRADE_GOODS = [
@@ -3665,14 +3668,14 @@
     }
 
     const rawDev = getDevelopmentEconomyBonus(house);
-    const developmentSeasonMultiplier = getSeasonMultiplier(clock);
+    const developmentMarketMultipliers = getGeneralMarketMultipliers(clock);
     const dev = {
       ...rawDev,
       rawGold: Number(rawDev.gold || 0),
       rawFood: Number(rawDev.food || 0),
-      seasonMultiplier: developmentSeasonMultiplier,
-      gold: Math.round(Number(rawDev.gold || 0) * developmentSeasonMultiplier * 100) / 100,
-      food: Math.round(Number(rawDev.food || 0) * developmentSeasonMultiplier * 100) / 100
+      seasonMultiplier: getGeneralMarketMultiplierText(clock),
+      gold: Math.round(Number(rawDev.gold || 0) * Number(developmentMarketMultipliers.Gold || 1) * 100) / 100,
+      food: Math.round(Number(rawDev.food || 0) * Number(developmentMarketMultipliers.Food || 1) * 100) / 100
     };
 
     gold += Number(dev.gold || 0);
@@ -3704,7 +3707,7 @@
     const breakdown = getTradeGoodIncomeBreakdown(house, clock);
     const manual = getHouseResourceIncome(house);
     const building = getActiveBuildingIncome(house, clock);
-    const manualAndBuildings = scaleResourceMap(addResourceMaps(manual, building), getSeasonMultiplier(clock));
+    const manualAndBuildings = scaleResourceMapByGeneralMarket(addResourceMaps(manual, building), clock);
     const total = addResourceMaps(manualAndBuildings, breakdown.income);
     return {
       trade: breakdown,
@@ -3774,6 +3777,67 @@
     const season = String(clock?.season ?? "Spring");
     const value = SEASON_INCOME_MULTIPLIERS[season];
     return Number.isFinite(Number(value)) ? Number(value) : 1;
+  }
+
+  function nearlyEqual(a, b) {
+    return Math.abs(Number(a || 0) - Number(b || 0)) < 0.000001;
+  }
+
+  function getGeneralMarketMultipliers(clock = getClock()) {
+    const season = String(clock?.season ?? "Spring");
+    const forces = getMarketForces();
+    const seasonForces = forces[season] || {};
+    const goldValues = [];
+    const foodValues = [];
+
+    for (const category of TRADE_GOOD_CATEGORIES) {
+      const raw = seasonForces[category] || { gold: 1, food: 1 };
+      const gold = Number(raw.gold ?? 1);
+      const food = Number(raw.food ?? 1);
+      goldValues.push(Number.isFinite(gold) ? gold : 1);
+      foodValues.push(Number.isFinite(food) ? food : 1);
+    }
+
+    const firstGold = goldValues.length ? goldValues[0] : 1;
+    const firstFood = foodValues.length ? foodValues[0] : 1;
+    const uniformGold = goldValues.every(value => nearlyEqual(value, firstGold));
+    const uniformFood = foodValues.every(value => nearlyEqual(value, firstFood));
+    const uniformAll = uniformGold && uniformFood && nearlyEqual(firstGold, firstFood);
+
+    return {
+      Gold: uniformGold ? firstGold : 1,
+      Food: uniformFood ? firstFood : 1,
+      all: uniformAll ? firstGold : 1,
+      appliesGlobally: uniformGold || uniformFood || uniformAll
+    };
+  }
+
+  function getGeneralMarketMultiplierText(clock = getClock()) {
+    const multipliers = getGeneralMarketMultipliers(clock);
+    const parts = [];
+    parts.push(`Gold ${Number(multipliers.Gold).toLocaleString(undefined, { maximumFractionDigits: 2 })}`);
+    parts.push(`Food ${Number(multipliers.Food).toLocaleString(undefined, { maximumFractionDigits: 2 })}`);
+    if (multipliers.all !== 1 && nearlyEqual(multipliers.Gold, multipliers.Food)) {
+      return Number(multipliers.all).toLocaleString(undefined, { maximumFractionDigits: 2 });
+    }
+    return parts.join("; ");
+  }
+
+  function scaleResourceMapByGeneralMarket(map, clock = getClock()) {
+    const multipliers = getGeneralMarketMultipliers(clock);
+    const output = {};
+
+    for (const [key, value] of Object.entries(normalizeResourceMap(map))) {
+      let multiplier = 1;
+      if (key === "Gold") multiplier = multipliers.Gold;
+      else if (key === "Food") multiplier = multipliers.Food;
+      else multiplier = multipliers.all;
+
+      const result = Number(value || 0) * Number(multiplier || 1);
+      output[key] = Number.isInteger(result) ? result : Math.round(result * 100) / 100;
+    }
+
+    return output;
   }
 
   function getNextClockData(clock = getClock()) {
@@ -5496,7 +5560,7 @@
     }
 
     const entries = getEconomyTilesForScope(scope, userId);
-    const seasonMultiplier = getSeasonMultiplier(clock);
+    const seasonMultiplier = getGeneralMarketMultiplierText(clock);
     let applied = 0;
     let totals = {};
     const lines = [];
