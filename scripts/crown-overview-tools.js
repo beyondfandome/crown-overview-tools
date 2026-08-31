@@ -1,6 +1,6 @@
 (() => {
   const MODULE_ID = "crown-overview-tools";
-  const MODULE_VERSION = "0.2.7";
+  const MODULE_VERSION = "0.3.0";
   const FLAG_SCOPE = "world";
   const WORLD_TILE_KEY = "worldTile";
   const WORLD_PIECE_KEY = "worldPiece";
@@ -25,6 +25,7 @@
   const LINK_VIEWER_KEY = "COA_WORLD_TILE_LINK_VIEWER";
   const BUILD_LEDGER_KEY = "worldBuildLedger";
   const ECONOMY_LEDGER_KEY = "worldEconomyLedger";
+  const MARKET_FORCES_KEY = "worldMarketForces";
   const PENDING_BUILD_STATUS_PENDING = "pending";
   const PENDING_BUILD_STATUS_APPLIED = "applied";
   const PENDING_BUILD_STATUS_FAILED = "failed";
@@ -90,6 +91,663 @@
     Fall: 1,
     Winter: 0.5
   };
+
+  const TRADE_GOODS = [
+    {
+        "category": "Grains & Field Crops",
+        "name": "Barley",
+        "goldValue": 1,
+        "foodValue": 3
+    },
+    {
+        "category": "Grains & Field Crops",
+        "name": "Buckwheat",
+        "goldValue": 1,
+        "foodValue": 3
+    },
+    {
+        "category": "Grains & Field Crops",
+        "name": "Oat",
+        "goldValue": 1,
+        "foodValue": 3
+    },
+    {
+        "category": "Grains & Field Crops",
+        "name": "Rye",
+        "goldValue": 1,
+        "foodValue": 3
+    },
+    {
+        "category": "Grains & Field Crops",
+        "name": "Wheat",
+        "goldValue": 2,
+        "foodValue": 3
+    },
+    {
+        "category": "Fruits & Orchard Crops",
+        "name": "Blueberries",
+        "goldValue": 1,
+        "foodValue": 2
+    },
+    {
+        "category": "Fruits & Orchard Crops",
+        "name": "Green Apples",
+        "goldValue": 1,
+        "foodValue": 2
+    },
+    {
+        "category": "Fruits & Orchard Crops",
+        "name": "Pears",
+        "goldValue": 1,
+        "foodValue": 2
+    },
+    {
+        "category": "Fruits & Orchard Crops",
+        "name": "Plums",
+        "goldValue": 1,
+        "foodValue": 2
+    },
+    {
+        "category": "Fruits & Orchard Crops",
+        "name": "Pumpkins",
+        "goldValue": 1,
+        "foodValue": 3
+    },
+    {
+        "category": "Fruits & Orchard Crops",
+        "name": "Red Apples",
+        "goldValue": 1,
+        "foodValue": 2
+    },
+    {
+        "category": "Fruits & Orchard Crops",
+        "name": "Cantaloupes",
+        "goldValue": 2,
+        "foodValue": 2
+    },
+    {
+        "category": "Fruits & Orchard Crops",
+        "name": "Grapes",
+        "goldValue": 2,
+        "foodValue": 2
+    },
+    {
+        "category": "Fruits & Orchard Crops",
+        "name": "Lemons",
+        "goldValue": 2,
+        "foodValue": 2
+    },
+    {
+        "category": "Fruits & Orchard Crops",
+        "name": "Olives",
+        "goldValue": 2,
+        "foodValue": 3
+    },
+    {
+        "category": "Fruits & Orchard Crops",
+        "name": "Peaches",
+        "goldValue": 2,
+        "foodValue": 2
+    },
+    {
+        "category": "Fruits & Orchard Crops",
+        "name": "Peppers",
+        "goldValue": 2,
+        "foodValue": 2
+    },
+    {
+        "category": "Fruits & Orchard Crops",
+        "name": "Watermelons",
+        "goldValue": 2,
+        "foodValue": 2
+    },
+    {
+        "category": "Fruits & Orchard Crops",
+        "name": "Fireplums",
+        "goldValue": 3,
+        "foodValue": 2
+    },
+    {
+        "category": "Fruits & Orchard Crops",
+        "name": "Spicy Peppers",
+        "goldValue": 3,
+        "foodValue": 2
+    },
+    {
+        "category": "Livestock & Mounts",
+        "name": "Cattle",
+        "goldValue": 1,
+        "foodValue": 3
+    },
+    {
+        "category": "Livestock & Mounts",
+        "name": "Chickens",
+        "goldValue": 1,
+        "foodValue": 3
+    },
+    {
+        "category": "Livestock & Mounts",
+        "name": "Ducks",
+        "goldValue": 1,
+        "foodValue": 2
+    },
+    {
+        "category": "Livestock & Mounts",
+        "name": "Geese",
+        "goldValue": 1,
+        "foodValue": 2
+    },
+    {
+        "category": "Livestock & Mounts",
+        "name": "Goats",
+        "goldValue": 1,
+        "foodValue": 3
+    },
+    {
+        "category": "Livestock & Mounts",
+        "name": "Pigs",
+        "goldValue": 1,
+        "foodValue": 3
+    },
+    {
+        "category": "Livestock & Mounts",
+        "name": "Sheep",
+        "goldValue": 1,
+        "foodValue": 3
+    },
+    {
+        "category": "Livestock & Mounts",
+        "name": "Bracken Browns",
+        "goldValue": 2,
+        "foodValue": 0
+    },
+    {
+        "category": "Livestock & Mounts",
+        "name": "Highland Cows",
+        "goldValue": 2,
+        "foodValue": 2
+    },
+    {
+        "category": "Livestock & Mounts",
+        "name": "Honeybees",
+        "goldValue": 2,
+        "foodValue": 2
+    },
+    {
+        "category": "Livestock & Mounts",
+        "name": "Pack Horses",
+        "goldValue": 2,
+        "foodValue": 0
+    },
+    {
+        "category": "Livestock & Mounts",
+        "name": "Westerland Golds",
+        "goldValue": 3,
+        "foodValue": 0
+    },
+    {
+        "category": "Livestock & Mounts",
+        "name": "Sand Steed",
+        "goldValue": 3,
+        "foodValue": 0
+    },
+    {
+        "category": "Livestock & Mounts",
+        "name": "Snow Steeds",
+        "goldValue": 3,
+        "foodValue": 0
+    },
+    {
+        "category": "Livestock & Mounts",
+        "name": "Vale Greys",
+        "goldValue": 3,
+        "foodValue": 0
+    },
+    {
+        "category": "Game & Animal Products",
+        "name": "Boar",
+        "goldValue": 1,
+        "foodValue": 2
+    },
+    {
+        "category": "Game & Animal Products",
+        "name": "Deer",
+        "goldValue": 1,
+        "foodValue": 2
+    },
+    {
+        "category": "Game & Animal Products",
+        "name": "Elk",
+        "goldValue": 1,
+        "foodValue": 2
+    },
+    {
+        "category": "Game & Animal Products",
+        "name": "Hides",
+        "goldValue": 1,
+        "foodValue": 0
+    },
+    {
+        "category": "Game & Animal Products",
+        "name": "Small Game",
+        "goldValue": 1,
+        "foodValue": 2
+    },
+    {
+        "category": "Game & Animal Products",
+        "name": "Bear Pelts",
+        "goldValue": 2,
+        "foodValue": 0
+    },
+    {
+        "category": "Game & Animal Products",
+        "name": "Falcons",
+        "goldValue": 2,
+        "foodValue": 0
+    },
+    {
+        "category": "Game & Animal Products",
+        "name": "Fox Furs",
+        "goldValue": 2,
+        "foodValue": 0
+    },
+    {
+        "category": "Game & Animal Products",
+        "name": "Hunting Hounds",
+        "goldValue": 2,
+        "foodValue": 0
+    },
+    {
+        "category": "Game & Animal Products",
+        "name": "Marten Pelts",
+        "goldValue": 2,
+        "foodValue": 0
+    },
+    {
+        "category": "Game & Animal Products",
+        "name": "Otter Pelts",
+        "goldValue": 2,
+        "foodValue": 0
+    },
+    {
+        "category": "Game & Animal Products",
+        "name": "Ravens",
+        "goldValue": 2,
+        "foodValue": 0
+    },
+    {
+        "category": "Game & Animal Products",
+        "name": "Wolf Pelts",
+        "goldValue": 2,
+        "foodValue": 0
+    },
+    {
+        "category": "Game & Animal Products",
+        "name": "Exotic Birds",
+        "goldValue": 3,
+        "foodValue": 1
+    },
+    {
+        "category": "Game & Animal Products",
+        "name": "Pale Hide",
+        "goldValue": 4,
+        "foodValue": 0
+    },
+    {
+        "category": "Game & Animal Products",
+        "name": "Unicorns",
+        "goldValue": 4,
+        "foodValue": 0
+    },
+    {
+        "category": "Game & Animal Products",
+        "name": "Unicorn Horn",
+        "goldValue": 4,
+        "foodValue": 0
+    },
+    {
+        "category": "Fish & Aquatic Resources",
+        "name": "Catfish",
+        "goldValue": 1,
+        "foodValue": 3
+    },
+    {
+        "category": "Fish & Aquatic Resources",
+        "name": "Cod",
+        "goldValue": 1,
+        "foodValue": 3
+    },
+    {
+        "category": "Fish & Aquatic Resources",
+        "name": "River Pike",
+        "goldValue": 1,
+        "foodValue": 3
+    },
+    {
+        "category": "Fish & Aquatic Resources",
+        "name": "River Trout",
+        "goldValue": 1,
+        "foodValue": 3
+    },
+    {
+        "category": "Fish & Aquatic Resources",
+        "name": "Crab",
+        "goldValue": 2,
+        "foodValue": 2
+    },
+    {
+        "category": "Fish & Aquatic Resources",
+        "name": "Fermented Crab",
+        "goldValue": 2,
+        "foodValue": 2
+    },
+    {
+        "category": "Fish & Aquatic Resources",
+        "name": "Seals",
+        "goldValue": 2,
+        "foodValue": 2
+    },
+    {
+        "category": "Fish & Aquatic Resources",
+        "name": "Tuna",
+        "goldValue": 2,
+        "foodValue": 3
+    },
+    {
+        "category": "Fish & Aquatic Resources",
+        "name": "Turtles",
+        "goldValue": 2,
+        "foodValue": 2
+    },
+    {
+        "category": "Fish & Aquatic Resources",
+        "name": "Whale Oil",
+        "goldValue": 2,
+        "foodValue": 1
+    },
+    {
+        "category": "Fish & Aquatic Resources",
+        "name": "Pearls",
+        "goldValue": 3,
+        "foodValue": 0
+    },
+    {
+        "category": "Metals & Ores",
+        "name": "Bog Iron",
+        "goldValue": 1,
+        "foodValue": 0
+    },
+    {
+        "category": "Metals & Ores",
+        "name": "Lead",
+        "goldValue": 1,
+        "foodValue": 0
+    },
+    {
+        "category": "Metals & Ores",
+        "name": "Bronze",
+        "goldValue": 2,
+        "foodValue": 0
+    },
+    {
+        "category": "Metals & Ores",
+        "name": "Copper",
+        "goldValue": 2,
+        "foodValue": 0
+    },
+    {
+        "category": "Metals & Ores",
+        "name": "Iron",
+        "goldValue": 2,
+        "foodValue": 0
+    },
+    {
+        "category": "Metals & Ores",
+        "name": "Tin",
+        "goldValue": 2,
+        "foodValue": 0
+    },
+    {
+        "category": "Metals & Ores",
+        "name": "Gold",
+        "goldValue": 3,
+        "foodValue": 0
+    },
+    {
+        "category": "Metals & Ores",
+        "name": "Silver",
+        "goldValue": 3,
+        "foodValue": 0
+    },
+    {
+        "category": "Stone & Minerals",
+        "name": "Clay",
+        "goldValue": 1,
+        "foodValue": 0
+    },
+    {
+        "category": "Stone & Minerals",
+        "name": "Sandstone",
+        "goldValue": 1,
+        "foodValue": 0
+    },
+    {
+        "category": "Stone & Minerals",
+        "name": "Stone",
+        "goldValue": 1,
+        "foodValue": 0
+    },
+    {
+        "category": "Stone & Minerals",
+        "name": "Cut Stone",
+        "goldValue": 2,
+        "foodValue": 0
+    },
+    {
+        "category": "Stone & Minerals",
+        "name": "Granite",
+        "goldValue": 2,
+        "foodValue": 0
+    },
+    {
+        "category": "Stone & Minerals",
+        "name": "Ice",
+        "goldValue": 2,
+        "foodValue": 0
+    },
+    {
+        "category": "Stone & Minerals",
+        "name": "Salt",
+        "goldValue": 2,
+        "foodValue": 0
+    },
+    {
+        "category": "Stone & Minerals",
+        "name": "Sulfur",
+        "goldValue": 2,
+        "foodValue": 0
+    },
+    {
+        "category": "Stone & Minerals",
+        "name": "Amber",
+        "goldValue": 3,
+        "foodValue": 0
+    },
+    {
+        "category": "Stone & Minerals",
+        "name": "Jewels",
+        "goldValue": 3,
+        "foodValue": 0
+    },
+    {
+        "category": "Stone & Minerals",
+        "name": "Marble",
+        "goldValue": 3,
+        "foodValue": 0
+    },
+    {
+        "category": "Timber & Natural Materials",
+        "name": "Beech",
+        "goldValue": 1,
+        "foodValue": 0
+    },
+    {
+        "category": "Timber & Natural Materials",
+        "name": "Peat",
+        "goldValue": 1,
+        "foodValue": 0
+    },
+    {
+        "category": "Timber & Natural Materials",
+        "name": "Reeds",
+        "goldValue": 1,
+        "foodValue": 0
+    },
+    {
+        "category": "Timber & Natural Materials",
+        "name": "Ash",
+        "goldValue": 2,
+        "foodValue": 0
+    },
+    {
+        "category": "Timber & Natural Materials",
+        "name": "Oak",
+        "goldValue": 2,
+        "foodValue": 0
+    },
+    {
+        "category": "Timber & Natural Materials",
+        "name": "Ironwood",
+        "goldValue": 3,
+        "foodValue": 0
+    },
+    {
+        "category": "Crafted & Manufactured Goods",
+        "name": "Candles",
+        "goldValue": 1,
+        "foodValue": 0
+    },
+    {
+        "category": "Crafted & Manufactured Goods",
+        "name": "Fertilizer",
+        "goldValue": 1,
+        "foodValue": 0
+    },
+    {
+        "category": "Crafted & Manufactured Goods",
+        "name": "Dyes",
+        "goldValue": 2,
+        "foodValue": 0
+    },
+    {
+        "category": "Crafted & Manufactured Goods",
+        "name": "Glass",
+        "goldValue": 2,
+        "foodValue": 0
+    },
+    {
+        "category": "Crafted & Manufactured Goods",
+        "name": "Goosefeather Arrows",
+        "goldValue": 2,
+        "foodValue": 0
+    },
+    {
+        "category": "Crafted & Manufactured Goods",
+        "name": "Paper",
+        "goldValue": 2,
+        "foodValue": 0
+    },
+    {
+        "category": "Crafted & Manufactured Goods",
+        "name": "Yew Bows",
+        "goldValue": 2,
+        "foodValue": 0
+    },
+    {
+        "category": "Crafted & Manufactured Goods",
+        "name": "Obsidian Blades",
+        "goldValue": 4,
+        "foodValue": 0
+    },
+    {
+        "category": "Crafted & Manufactured Goods",
+        "name": "Poison",
+        "goldValue": 3,
+        "foodValue": 0
+    },
+    {
+        "category": "Crafted & Manufactured Goods",
+        "name": "Weirwood Bows",
+        "goldValue": 4,
+        "foodValue": 0
+    },
+    {
+        "category": "Trade & Industry",
+        "name": "Ale",
+        "goldValue": 1,
+        "foodValue": 1
+    },
+    {
+        "category": "Trade & Industry",
+        "name": "Cider",
+        "goldValue": 1,
+        "foodValue": 1
+    },
+    {
+        "category": "Trade & Industry",
+        "name": "Whiskey",
+        "goldValue": 2,
+        "foodValue": 1
+    },
+    {
+        "category": "Trade & Industry",
+        "name": "Wine",
+        "goldValue": 2,
+        "foodValue": 1
+    },
+    {
+        "category": "Trade & Industry",
+        "name": "Dornish Red",
+        "goldValue": 3,
+        "foodValue": 1
+    },
+    {
+        "category": "Trade & Industry",
+        "name": "Eyrie Purple (Wine)",
+        "goldValue": 3,
+        "foodValue": 1
+    },
+    {
+        "category": "Trade & Industry",
+        "name": "Tradeports",
+        "goldValue": 3,
+        "foodValue": 0
+    }
+];
+
+  const TRADE_GOOD_CATEGORIES = Array.from(new Set(TRADE_GOODS.map(good => good.category)));
+
+  const DEVELOPMENT_ECONOMY_BONUSES = {
+    0: { label: "Ruins", gold: 0, food: 1 },
+    1: { label: "Hamlet / Village", gold: 3, food: 2 },
+    2: { label: "Holdfast", gold: 4, food: 2 },
+    3: { label: "Town", gold: 6, food: 1 },
+    4: { label: "City", gold: 9, food: -1 }
+  };
+
+  const BUILDING_TREE_DEFINITIONS = {
+    economy: {
+      maxLevel: 3,
+      notes: "Category buildings can be built anywhere, but perform better when the tile has a matching trade good.",
+      categories: TRADE_GOOD_CATEGORIES
+    },
+    road: { maxLevel: 1, movementModifierPerLevel: -0.5, notes: "Roads reduce movement cost by 0.5 and do not upgrade twice." },
+    military: { maxLevel: 3, lines: ["Barracks", "Archery Range", "Stable", "Siege Workshop"], notes: "Future hook: converts base mob into trained soldiers." },
+    musteringGrounds: { maxLevel: 3, baseManpower: 1000, manpowerPerLevel: 500, upkeep: { Gold: 1, Food: 1 } },
+    influence: { maxLevel: 3, lines: ["Sept", "Godswood", "Festival Square", "School"], notes: "Future hook: influence income, holy mercenaries, weddings, tourneys, and stat upgrades." },
+    fortification: { maxLevel: 3, movementCostIncreasePerLevel: 0.5, quickSiegeDcIncreasePerLevel: 2 }
+  };
+
 
   function escapeHtml(value) {
     return String(value ?? "")
@@ -743,6 +1401,7 @@
         <button data-coa-action="editWorldPiece">Edit World Piece</button>
         <button data-coa-action="assignHouse">Assign House Data</button>
         <button data-coa-action="manageTileEconomy">Manage Tile Economy</button>
+        <button data-coa-action="manageMarketForces">Manage Market Forces</button>
         <button data-coa-action="collectEconomy">Collect Economy</button>
         <button data-coa-action="repairEconomyData">Repair Economy Data</button>
         <button data-coa-action="importRealm">Import CSV</button>
@@ -897,6 +1556,7 @@
         html += `<strong>Treasury:</strong> ${escapeHtml(Number.isNaN(treasury) ? house.treasury : treasury.toLocaleString())}<br>`;
       }
       if (isEconomyEnabled(house)) {
+        html += `<strong>Trade Goods:</strong> ${escapeHtml(tradeGoodSummaryText(house))}<br>`;
         html += `<strong>Stockpile:</strong> ${escapeHtml(resourceMapToText(getHouseResourceStockpile(house)))}<br>`;
         html += `<strong>Round Income:</strong> ${escapeHtml(resourceMapToText(getTileTotalIncome(house, getClock())))}<br>`;
       }
@@ -1806,7 +2466,7 @@
     el.id = PIECE_TOOLTIP_ID;
     el.style.position = "fixed";
     el.style.left = "16px";
-    el.style.bottom = "292px";
+    el.style.bottom = "560px";
     el.style.width = "420px";
     el.style.maxHeight = "220px";
     el.style.overflowY = "auto";
@@ -1875,7 +2535,7 @@
     if (hover && hover.style.display !== "none") {
       const hoverRect = hover.getBoundingClientRect();
       const ownRect = el.getBoundingClientRect();
-      const preferredBottom = Math.max(104, window.innerHeight - hoverRect.top + 12);
+      const preferredBottom = Math.max(320, window.innerHeight - hoverRect.top + 28);
       const maxBottom = Math.max(104, window.innerHeight - ownRect.height - margin);
       el.style.left = `${Math.max(margin, hoverRect.left)}px`;
       el.style.bottom = `${Math.min(preferredBottom, maxBottom)}px`;
@@ -1884,7 +2544,7 @@
     }
 
     el.style.left = "16px";
-    el.style.bottom = "470px";
+    el.style.bottom = "560px";
     el.style.top = "auto";
   }
 
@@ -2855,6 +3515,182 @@
     return parts.length ? parts.join("; ") : emptyText;
   }
 
+
+  function getTradeGoodByName(name) {
+    const target = normalize(name);
+    if (!target) return null;
+    return TRADE_GOODS.find(good => normalize(good.name) === target) || null;
+  }
+
+  function buildTradeGoodOptions(selectedName = "") {
+    const selected = normalize(selectedName);
+    let html = '<option value="">None</option>';
+    const grouped = new Map();
+    for (const good of TRADE_GOODS) {
+      if (!grouped.has(good.category)) grouped.set(good.category, []);
+      grouped.get(good.category).push(good);
+    }
+    for (const [category, goods] of grouped.entries()) {
+      html += `<optgroup label="${escapeHtml(category)}">`;
+      for (const good of goods) {
+        const isSelected = normalize(good.name) === selected ? "selected" : "";
+        html += `<option value="${escapeHtml(good.name)}" ${isSelected}>${escapeHtml(good.name)} — G${escapeHtml(good.goldValue)} / F${escapeHtml(good.foodValue)}</option>`;
+      }
+      html += "</optgroup>";
+    }
+    return html;
+  }
+
+  function getHouseTradeGoods(house = {}) {
+    const primaryName = house.tradeGoods?.primary?.name || house.primaryTradeGood || house.primaryExport || house.exports || "";
+    const secondaryName = house.tradeGoods?.secondary?.name || house.secondaryTradeGood || house.secondaryExport || "";
+    const primary = getTradeGoodByName(primaryName);
+    const secondary = getTradeGoodByName(secondaryName);
+    return { primary, secondary };
+  }
+
+  function setHouseTradeGoods(house, primaryName, secondaryName) {
+    const primary = getTradeGoodByName(primaryName);
+    const secondary = getTradeGoodByName(secondaryName);
+    house.tradeGoods = {
+      primary: primary ? foundry.utils.deepClone(primary) : null,
+      secondary: secondary ? foundry.utils.deepClone(secondary) : null
+    };
+    house.primaryTradeGood = primary?.name || "";
+    house.secondaryTradeGood = secondary?.name || "";
+    house.primaryExport = primary?.name || String(primaryName || "").trim();
+    house.secondaryExport = secondary?.name || String(secondaryName || "").trim();
+    return house;
+  }
+
+  function getDefaultMarketForces() {
+    const output = {};
+    for (const season of ROUND_ORDER.map(item => item.season).filter((value, index, array) => array.indexOf(value) === index)) {
+      output[season] = {};
+      for (const category of TRADE_GOOD_CATEGORIES) output[season][category] = { gold: 1, food: 1 };
+    }
+    return output;
+  }
+
+  function normalizeMarketForces(value = {}) {
+    const output = getDefaultMarketForces();
+    for (const [season, categories] of Object.entries(value || {})) {
+      if (!output[season]) output[season] = {};
+      for (const [category, raw] of Object.entries(categories || {})) {
+        const matchedCategory = TRADE_GOOD_CATEGORIES.find(cat => normalize(cat) === normalize(category));
+        if (!matchedCategory) continue;
+        if (typeof raw === "number" || typeof raw === "string") {
+          const amount = Number(raw);
+          if (Number.isFinite(amount)) output[season][matchedCategory] = { gold: amount, food: amount };
+        } else if (raw && typeof raw === "object") {
+          const gold = Number(raw.gold ?? raw.value ?? 1);
+          const food = Number(raw.food ?? raw.value ?? gold);
+          output[season][matchedCategory] = {
+            gold: Number.isFinite(gold) ? gold : 1,
+            food: Number.isFinite(food) ? food : 1
+          };
+        }
+      }
+    }
+    return output;
+  }
+
+  function getMarketForces() {
+    return normalizeMarketForces(canvas.scene?.getFlag(FLAG_SCOPE, MARKET_FORCES_KEY) ?? {});
+  }
+
+  async function saveMarketForces(forces) {
+    await canvas.scene.setFlag(FLAG_SCOPE, MARKET_FORCES_KEY, normalizeMarketForces(forces));
+  }
+
+  function parseMarketForcesText(text, existing, season) {
+    const forces = normalizeMarketForces(existing);
+    const lines = String(text || "").split(/\n|;/).map(line => line.trim()).filter(Boolean);
+    for (const line of lines) {
+      const match = line.match(/^(.+?)(?:[:=]+)\s*([-+]?\d+(?:\.\d+)?)(?:\s*[,/]\s*([-+]?\d+(?:\.\d+)?))?$/);
+      if (!match) continue;
+      const category = TRADE_GOOD_CATEGORIES.find(cat => normalize(cat) === normalize(match[1]));
+      if (!category) continue;
+      const gold = Number(match[2]);
+      const food = match[3] !== undefined ? Number(match[3]) : gold;
+      forces[season][category] = {
+        gold: Number.isFinite(gold) ? gold : 1,
+        food: Number.isFinite(food) ? food : (Number.isFinite(gold) ? gold : 1)
+      };
+    }
+    return forces;
+  }
+
+  function marketForcesToText(forces, season) {
+    const normalized = normalizeMarketForces(forces);
+    return TRADE_GOOD_CATEGORIES
+      .map(category => `${category}: ${normalized[season]?.[category]?.gold ?? 1}, ${normalized[season]?.[category]?.food ?? 1}`)
+      .join("\n");
+  }
+
+  function getDevelopmentEconomyBonus(house = {}) {
+    const level = Math.max(0, Math.min(4, Number(house.developmentLevel ?? (Array.isArray(house.builtBuildings) ? house.builtBuildings.length : 0)) || 0));
+    return DEVELOPMENT_ECONOMY_BONUSES[level] || DEVELOPMENT_ECONOMY_BONUSES[0];
+  }
+
+  function getTradeGoodIncomeBreakdown(house = {}, clock = getClock()) {
+    const forces = getMarketForces();
+    const season = String(clock?.season || "Spring");
+    const goods = getHouseTradeGoods(house);
+    const selectedGoods = [goods.primary, goods.secondary].filter(Boolean);
+    let gold = 0;
+    let food = 0;
+    const rows = [];
+
+    for (const good of selectedGoods) {
+      const force = forces[season]?.[good.category] || { gold: 1, food: 1 };
+      const goldValue = Math.round(Number(good.goldValue || 0) * Number(force.gold || 1) * 100) / 100;
+      const foodValue = Math.round(Number(good.foodValue || 0) * Number(force.food || 1) * 100) / 100;
+      gold += goldValue;
+      food += foodValue;
+      rows.push({ ...good, finalGoldValue: goldValue, finalFoodValue: foodValue, goldMultiplier: force.gold, foodMultiplier: force.food });
+    }
+
+    const dev = getDevelopmentEconomyBonus(house);
+    gold += Number(dev.gold || 0);
+    food += Number(dev.food || 0);
+
+    gold = Math.round(gold * 100) / 100;
+    food = Math.round(food * 100) / 100;
+
+    return {
+      goods,
+      rows,
+      development: dev,
+      gold,
+      food,
+      income: { Gold: gold, Food: food },
+      text: `Gold: ${gold.toLocaleString(undefined, { maximumFractionDigits: 2 })}; Food: ${food.toLocaleString(undefined, { maximumFractionDigits: 2 })}`
+    };
+  }
+
+  function tradeGoodSummaryText(house = {}, emptyText = "None") {
+    const goods = getHouseTradeGoods(house);
+    const parts = [];
+    if (goods.primary) parts.push(`${goods.primary.name} (${goods.primary.category}, G${goods.primary.goldValue}/F${goods.primary.foodValue})`);
+    if (goods.secondary) parts.push(`${goods.secondary.name} (${goods.secondary.category}, G${goods.secondary.goldValue}/F${goods.secondary.foodValue})`);
+    return parts.length ? parts.join("; ") : emptyText;
+  }
+
+  function getTileEconomyBreakdownText(house = {}, clock = getClock()) {
+    const breakdown = getTradeGoodIncomeBreakdown(house, clock);
+    const manual = getHouseResourceIncome(house);
+    const building = getActiveBuildingIncome(house, clock);
+    const manualAndBuildings = scaleResourceMap(addResourceMaps(manual, building), getSeasonMultiplier(clock));
+    const total = addResourceMaps(manualAndBuildings, breakdown.income);
+    return {
+      trade: breakdown,
+      manualAndBuildings,
+      total,
+      totalText: resourceMapToText(total)
+    };
+  }
+
   function addResourceMaps(...maps) {
     const output = {};
     for (const map of maps) {
@@ -2893,7 +3729,10 @@
   }
 
   function isEconomyEnabled(house = {}) {
-    return house.economyEnabled === true || hasAnyResources(getHouseResourceIncome(house)) || hasAnyResources(getHouseResourceStockpile(house));
+    return house.economyEnabled === true ||
+      hasAnyResources(getHouseResourceIncome(house)) ||
+      hasAnyResources(getHouseResourceStockpile(house)) ||
+      Boolean(getHouseTradeGoods(house).primary || getHouseTradeGoods(house).secondary);
   }
 
   function getSeasonMultiplier(clock = getClock()) {
@@ -2944,10 +3783,7 @@
   }
 
   function getTileTotalIncome(house = {}, clock = getClock()) {
-    const base = getHouseResourceIncome(house);
-    const buildingIncome = getActiveBuildingIncome(house, clock);
-    const combined = addResourceMaps(base, buildingIncome);
-    return scaleResourceMap(combined, getSeasonMultiplier(clock));
+    return getTileEconomyBreakdownText(house, clock).total;
   }
 
   function getMissingResources(stockpile, cost) {
@@ -2975,6 +3811,7 @@
 
   function syncTreasuryFromResources(house) {
     const stockpile = getHouseResourceStockpile(house);
+    house.resourceStockpile = stockpile;
     if (stockpile.Gold !== undefined) house.treasury = stockpile.Gold;
     return house;
   }
@@ -4409,6 +5246,68 @@
     ui.notifications.info(`Economy repair complete. Tiles repaired: ${repaired}.`);
   }
 
+
+  async function manageMarketForces() {
+    if (!requireOverviewScene()) return;
+    if (!game.user.isGM) { ui.notifications.warn("Only the GM can manage market forces."); return; }
+
+    const clock = getClock() || { season: "Spring" };
+    const currentSeason = String(clock.season || "Spring");
+    const forces = getMarketForces();
+    const seasons = Object.keys(forces);
+    const seasonOptions = seasons.map(season => `<option value="${escapeHtml(season)}" ${season === currentSeason ? "selected" : ""}>${escapeHtml(season)}</option>`).join("");
+
+    const result = await new Promise(resolve => {
+      new Dialog({
+        title: "Manage Market Forces",
+        content: `<form>
+          <p>These multipliers modify trade-good output by category. Use one number for both Gold/Food, or two values as <code>gold, food</code>.</p>
+          <div class="form-group">
+            <label>Season</label>
+            <select name="season" style="width:100%;">${seasonOptions}</select>
+          </div>
+          <div class="form-group">
+            <label><strong>Category Multipliers</strong></label>
+            <textarea name="marketForces" rows="12" style="width:100%;">${escapeHtml(marketForcesToText(forces, currentSeason))}</textarea>
+            <p class="notes">Example: Grains & Field Crops: 1.25, 1.5 means +25% gold value and +50% food value for that category.</p>
+          </div>
+          <div class="form-group">
+            <label><input type="checkbox" name="resetAll"> Reset all categories/seasons to 1</label>
+          </div>
+        </form>`,
+        buttons: {
+          save: { label: "Save Market Forces", callback: html => {
+            const form = html[0].querySelector("form");
+            resolve({
+              season: String(form.season.value || currentSeason),
+              marketForces: String(form.marketForces.value || ""),
+              resetAll: form.resetAll.checked
+            });
+          } },
+          cancel: { label: "Cancel", callback: () => resolve(null) }
+        },
+        render: html => {
+          const form = html[0].querySelector("form");
+          const seasonSelect = form.querySelector('[name="season"]');
+          const textArea = form.querySelector('[name="marketForces"]');
+          seasonSelect.addEventListener("change", () => {
+            textArea.value = marketForcesToText(forces, seasonSelect.value);
+          });
+        },
+        default: "save"
+      }, { width: 700, height: 600, resizable: true }).render(true);
+    });
+
+    if (!result) return;
+    const updated = result.resetAll ? getDefaultMarketForces() : parseMarketForcesText(result.marketForces, forces, result.season);
+    await saveMarketForces(updated);
+    await ChatMessage.create({
+      speaker: ChatMessage.getSpeaker({ alias: "Crown Market" }),
+      content: `<h2>Market Forces Updated</h2><p><strong>Season:</strong> ${escapeHtml(result.resetAll ? "All seasons reset" : result.season)}</p><pre style="white-space:pre-wrap;">${escapeHtml(result.resetAll ? marketForcesToText(updated, currentSeason) : marketForcesToText(updated, result.season))}</pre>`
+    });
+    ui.notifications.info("Market forces updated.");
+  }
+
   async function manageTileEconomy() {
     if (!requireOverviewScene()) return;
     if (!game.user.isGM) { ui.notifications.warn("Only the GM can manage tile economy data."); return; }
@@ -4424,7 +5323,8 @@
     const house = foundry.utils.deepClone(doc.getFlag(FLAG_SCOPE, HOUSE_KEY) ?? {});
     const stockpile = getHouseResourceStockpile(house);
     const income = getHouseResourceIncome(house);
-    const activeIncome = getTileTotalIncome(house, getClock());
+    const breakdown = getTileEconomyBreakdownText(house, getClock());
+    const goods = getHouseTradeGoods(house);
 
     const result = await new Promise(resolve => {
       new Dialog({
@@ -4433,17 +5333,30 @@
           <div style="padding:8px;margin-bottom:10px;border:1px solid #777;border-radius:6px;">
             <strong>Tile:</strong> ${escapeHtml(worldTile.name || "Unnamed Tile")}<br>
             <strong>House:</strong> ${escapeHtml(house.house || worldTile.owner || "None")}<br>
-            <strong>Current round income estimate:</strong> ${escapeHtml(resourceMapToText(activeIncome))}
+            <strong>Trade Goods:</strong> ${escapeHtml(tradeGoodSummaryText(house))}<br>
+            <strong>Development Bonus:</strong> ${escapeHtml(breakdown.trade.development.label)} — Gold ${escapeHtml(breakdown.trade.development.gold)}, Food ${escapeHtml(breakdown.trade.development.food)}<br>
+            <strong>Current round total income estimate:</strong> ${escapeHtml(breakdown.totalText)}
           </div>
 
           <div class="form-group">
-            <label><input type="checkbox" name="economyEnabled" ${isEconomyEnabled(house) ? "checked" : ""}> Enable resource costs for building on this tile</label>
+            <label><input type="checkbox" name="economyEnabled" ${isEconomyEnabled(house) ? "checked" : ""}> Enable economy and resource costs for this tile</label>
+          </div>
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+            <div class="form-group">
+              <label><strong>Primary Trade Good</strong></label>
+              <select name="primaryTradeGood" style="width:100%;">${buildTradeGoodOptions(goods.primary?.name || house.primaryExport || "")}</select>
+            </div>
+            <div class="form-group">
+              <label><strong>Secondary Trade Good</strong></label>
+              <select name="secondaryTradeGood" style="width:100%;">${buildTradeGoodOptions(goods.secondary?.name || house.secondaryExport || "")}</select>
+            </div>
           </div>
 
           <div class="form-group">
-            <label><strong>Base Resource Income Each Round</strong></label>
-            <textarea name="resourceIncome" rows="4" style="width:100%;">${escapeHtml(resourceMapToText(income, ""))}</textarea>
-            <p class="notes">Format: Gold: 2; Wool: 1. Buildings add extra income after their first active round.</p>
+            <label><strong>Manual Base Resource Income Each Round</strong></label>
+            <textarea name="resourceIncome" rows="3" style="width:100%;">${escapeHtml(resourceMapToText(income, ""))}</textarea>
+            <p class="notes">Optional. Format: Gold: 2; Food: 1; Wool: 1. Trade goods and buildings are added automatically.</p>
           </div>
 
           <div class="form-group">
@@ -4454,7 +5367,7 @@
 
           <div class="form-group">
             <label><strong>Add / Subtract Stockpile Now</strong></label>
-            <input type="text" name="resourceDelta" style="width:100%;" placeholder="Gold: -2; Wool: 3" />
+            <input type="text" name="resourceDelta" style="width:100%;" placeholder="Gold: -2; Food: 3" />
           </div>
         </form>`,
         buttons: {
@@ -4462,6 +5375,8 @@
             const form = html[0].querySelector("form");
             resolve({
               economyEnabled: form.economyEnabled.checked,
+              primaryTradeGood: String(form.primaryTradeGood.value || ""),
+              secondaryTradeGood: String(form.secondaryTradeGood.value || ""),
               resourceIncome: String(form.resourceIncome.value || ""),
               resourceStockpile: String(form.resourceStockpile.value || ""),
               resourceDelta: String(form.resourceDelta.value || "")
@@ -4470,13 +5385,14 @@
           cancel: { label: "Cancel", callback: () => resolve(null) }
         },
         default: "save"
-      }, { width: 640, height: 560, resizable: true }).render(true);
+      }, { width: 760, height: 690, resizable: true }).render(true);
     });
 
     if (!result) return;
 
     const updatedHouse = foundry.utils.deepClone(house);
     updatedHouse.economyEnabled = result.economyEnabled;
+    setHouseTradeGoods(updatedHouse, result.primaryTradeGood, result.secondaryTradeGood);
     updatedHouse.resourceIncome = normalizeResourceMap(result.resourceIncome);
     updatedHouse.resourceStockpile = addResourceMaps(normalizeResourceMap(result.resourceStockpile), normalizeResourceMap(result.resourceDelta));
     if (updatedHouse.resourceStockpile.Gold !== undefined) updatedHouse.treasury = updatedHouse.resourceStockpile.Gold;
@@ -4487,9 +5403,10 @@
 
     await doc.setFlag(FLAG_SCOPE, HOUSE_KEY, updatedHouse);
 
+    const updatedBreakdown = getTileEconomyBreakdownText(updatedHouse, getClock());
     await ChatMessage.create({
       speaker: ChatMessage.getSpeaker({ alias: "Crown Economy" }),
-      content: `<h2>Tile Economy Updated</h2><p><strong>Tile:</strong> ${escapeHtml(worldTile.name || "Unnamed Tile")}</p><p><strong>Base Income:</strong> ${escapeHtml(resourceMapToText(updatedHouse.resourceIncome))}</p><p><strong>Stockpile:</strong> ${escapeHtml(resourceMapToText(updatedHouse.resourceStockpile))}</p><p><strong>Economy Enabled:</strong> ${updatedHouse.economyEnabled ? "Yes" : "No"}</p>`
+      content: `<h2>Tile Economy Updated</h2><p><strong>Tile:</strong> ${escapeHtml(worldTile.name || "Unnamed Tile")}</p><p><strong>Trade Goods:</strong> ${escapeHtml(tradeGoodSummaryText(updatedHouse))}</p><p><strong>Manual Base Income:</strong> ${escapeHtml(resourceMapToText(updatedHouse.resourceIncome))}</p><p><strong>Current Total Income:</strong> ${escapeHtml(updatedBreakdown.totalText)}</p><p><strong>Stockpile:</strong> ${escapeHtml(resourceMapToText(updatedHouse.resourceStockpile))}</p><p><strong>Economy Enabled:</strong> ${updatedHouse.economyEnabled ? "Yes" : "No"}</p>`
     });
 
     ui.notifications.info(`Economy updated for ${worldTile.name || "selected tile"}.`);
@@ -4649,6 +5566,18 @@
         resourceIncome: resourceMapToText(getHouseResourceIncome(house), ""),
         resourceStockpile: resourceMapToText(getHouseResourceStockpile(house), ""),
         economyEnabled: isEconomyEnabled(house) ? "Yes" : "No",
+        primaryTradeGood: getHouseTradeGoods(house).primary?.name || "",
+        primaryTradeCategory: getHouseTradeGoods(house).primary?.category || "",
+        primaryTradeGoldValue: getHouseTradeGoods(house).primary?.goldValue ?? "",
+        primaryTradeFoodValue: getHouseTradeGoods(house).primary?.foodValue ?? "",
+        secondaryTradeGood: getHouseTradeGoods(house).secondary?.name || "",
+        secondaryTradeCategory: getHouseTradeGoods(house).secondary?.category || "",
+        secondaryTradeGoldValue: getHouseTradeGoods(house).secondary?.goldValue ?? "",
+        secondaryTradeFoodValue: getHouseTradeGoods(house).secondary?.foodValue ?? "",
+        tradeFinalGoldValue: getTradeGoodIncomeBreakdown(house, getClock()).gold,
+        tradeFinalFoodValue: getTradeGoodIncomeBreakdown(house, getClock()).food,
+        developmentGoldBonus: getDevelopmentEconomyBonus(house).gold,
+        developmentFoodBonus: getDevelopmentEconomyBonus(house).food,
         buildingData: JSON.stringify(Array.isArray(house.buildingData) ? house.buildingData : []),
         primaryExport: house.primaryExport || house.exports || "",
         secondaryExport: house.secondaryExport ?? "",
@@ -4665,7 +5594,7 @@
     if (!rows.length) { ui.notifications.warn("No World Tiles were found on this scene."); return; }
     rows.sort((a, b) => String(a.region).localeCompare(String(b.region)) || String(a.province).localeCompare(String(b.province)));
     const columns = [
-      ["Province / Tile", "province"], ["Drawing ID", "drawingId"], ["Region / Kingdom", "region"], ["Tile Type", "tileType"], ["Terrain", "terrain"], ["Movement Cost", "movementCost"], ["House", "house"], ["Lord / Ruler", "lord"], ["Culture", "culture"], ["Development Level", "developmentLevel"], ["Development Type", "developmentType"], ["Population", "population"], ["Treasury", "treasury"], ["Resource Income", "resourceIncome"], ["Resource Stockpile", "resourceStockpile"], ["Economy Enabled", "economyEnabled"], ["Building Data", "buildingData"], ["Primary Export", "primaryExport"], ["Secondary Export", "secondaryExport"], ["Allegiance", "allegiance"], ["Built Buildings", "builtBuildings"], ["Building Count", "buildingCount"], ["Adjacent Tiles", "adjacentTiles"], ["World Tile Owner", "worldTileOwner"], ["Tile Assigned By", "tileAssignedBy"], ["House Updated By", "houseUpdatedBy"], ["House Updated At", "houseUpdatedAt"]
+      ["Province / Tile", "province"], ["Drawing ID", "drawingId"], ["Region / Kingdom", "region"], ["Tile Type", "tileType"], ["Terrain", "terrain"], ["Movement Cost", "movementCost"], ["House", "house"], ["Lord / Ruler", "lord"], ["Culture", "culture"], ["Development Level", "developmentLevel"], ["Development Type", "developmentType"], ["Population", "population"], ["Treasury", "treasury"], ["Resource Income", "resourceIncome"], ["Resource Stockpile", "resourceStockpile"], ["Economy Enabled", "economyEnabled"], ["Primary Trade Good", "primaryTradeGood"], ["Primary Trade Category", "primaryTradeCategory"], ["Primary Trade Gold Value", "primaryTradeGoldValue"], ["Primary Trade Food Value", "primaryTradeFoodValue"], ["Secondary Trade Good", "secondaryTradeGood"], ["Secondary Trade Category", "secondaryTradeCategory"], ["Secondary Trade Gold Value", "secondaryTradeGoldValue"], ["Secondary Trade Food Value", "secondaryTradeFoodValue"], ["Trade Final Gold Value", "tradeFinalGoldValue"], ["Trade Final Food Value", "tradeFinalFoodValue"], ["Development Gold Bonus", "developmentGoldBonus"], ["Development Food Bonus", "developmentFoodBonus"], ["Building Data", "buildingData"], ["Primary Export", "primaryExport"], ["Secondary Export", "secondaryExport"], ["Allegiance", "allegiance"], ["Built Buildings", "builtBuildings"], ["Building Count", "buildingCount"], ["Adjacent Tiles", "adjacentTiles"], ["World Tile Owner", "worldTileOwner"], ["Tile Assigned By", "tileAssignedBy"], ["House Updated By", "houseUpdatedBy"], ["House Updated At", "houseUpdatedAt"]
     ];
     let csv = "\uFEFF" + columns.map(column => csvEscape(column[0])).join(",") + "\r\n";
     for (const row of rows) csv += columns.map(column => csvEscape(row[column[1]])).join(",") + "\r\n";
@@ -4735,8 +5664,8 @@
         resourceStockpile: normalizeResourceMap(getColumn(row, "Resource Stockpile")),
         economyEnabled: normalize(getColumn(row, "Economy Enabled")) === "yes" || normalize(getColumn(row, "Economy Enabled")) === "true",
         buildingData: (() => { try { const value = getColumn(row, "Building Data"); return value ? JSON.parse(value) : (Array.isArray(existingHouse.buildingData) ? existingHouse.buildingData : []); } catch (_) { return Array.isArray(existingHouse.buildingData) ? existingHouse.buildingData : []; } })(),
-        primaryExport: String(getColumn(row, "Primary Export")).trim(),
-        secondaryExport: String(getColumn(row, "Secondary Export")).trim(),
+        primaryExport: String(getColumn(row, "Primary Export") || getColumn(row, "Primary Trade Good")).trim(),
+        secondaryExport: String(getColumn(row, "Secondary Export") || getColumn(row, "Secondary Trade Good")).trim(),
         allegiance: String(getColumn(row, "Allegiance")).trim(),
         builtBuildings: buildings,
         worldTileId: drawingId,
@@ -4745,6 +5674,8 @@
         updatedAt: new Date().toISOString(),
         updatedBy: game.user.name
       };
+      setHouseTradeGoods(updatedHouse, getColumn(row, "Primary Trade Good") || updatedHouse.primaryExport, getColumn(row, "Secondary Trade Good") || updatedHouse.secondaryExport);
+      syncTreasuryFromResources(updatedHouse);
       updates.push({ doc, world: updatedWorld, house: updatedHouse });
     }
     let summaryHtml = `<h2>Realm Import</h2><p><strong>${updates.length}</strong> world tiles are ready to update.</p>`;
@@ -4830,6 +5761,7 @@
     editWorldPiece,
     assignHouse,
     manageTileEconomy,
+    manageMarketForces,
     collectEconomy,
     repairEconomyData,
     collectEconomyForRound,
