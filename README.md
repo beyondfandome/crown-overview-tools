@@ -1,10 +1,10 @@
-# Crown Overview Tools v0.4.1
+# Crown Overview Tools v0.4.2
 
 Strategic overview-map tools for Foundry VTT Crown of Ashes scenes.
 
-## Included in v0.4.1
+## Included in v0.4.2
 
-- Includes the previously planned v0.4.0 systems, so you can install this directly from v0.3.x.
+- Includes the previously planned v0.4.0 systems and the v0.4.1 cleaned building catalogue, so you can install this directly from v0.3.x.
 - Hard fix for Manual Base Resource Income clearing.
   - Clearing the field now stays cleared.
   - Legacy manual income fields are removed on save/repair/import/collection.
@@ -20,6 +20,7 @@ Strategic overview-map tools for Foundry VTT Crown of Ashes scenes.
   - Buildings no longer receive matching-export bonuses.
   - Mine remains the best pure-gold line.
   - Foundry remains strong at +4/+8/+12 Gold.
+  - Foundry, Blacksmith, and Armorer also keep troop-support effects for the future recruitment system.
   - Stone gives lower Gold plus infrastructure/fortification discounts.
   - Influence buildings provide +1 additional Influence per upgrade tier, shown as 1/2/3 total Influence.
 - Create/Edit World Piece now includes optional Statecraft.
@@ -39,3 +40,10 @@ The module runs on:
 - Crown of Ashes (Copy)
 
 Or on scenes explicitly flagged by the module.
+
+
+## v0.4.2 hotfix
+
+- Restores the Foundry / Blacksmith / Armorer troop-support effects alongside their Gold income.
+- These effects are stored as building metadata and shown in the build UI.
+- Recruitment/conversion enforcement is still handled by the military-building system/future recruitment tools; this patch preserves the design intent so the line is not gold-only.

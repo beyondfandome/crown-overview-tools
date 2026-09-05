@@ -1,6 +1,6 @@
 (() => {
   const MODULE_ID = "crown-overview-tools";
-  const MODULE_VERSION = "0.4.1";
+  const MODULE_VERSION = "0.4.2";
   const FLAG_SCOPE = "world";
   const WORLD_TILE_KEY = "worldTile";
   const WORLD_PIECE_KEY = "worldPiece";
@@ -105,9 +105,9 @@
       { level: 3, name: "Trading Hall", income: { Gold: 9, Food: 3 }, effect: "+9 Gold, +3 Food" }
     ]},
     { key: "foundry", group: "Economy", label: "Stoke The Forges Anew", levels: [
-      { level: 1, name: "Foundry", income: { Gold: 4 }, effect: "+4 Gold; strong industrial income, below mines" },
-      { level: 2, name: "Blacksmith", income: { Gold: 8 }, effect: "+8 Gold; strong industrial income, below mines" },
-      { level: 3, name: "Armorer", aliases: ["Armoror"], income: { Gold: 12 }, effect: "+12 Gold; strong industrial income, below mines" }
+      { level: 1, name: "Foundry", income: { Gold: 4 }, troopSupport: { basicEquipment: true }, effect: "+4 Gold; supplies basic military equipment" },
+      { level: 2, name: "Blacksmith", income: { Gold: 8 }, troopSupport: { basicEquipment: true, trainedCapacityBonus: 250 }, effect: "+8 Gold; supplies better arms; +250 trained-troop support when recruitment is added" },
+      { level: 3, name: "Armorer", aliases: ["Armoror"], income: { Gold: 12 }, troopSupport: { basicEquipment: true, trainedCapacityBonus: 500, heavyEquipment: true }, effect: "+12 Gold; supplies heavy arms/armor; heavy-troop support when recruitment is added" }
     ]},
     { key: "pastures", group: "Economy", label: "Pen The Lost Herds", levels: [
       { level: 1, name: "Pastures", income: { Food: 4 }, effect: "+4 Food" },
