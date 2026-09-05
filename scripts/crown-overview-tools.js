@@ -1,6 +1,6 @@
 (() => {
   const MODULE_ID = "crown-overview-tools";
-  const MODULE_VERSION = "0.3.4";
+  const MODULE_VERSION = "0.4.1";
   const FLAG_SCOPE = "world";
   const WORLD_TILE_KEY = "worldTile";
   const WORLD_PIECE_KEY = "worldPiece";
@@ -58,31 +58,157 @@
   };
 
   const CULTURES = ["First Men", "Andal", "Ironborn", "Rhoynar", "Valyrian", "Free Folk", "Other"];
-  const BUILDINGS = [
-    "Great Hall", "Keep", "Barracks", "Stable", "Smithy", "Market", "Temple", "Shipyard",
-    "Whaling Dock", "Smokehouse", "Workshop", "Granary", "Mill", "Watchtower", "Harbor"
+
+  const DEFAULT_RESOURCE_NAMES = ["Gold", "Food", "Influence", "Mob", "Light Infantry", "Spearmen", "Heavy Infantry", "Pikemen", "Archers", "Crossbowmen", "Light Cavalry", "Lancers", "Heavy Cavalry", "Ships", "Siege", "Grain", "Wood", "Stone", "Iron", "Wool", "Fish", "Horses"];
+
+  const BUILDING_TIER_COSTS = {
+    1: { Gold: 4 },
+    2: { Gold: 12 },
+    3: { Gold: 24 }
+  };
+
+  const BUILDING_TIER_STATECRAFT_REQUIREMENTS = {
+    1: 5,
+    2: 10,
+    3: 12
+  };
+
+  const BUILDING_LINES = [
+    { key: "fields", group: "Economy", label: "Resow The Fields", levels: [
+      { level: 1, name: "Fields", income: { Food: 4 }, effect: "+4 Food" },
+      { level: 2, name: "Mills", income: { Food: 8 }, effect: "+8 Food" },
+      { level: 3, name: "Granary", income: { Food: 12 }, effect: "+12 Food" }
+    ]},
+    { key: "orchard", group: "Economy", label: "Replant The Vineyard", levels: [
+      { level: 1, name: "Orchard", income: { Gold: 1, Food: 2 }, effect: "+1 Gold, +2 Food" },
+      { level: 2, name: "Mead Makers", income: { Gold: 2, Food: 4 }, effect: "+2 Gold, +4 Food" },
+      { level: 3, name: "Winery", income: { Gold: 3, Food: 6 }, effect: "+3 Gold, +6 Food" }
+    ]},
+    { key: "mine", group: "Economy", label: "Reopen The Mines", levels: [
+      { level: 1, name: "Mine", income: { Gold: 5 }, effect: "+5 Gold; best pure-gold economy line" },
+      { level: 2, name: "Deep Mine", income: { Gold: 10 }, effect: "+10 Gold; best pure-gold economy line" },
+      { level: 3, name: "Mining Complex", income: { Gold: 15 }, effect: "+15 Gold; best pure-gold economy line" }
+    ]},
+    { key: "forester", group: "Economy", label: "Fight Back The Wilderness", levels: [
+      { level: 1, name: "Forester Camps", income: { Gold: 3, Food: 1 }, effect: "+3 Gold, +1 Food" },
+      { level: 2, name: "Logging Guild", income: { Gold: 6, Food: 2 }, effect: "+6 Gold, +2 Food" },
+      { level: 3, name: "Arborialists", income: { Gold: 9, Food: 3 }, effect: "+9 Gold, +3 Food" }
+    ]},
+    { key: "hunters", group: "Economy", label: "Hunt The Great Beasts", levels: [
+      { level: 1, name: "Hunters Camp", aliases: ["Hunters Camps"], income: { Gold: 2, Food: 2 }, effect: "+2 Gold, +2 Food" },
+      { level: 2, name: "Adventurer's Guild", aliases: ["Adventurer's Guilds"], income: { Gold: 4, Food: 4 }, effect: "+4 Gold, +4 Food" },
+      { level: 3, name: "Monster Hunters League", income: { Gold: 6, Food: 6 }, effect: "+6 Gold, +6 Food" }
+    ]},
+    { key: "market", group: "Economy", label: "Clear Away The Rubble In The Square", levels: [
+      { level: 1, name: "Town Square", income: { Gold: 3, Food: 1 }, effect: "+3 Gold, +1 Food" },
+      { level: 2, name: "Market Square", income: { Gold: 6, Food: 2 }, effect: "+6 Gold, +2 Food" },
+      { level: 3, name: "Trading Hall", income: { Gold: 9, Food: 3 }, effect: "+9 Gold, +3 Food" }
+    ]},
+    { key: "foundry", group: "Economy", label: "Stoke The Forges Anew", levels: [
+      { level: 1, name: "Foundry", income: { Gold: 4 }, effect: "+4 Gold; strong industrial income, below mines" },
+      { level: 2, name: "Blacksmith", income: { Gold: 8 }, effect: "+8 Gold; strong industrial income, below mines" },
+      { level: 3, name: "Armorer", aliases: ["Armoror"], income: { Gold: 12 }, effect: "+12 Gold; strong industrial income, below mines" }
+    ]},
+    { key: "pastures", group: "Economy", label: "Pen The Lost Herds", levels: [
+      { level: 1, name: "Pastures", income: { Food: 4 }, effect: "+4 Food" },
+      { level: 2, name: "Expanded Pastures", income: { Food: 8 }, effect: "+8 Food" },
+      { level: 3, name: "Slaughterhouses", income: { Food: 12 }, effect: "+12 Food" }
+    ]},
+    { key: "fishery", group: "Economy", label: "Brave The Seas For Its Bounty", levels: [
+      { level: 1, name: "Fishing Wharf", aliases: ["Fishing Warf"], income: { Food: 4 }, effect: "+4 Food" },
+      { level: 2, name: "Fishing Boats", income: { Food: 8 }, effect: "+8 Food" },
+      { level: 3, name: "Deep Sea Fishing Boats", income: { Food: 12 }, effect: "+12 Food" }
+    ]},
+    { key: "stone", group: "Economy", label: "Break Open The Stone Pits", levels: [
+      { level: 1, name: "Stone Pit", income: { Gold: 2 }, infrastructureDiscount: 1, effect: "+2 Gold; Roads, Ports, and Watchtowers cost -1 Gold on this tile" },
+      { level: 2, name: "Stone Quarry", income: { Gold: 4 }, infrastructureDiscount: 2, effect: "+4 Gold; Roads, Ports, and Watchtowers cost -2 Gold on this tile" },
+      { level: 3, name: "Quarrying Complex", income: { Gold: 6 }, infrastructureDiscount: 3, effect: "+6 Gold; Roads, Ports, and Watchtowers cost -3 Gold on this tile" }
+    ]},
+    { key: "road", group: "Infrastructure", label: "Road", levels: [
+      { level: 1, name: "Road", income: {}, effect: "One-and-done; -0.5 movement cost through this tile" }
+    ]},
+    { key: "port", group: "Infrastructure", label: "Port", levels: [
+      { level: 1, name: "Port", income: { Gold: 1 }, effect: "Enables port travel; +1 Gold" },
+      { level: 2, name: "Trade Port", income: { Gold: 2, Food: 1 }, effect: "+2 Gold, +1 Food" },
+      { level: 3, name: "Safe Harbor", income: { Gold: 3, Food: 2 }, effect: "+3 Gold, +2 Food" }
+    ]},
+    { key: "barracks", group: "Military", label: "Barracks", levels: [
+      { level: 1, name: "Town Guards", income: { "Light Infantry": 500 }, effect: "Convert 500 Mob to Light Infantry/Spearmen" },
+      { level: 2, name: "Town Barracks", income: { "Light Infantry": 1000, Spearmen: 1000 }, effect: "Convert 1000 Mob to Light Infantry/Spearmen" },
+      { level: 3, name: "Infantry Schools", income: { "Light Infantry": 1000, Spearmen: 1000, "Heavy Infantry": 250, Pikemen: 250 }, effect: "Convert 1000 Mob to Light Infantry/Spearmen; 250 Heavy Infantry/Pikemen" }
+    ]},
+    { key: "archery", group: "Military", label: "Archery Range", levels: [
+      { level: 1, name: "Hunters Lodge", income: { Archers: 500 }, effect: "Convert 500 Mob to Archers" },
+      { level: 2, name: "Archery Range", income: { Archers: 1000, Crossbowmen: 1000 }, effect: "Convert 1000 Mob to Archers/Crossbowmen" },
+      { level: 3, name: "Master Fletchers", income: { Archers: 1500, Crossbowmen: 1500 }, effect: "Convert 1500 Mob to Archers/Crossbowmen" }
+    ]},
+    { key: "stable", group: "Military", label: "Stable", levels: [
+      { level: 1, name: "Scout Stable", aliases: ["Scouts Stable"], income: { "Light Cavalry": 250 }, effect: "Convert 250 Mob to Light Cavalry" },
+      { level: 2, name: "Lancers Training Grounds", income: { "Light Cavalry": 500, Lancers: 500 }, effect: "Convert 500 Mob to Light Cavalry/Lancers" },
+      { level: 3, name: "Knight's Holdfast", aliases: ["Knights Holdfasts"], income: { "Light Cavalry": 500, Lancers: 500, "Heavy Cavalry": 200 }, effect: "Convert 500 Mob to Light Cavalry/Lancers; 200 Heavy Cavalry" }
+    ]},
+    { key: "mustering", group: "Military", label: "Mustering Grounds", levels: [
+      { level: 1, name: "Mustering Hall", income: { Mob: 500, Food: -3 }, effect: "+500 Mob, -3 Food upkeep" },
+      { level: 2, name: "Mustering Grounds", income: { Mob: 1000, Food: -6 }, effect: "+1000 Mob, -6 Food upkeep" },
+      { level: 3, name: "Levee En Masse", aliases: ["Levee En Mass"], income: { Mob: 1500, Food: -6, Gold: -3 }, effect: "+1500 Mob, -6 Food, -3 Gold upkeep" }
+    ]},
+    { key: "watchtower", group: "Military", label: "Watchtowers", levels: [
+      { level: 1, name: "Watchtowers", income: {}, movementCostModifier: 0.5, siegeModifier: 1, effect: "+1 siege DC, +0.5 enemy movement cost" },
+      { level: 2, name: "Holdfasts", income: {}, movementCostModifier: 1, siegeModifier: 2, effect: "+2 siege DC, +1 enemy movement cost" },
+      { level: 3, name: "Castles", income: {}, movementCostModifier: 1.5, siegeModifier: 3, effect: "+3 siege DC, +1.5 enemy movement cost" }
+    ]},
+    { key: "siege", group: "Military", label: "Siege Workshop", levels: [
+      { level: 1, name: "Ram Specialists", income: { Siege: 5 }, effect: "Unlock Battering Ram" },
+      { level: 2, name: "Carpenters Guild", income: { Siege: 10 }, effect: "Unlock Ballista/Onager" },
+      { level: 3, name: "Siege Workshop", income: { Siege: 15 }, effect: "Unlock Trebuchet" }
+    ]},
+    { key: "drydock", group: "Military", label: "Drydock", levels: [
+      { level: 1, name: "Shipwright", income: { Ships: 1 }, effect: "Unlock small boats" },
+      { level: 2, name: "Sail Makers", income: { Ships: 2 }, effect: "Unlock more boats" },
+      { level: 3, name: "Dry Dock", income: { Ships: 3 }, effect: "Unlock heavy boats" }
+    ]},
+    { key: "sept", group: "Social", label: "Sept", levels: [
+      { level: 1, name: "Village Sept", income: { Influence: 1 }, effect: "+1 Influence; holy order flavour" },
+      { level: 2, name: "Monastery", aliases: ["Monastary"], income: { Influence: 2 }, effect: "+2 total Influence" },
+      { level: 3, name: "Grand Sept", income: { Influence: 3 }, effect: "+3 total Influence" }
+    ]},
+    { key: "godswood", group: "Social", label: "Godswood", levels: [
+      { level: 1, name: "Small Godswood", income: { Influence: 1 }, effect: "+1 Influence; old gods flavour" },
+      { level: 2, name: "Godsgrove", income: { Influence: 2 }, effect: "+2 total Influence" },
+      { level: 3, name: "Massive Godswood", income: { Influence: 3 }, effect: "+3 total Influence" }
+    ]},
+    { key: "festival", group: "Social", label: "Festival Square", levels: [
+      { level: 1, name: "Festival Square", income: { Influence: 1 }, festivalCostReduction: 10, effect: "+1 Influence; -10% festival cost" },
+      { level: 2, name: "Feasting Halls", income: { Influence: 2 }, festivalCostReduction: 15, effect: "+2 total Influence; -15% festival cost" },
+      { level: 3, name: "Tourney Grounds", income: { Influence: 3 }, festivalCostReduction: 20, effect: "+3 total Influence; -20% festival/tourney cost" }
+    ]},
+    { key: "school", group: "Social", label: "Schools", levels: [
+      { level: 1, name: "Apprenticeships", income: { Influence: 1 }, skillTrainingUses: 1, effect: "+1 Influence; train 1 skill once" },
+      { level: 2, name: "School", income: { Influence: 2 }, skillTrainingUses: 1, effect: "+2 total Influence; train 1 skill once" },
+      { level: 3, name: "University", income: { Influence: 3 }, skillTrainingUses: 1, effect: "+3 total Influence; train 1 skill once" }
+    ]},
+    { key: "townhall", group: "Social", label: "Town Hall", levels: [
+      { level: 1, name: "Village Charters", income: { Influence: 1 }, effect: "+1 Influence" },
+      { level: 2, name: "Travelling Doctors", aliases: ["Traveling Doctors"], income: { Influence: 2 }, effect: "+2 total Influence" },
+      { level: 3, name: "Town Halls", income: { Influence: 3 }, effect: "+3 total Influence" }
+    ]}
   ];
 
-  const DEFAULT_RESOURCE_NAMES = ["Gold", "Grain", "Wood", "Stone", "Iron", "Wool", "Fish", "Horses"];
+  const BUILDINGS = BUILDING_LINES.map(line => line.levels[0]?.name).filter(Boolean);
 
-  // Costs are intentionally light/default. A tile only enforces costs once its economy is enabled
-  // by Manage Tile Economy or CSV import. This keeps existing playtest tiles backwards compatible.
   const BUILDING_RULES = {
-    "Great Hall": { cost: { Gold: 4 }, income: { Gold: 1 } },
-    "Keep": { cost: { Gold: 5, Stone: 1 }, income: { Gold: 1 } },
-    "Barracks": { cost: { Gold: 3, Wood: 1 }, income: {} },
-    "Stable": { cost: { Gold: 3, Wood: 1 }, income: { Horses: 1 } },
-    "Smithy": { cost: { Gold: 3, Iron: 1 }, income: { Gold: 1, Iron: 1 } },
-    "Market": { cost: { Gold: 4 }, income: { Gold: 2 } },
-    "Temple": { cost: { Gold: 3, Stone: 1 }, income: { Gold: 1 } },
-    "Shipyard": { cost: { Gold: 4, Wood: 2 }, income: { Wood: 1 } },
-    "Whaling Dock": { cost: { Gold: 3, Wood: 1 }, income: { Fish: 2, Gold: 1 } },
-    "Smokehouse": { cost: { Gold: 2, Wood: 1 }, income: { Fish: 1 } },
-    "Workshop": { cost: { Gold: 3, Wood: 1 }, income: { Gold: 1 } },
-    "Granary": { cost: { Gold: 2, Wood: 1 }, income: { Grain: 2 } },
-    "Mill": { cost: { Gold: 2, Wood: 1 }, income: { Grain: 1, Gold: 1 } },
-    "Watchtower": { cost: { Gold: 2, Wood: 1 }, income: {} },
-    "Harbor": { cost: { Gold: 5, Wood: 2 }, income: { Gold: 2, Fish: 1 } }
+    "Great Hall": { cost: { Gold: 4 }, income: { Gold: 1 }, effect: "Legacy building" },
+    "Keep": { cost: { Gold: 5, Stone: 1 }, income: { Gold: 1 }, effect: "Legacy building" },
+    "Barracks": { cost: { Gold: 3, Wood: 1 }, income: {}, effect: "Legacy building" },
+    "Stable": { cost: { Gold: 3, Wood: 1 }, income: {}, effect: "Legacy building" },
+    "Smithy": { cost: { Gold: 3, Iron: 1 }, income: { Gold: 1 }, effect: "Legacy building" },
+    "Market": { cost: { Gold: 4 }, income: { Gold: 2 }, effect: "Legacy building" },
+    "Temple": { cost: { Gold: 3, Stone: 1 }, income: { Gold: 1 }, effect: "Legacy building" },
+    "Shipyard": { cost: { Gold: 4, Wood: 2 }, income: {}, effect: "Legacy building" },
+    "Whaling Dock": { cost: { Gold: 3, Wood: 1 }, income: { Gold: 1, Food: 2 }, effect: "Legacy building" },
+    "Smokehouse": { cost: { Gold: 2, Wood: 1 }, income: { Food: 1 }, effect: "Legacy building" },
+    "Workshop": { cost: { Gold: 3, Wood: 1 }, income: { Gold: 1 }, effect: "Legacy building" },
+    "Harbor": { cost: { Gold: 5, Wood: 2 }, income: { Gold: 2, Food: 1 }, effect: "Legacy building" }
   };
 
   // v0.3.4: Market Forces are now the source of truth for seasonal scaling.
@@ -741,15 +867,205 @@
   const BUILDING_TREE_DEFINITIONS = {
     economy: {
       maxLevel: 3,
-      notes: "Category buildings can be built anywhere, but perform better when the tile has a matching trade good.",
+      notes: "Trade goods provide natural tile income. Buildings provide flat income/unlocks and do not gain matching-export bonuses.",
       categories: TRADE_GOOD_CATEGORIES
     },
     road: { maxLevel: 1, movementModifierPerLevel: -0.5, notes: "Roads reduce movement cost by 0.5 and do not upgrade twice." },
     military: { maxLevel: 3, lines: ["Barracks", "Archery Range", "Stable", "Siege Workshop"], notes: "Future hook: converts base mob into trained soldiers." },
     musteringGrounds: { maxLevel: 3, baseManpower: 1000, manpowerPerLevel: 500, upkeep: { Gold: 1, Food: 1 } },
-    influence: { maxLevel: 3, lines: ["Sept", "Godswood", "Festival Square", "School"], notes: "Future hook: influence income, holy mercenaries, weddings, tourneys, and stat upgrades." },
+    influence: { maxLevel: 3, lines: ["Sept", "Godswood", "Festival Square", "School"], notes: "Influence buildings provide +1 additional Influence per upgrade tier, shown as total Influence 1/2/3." },
     fortification: { maxLevel: 3, movementCostIncreasePerLevel: 0.5, quickSiegeDcIncreasePerLevel: 2 }
   };
+
+  function getBuildingAliases(level) {
+    return Array.isArray(level?.aliases) ? level.aliases : [];
+  }
+
+  function getBuildingMetaByName(name) {
+    const target = normalize(name);
+    if (!target) return null;
+    for (const line of BUILDING_LINES) {
+      for (const level of line.levels || []) {
+        const names = [level.name, ...getBuildingAliases(level)];
+        if (names.some(value => normalize(value) === target)) return { line, level };
+      }
+    }
+    return null;
+  }
+
+  function getBuildingLineState(house = {}) {
+    const built = Array.isArray(house.builtBuildings) ? house.builtBuildings.map(String) : [];
+    const state = new Map();
+
+    for (const item of Array.isArray(house.buildingSlots) ? house.buildingSlots : []) {
+      const line = BUILDING_LINES.find(candidate => candidate.key === item?.key);
+      const level = line?.levels?.find(candidate => Number(candidate.level) === Number(item?.level));
+      if (line && level) state.set(line.key, { line, level, name: level.name });
+    }
+
+    for (const name of built) {
+      const meta = getBuildingMetaByName(name);
+      if (!meta) continue;
+      const current = state.get(meta.line.key);
+      if (!current || Number(meta.level.level) > Number(current.level.level)) {
+        state.set(meta.line.key, { line: meta.line, level: meta.level, name: meta.level.name });
+      }
+    }
+
+    return state;
+  }
+
+  function getBuildingSlotCount(house = {}) {
+    const state = getBuildingLineState(house);
+    const legacyBuilt = Array.isArray(house.builtBuildings) ? house.builtBuildings : [];
+    let legacyCount = 0;
+    for (const name of legacyBuilt) if (!getBuildingMetaByName(name)) legacyCount++;
+    return state.size + legacyCount;
+  }
+
+  function getNextBuildingLevel(line, currentLevel = 0) {
+    return (line.levels || []).find(level => Number(level.level) === Number(currentLevel) + 1) || null;
+  }
+
+  function getBuildingTradeCategories(house = {}) {
+    const goods = getHouseTradeGoods(house);
+    return new Set([goods.primary?.category, goods.secondary?.category].filter(Boolean));
+  }
+
+  function buildingMatchesTileTrade(line, house = {}) {
+    // v0.4.1: building income is flat. Trade goods remain separate natural tile income.
+    return false;
+  }
+
+  function getBuildingIncomeForLevel(line, level, house = {}) {
+    if (!level) return {};
+    return normalizeResourceMap(level.income || {});
+  }
+
+  function getBuildingDisplayEffect(line, level, house = {}) {
+    const income = getBuildingIncomeForLevel(line, level, house);
+    const parts = [];
+    const incomeText = resourceMapToText(income, "");
+    if (incomeText) parts.push(incomeText);
+    if (level?.effect) parts.push(level.effect);
+    return parts.filter(Boolean).join(" — ") || "No passive income";
+  }
+
+  function getPieceStatecraft(piece = {}) {
+    const raw = piece.statecraft ?? piece.stats?.statecraft ?? piece.abilities?.statecraft;
+    const value = Number(raw);
+    return Number.isFinite(value) ? value : null;
+  }
+
+  function getBuildingStatecraftRequirement(levelNumber) {
+    return Number(BUILDING_TIER_STATECRAFT_REQUIREMENTS[Number(levelNumber)] || 0);
+  }
+
+  function getStoneInfrastructureDiscount(house = {}) {
+    const state = getBuildingLineState(house).get("stone");
+    const discount = Number(state?.level?.infrastructureDiscount || 0);
+    return Number.isFinite(discount) ? Math.max(0, discount) : 0;
+  }
+
+  function getBuildingTierCost(levelNumber, line = null, house = {}) {
+    const cost = normalizeResourceMap(BUILDING_TIER_COSTS[Number(levelNumber)] || { Gold: 4 });
+    const discountApplies = Boolean(line && (line.group === "Infrastructure" || line.key === "watchtower"));
+    const discount = discountApplies ? getStoneInfrastructureDiscount(house) : 0;
+
+    if (discount > 0 && Number(cost.Gold || 0) > 0) {
+      cost.Gold = Math.max(0, Number(cost.Gold || 0) - discount);
+    }
+
+    return cost;
+  }
+
+  function getBuiltBuildingsAfterCatalogChange(house = {}, targetName) {
+    const built = Array.isArray(house.builtBuildings) ? house.builtBuildings.map(String) : [];
+    const meta = getBuildingMetaByName(targetName);
+    if (!meta) return built.includes(targetName) ? built : [...built, targetName];
+    const clean = built.filter(name => getBuildingMetaByName(name)?.line?.key !== meta.line.key);
+    clean.push(meta.level.name);
+    return clean;
+  }
+
+  function getBuildingSlotsAfterCatalogChange(house = {}, targetName) {
+    const state = getBuildingLineState(house);
+    const meta = getBuildingMetaByName(targetName);
+    if (!meta) return Array.from(state.values()).map(item => ({ key: item.line.key, label: item.line.label, level: item.level.level, name: item.level.name }));
+    state.set(meta.line.key, { line: meta.line, level: meta.level, name: meta.level.name });
+    return Array.from(state.values()).map(item => ({
+      key: item.line.key,
+      label: item.line.label,
+      group: item.line.group,
+      tradeCategory: item.line.tradeCategory || "",
+      level: item.level.level,
+      name: item.level.name,
+      statecraftRequired: getBuildingStatecraftRequirement(item.level.level),
+      cost: getBuildingTierCost(item.level.level, item.line, house),
+      effect: getBuildingDisplayEffect(item.line, item.level, house)
+    }));
+  }
+
+  function describeBuildingOption(line, level, mode, house = {}) {
+    const costText = resourceMapToText(getBuildingTierCost(level.level, line, house));
+    const req = getBuildingStatecraftRequirement(level.level);
+    const effect = getBuildingDisplayEffect(line, level, house);
+    return `${mode}: ${line.label} → ${level.name} [Tier ${level.level}, Statecraft ${req}, Cost ${costText}] — ${effect}`;
+  }
+
+  function buildCatalogBuildingOptions(house = {}, piece = {}) {
+    const built = Array.isArray(house.builtBuildings) ? house.builtBuildings.map(String) : [];
+    const state = getBuildingLineState(house);
+    const slotCount = getBuildingSlotCount(house);
+    const options = [];
+
+    for (const line of BUILDING_LINES) {
+      const current = state.get(line.key);
+      if (current) {
+        const next = getNextBuildingLevel(line, current.level.level);
+        if (next) {
+          options.push({
+            group: `${line.group} Upgrades`,
+            value: next.name,
+            label: describeBuildingOption(line, next, `Upgrade ${current.level.name}`, house)
+          });
+        }
+      } else if (slotCount < 4) {
+        const first = line.levels?.[0];
+        if (first) {
+          options.push({
+            group: line.group,
+            value: first.name,
+            label: describeBuildingOption(line, first, "Build", house)
+          });
+        }
+      }
+    }
+
+    for (const legacy of BUILDINGS) {
+      if (!built.includes(legacy) && !getBuildingMetaByName(legacy) && slotCount < 4) {
+        options.push({ group: "Legacy", value: legacy, label: legacy });
+      }
+    }
+
+    return options;
+  }
+
+  function renderOptionGroups(options) {
+    const groups = new Map();
+    for (const option of options) {
+      const group = option.group || "Buildings";
+      if (!groups.has(group)) groups.set(group, []);
+      groups.get(group).push(option);
+    }
+    let html = "";
+    for (const [group, rows] of groups.entries()) {
+      html += `<optgroup label="${escapeHtml(group)}">`;
+      for (const option of rows) html += `<option value="${escapeHtml(option.value)}">${escapeHtml(option.label)}</option>`;
+      html += `</optgroup>`;
+    }
+    return html;
+  }
 
 
   function escapeHtml(value) {
@@ -1522,60 +1838,84 @@
     return isSeaTile(tile) || normalize(tile?.terrainKey) === "sea" || normalize(tile?.terrainLabel) === "sea";
   }
 
+  function getSelectedTravelTextToTile(destinationTile) {
+    const selected = canvas.tokens.controlled.filter(token => Boolean(getWorldPiece(token)));
+    if (selected.length !== 1) return "";
+    const token = selected[0];
+    const piece = getWorldPiece(token);
+    if (!piece || !canUserControlWorldPiece(token, piece)) return "";
+    let startEntry = findTileAtPoint(getTokenCenter(token));
+    if (!startEntry && piece.currentTileId) startEntry = getTileById(piece.currentTileId);
+    if (!startEntry || !destinationTile || String(startEntry.tile?.id || "") === String(destinationTile.id || "")) return "Current location";
+    const comparisons = getRouteComparisons(startEntry.tile, destinationTile, piece);
+    const best = comparisons.bestPath;
+    if (!best) return "No valid route from selected piece";
+    return `${best.cost} movement by ${routeModeLabel(best.mode)}`;
+  }
+
+  function canCurrentUserSeeTileDetails(tile, house = null) {
+    return game.user.isGM || isTileOwnedByUser(tile, house, game.user);
+  }
+
   function showHoverTooltip(entry) {
     const el = getOrCreateHoverTooltip();
     const tile = entry.tile;
     const house = getHouseData(entry.drawing);
     const isSea = isSeaByTile(tile);
     const adjacentNames = Array.isArray(tile.adjacentTileNames) ? tile.adjacentTileNames.join(", ") : "";
-    const buildings = !isSea && house && Array.isArray(house.builtBuildings) ? house.builtBuildings.join(", ") : "";
     const tileOwnerName = getTileOwnerUserName(tile, house);
+    const canSeeDetails = canCurrentUserSeeTileDetails(tile, house);
+    const travelText = getSelectedTravelTextToTile(tile);
 
     let html = `<div><strong style="font-size:17px;">${escapeHtml(tile.name || "Unnamed Tile")}</strong>
       <div style="margin-top:6px;">
         <strong>Region:</strong> ${escapeHtml(tile.region || "None")}<br>
         <strong>Type:</strong> ${escapeHtml(tile.tileType || "land")}<br>
         <strong>Terrain:</strong> ${escapeHtml(tile.terrainLabel || tile.terrainKey || "None")}<br>
-        <strong>Move Cost:</strong> ${escapeHtml(tile.movementCost ?? 1)}${tileOwnerName ? `<br><strong>Player Owner:</strong> ${escapeHtml(tileOwnerName)}` : ""}
+        <strong>Move Cost:</strong> ${escapeHtml(tile.movementCost ?? 1)}${tileOwnerName ? `<br><strong>Player Owner:</strong> ${escapeHtml(tileOwnerName)}` : ""}${travelText ? `<br><strong>Travel:</strong> ${escapeHtml(travelText)}` : ""}
       </div>`;
 
     if (house) {
       html += `<div style="margin-top:10px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.30);">
         <strong style="font-size:16px;">${escapeHtml(house.house || "House Information")}</strong>
         <div style="margin-top:6px;">`;
+
       if (house.lord) html += `<strong>Ruler:</strong> ${escapeHtml(house.lord)}<br>`;
-      if (!isSea && house.culture) html += `<strong>Culture:</strong> ${escapeHtml(house.culture)}<br>`;
-      if (!isSea && (house.developmentLabel || house.developmentLevel !== undefined)) {
-        html += `<strong>Development:</strong> ${escapeHtml(house.developmentLabel || `Level ${house.developmentLevel}`)}`;
-        if (house.developmentLevel !== "" && house.developmentLevel !== undefined && house.developmentLevel !== null) html += ` (${escapeHtml(house.developmentLevel)})`;
-        html += `<br>`;
+
+      if (!canSeeDetails) {
+        html += `<span style="opacity:0.78;">Detailed economy, population, buildings, and internal stats are hidden because this is not your holding.</span>`;
+      } else {
+        const buildings = !isSea && Array.isArray(house.builtBuildings) ? house.builtBuildings.join(", ") : "";
+        if (!isSea && house.culture) html += `<strong>Culture:</strong> ${escapeHtml(house.culture)}<br>`;
+        if (!isSea && (house.developmentLabel || house.developmentLevel !== undefined)) {
+          html += `<strong>Development:</strong> ${escapeHtml(house.developmentLabel || `Level ${house.developmentLevel}`)}`;
+          if (house.developmentLevel !== "" && house.developmentLevel !== undefined && house.developmentLevel !== null) html += ` (${escapeHtml(house.developmentLevel)})`;
+          html += `<br>`;
+        }
+        if (!isSea && house.population !== "" && house.population !== undefined && house.population !== null) {
+          const population = Number(house.population);
+          html += `<strong>Population:</strong> ${escapeHtml(Number.isNaN(population) ? house.population : population.toLocaleString())}<br>`;
+        }
+        if (isEconomyEnabled(house)) {
+          html += `<strong>Trade Goods:</strong> ${escapeHtml(tradeGoodSummaryText(house))}<br>`;
+          html += `<strong>Stockpile:</strong> ${escapeHtml(resourceMapToText(getHouseResourceStockpile(house)))}<br>`;
+          html += `<strong>Round Income:</strong> ${escapeHtml(resourceMapToText(getTileTotalIncome(house, getClock())))}<br>`;
+        } else if (house.treasury !== "" && house.treasury !== undefined && house.treasury !== null) {
+          const treasury = Number(house.treasury);
+          html += `<strong>Treasury:</strong> ${escapeHtml(Number.isNaN(treasury) ? house.treasury : treasury.toLocaleString())}<br>`;
+        }
+        if (house.primaryExport || house.exports) html += `<strong>Primary Export:</strong> ${escapeHtml(house.primaryExport || house.exports)}<br>`;
+        if (house.secondaryExport) html += `<strong>Secondary Export:</strong> ${escapeHtml(house.secondaryExport)}<br>`;
+        if (house.allegiance) html += `<strong>Allegiance:</strong> ${escapeHtml(house.allegiance)}<br>`;
+        html += `</div>`;
+        if (!isSea && buildings) html += `<div style="margin-top:7px;padding-top:6px;border-top:1px solid rgba(255,255,255,0.15);"><strong>Buildings:</strong><br><span style="opacity:0.9;">${escapeHtml(buildings)}</span></div>`;
       }
-      if (!isSea && house.population !== "" && house.population !== undefined && house.population !== null) {
-        const population = Number(house.population);
-        html += `<strong>Population:</strong> ${escapeHtml(Number.isNaN(population) ? house.population : population.toLocaleString())}<br>`;
-      }
-      if (house.treasury !== "" && house.treasury !== undefined && house.treasury !== null) {
-        const treasury = Number(house.treasury);
-        html += `<strong>Treasury:</strong> ${escapeHtml(Number.isNaN(treasury) ? house.treasury : treasury.toLocaleString())}<br>`;
-      }
-      if (isEconomyEnabled(house)) {
-        html += `<strong>Trade Goods:</strong> ${escapeHtml(tradeGoodSummaryText(house))}<br>`;
-        html += `<strong>Stockpile:</strong> ${escapeHtml(resourceMapToText(getHouseResourceStockpile(house)))}<br>`;
-        html += `<strong>Round Income:</strong> ${escapeHtml(resourceMapToText(getTileTotalIncome(house, getClock())))}<br>`;
-      }
-      if (house.primaryExport || house.exports) html += `<strong>Primary Export:</strong> ${escapeHtml(house.primaryExport || house.exports)}<br>`;
-      if (house.secondaryExport) html += `<strong>Secondary Export:</strong> ${escapeHtml(house.secondaryExport)}<br>`;
-      if (house.allegiance) html += `<strong>Allegiance:</strong> ${escapeHtml(house.allegiance)}<br>`;
-      html += `</div>`;
-      if (!isSea && buildings) html += `<div style="margin-top:7px;padding-top:6px;border-top:1px solid rgba(255,255,255,0.15);"><strong>Buildings:</strong><br><span style="opacity:0.9;">${escapeHtml(buildings)}</span></div>`;
+
       html += `</div>`;
     }
-    if (adjacentNames) {
-      const linkedTiles = adjacentNames
-        .split(",")
-        .map(value => value.trim())
-        .filter(Boolean);
 
+    if (adjacentNames) {
+      const linkedTiles = adjacentNames.split(",").map(value => value.trim()).filter(Boolean);
       html += `<div style="margin-top:9px;padding-top:6px;border-top:1px solid rgba(255,255,255,0.15);">
         <strong>Links:</strong>
         <div class="coa-hover-links">
@@ -2059,6 +2399,31 @@
     return allTiles.filter(entry => idSet.has(String(entry.tile.id)) || idSet.has(String(entry.drawing.document.id)) || nameSet.has(normalize(entry.tile.name)));
   }
 
+  function getRevealEntriesForTileEntry(entry) {
+    if (!entry?.tile) return [];
+    return [entry, ...getLinkedTiles(entry)];
+  }
+
+  function isTileOwnedByUser(worldTile, house = null, user = game.user) {
+    if (!user || user.isGM) return true;
+    const ownerUserId = getTileOwnerUserId(worldTile, house);
+    if (ownerUserId) return String(ownerUserId) === String(user.id);
+    const ownerUserName = getTileOwnerUserName(worldTile, house);
+    if (ownerUserName) return normalize(ownerUserName) === normalize(user.name);
+    return false;
+  }
+
+  function getOwnedTileRevealEntriesForUser(user = game.user) {
+    if (!user || user.isGM) return [];
+    const entries = [];
+    for (const entry of getWorldTileEntries()) {
+      const house = getHouseData(entry.drawing) || {};
+      if (!isTileOwnedByUser(entry.tile, house, user)) continue;
+      entries.push(...getRevealEntriesForTileEntry(entry));
+    }
+    return entries;
+  }
+
   function isWorldPieceRevealed(token) {
     const manager = globalThis[VISIBILITY_KEY];
     if (!manager || !getWorldPiece(token) || !manager.revealedEntries?.length) return false;
@@ -2121,6 +2486,10 @@
     if (!manager) return;
 
     const byTileId = new Map();
+    for (const entry of getOwnedTileRevealEntriesForUser(game.user)) {
+      const id = String(getTileId(entry) || entry.tile?.id || entry.drawing?.document?.id || "");
+      if (id && !byTileId.has(id)) byTileId.set(id, entry);
+    }
     for (const token of tokens || []) {
       for (const entry of getRevealEntriesForToken(token)) {
         const id = String(getTileId(entry) || entry.tile?.id || entry.drawing?.document?.id || "");
@@ -2500,16 +2869,32 @@
     const currentEntry = findTileAtPoint(getTokenCenter(token)) || getTileById(piece.currentTileId);
     const currentTileName = currentEntry?.tile?.name || piece.currentTileName || "Unknown";
     const ownerName = getWorldPieceOwnerName(token, piece);
+    const canSeeDetails = game.user.isGM || canUserControlWorldPiece(token, piece);
     const movementUsed = Number(piece.movementUsed || 0);
     const movementMax = Number(piece.movementMax || 0);
     const movementRemaining = Math.max(0, movementMax - movementUsed);
 
-    let extra = "";
-    if (piece.pieceType === "army" && (piece.strengthCurrent !== undefined || piece.strengthMax !== undefined)) {
-      extra += `<strong>Strength:</strong> ${escapeHtml(piece.strengthCurrent ?? "?")} / ${escapeHtml(piece.strengthMax ?? "?")}<br>`;
-    }
-    if (piece.pieceType === "character" && piece.wounds !== undefined) {
-      extra += `<strong>Wounds:</strong> ${escapeHtml(piece.wounds)}<br>`;
+    let detailsHtml = `
+      <strong>Type:</strong> ${escapeHtml(piece.pieceType || "Unknown")}<br>
+      <strong>Player Owner:</strong> ${escapeHtml(ownerName)}<br>
+      <strong>Current Tile:</strong> ${escapeHtml(currentTileName)}<br>
+    `;
+
+    if (canSeeDetails) {
+      detailsHtml += `
+        <strong>Faction:</strong> ${escapeHtml(piece.faction || "None")}<br>
+        <strong>Movement:</strong> ${escapeHtml(movementUsed)} / ${escapeHtml(movementMax)} used — ${escapeHtml(movementRemaining)} remaining<br>
+      `;
+      const statecraft = getPieceStatecraft(piece);
+      if (statecraft !== null) detailsHtml += `<strong>Statecraft:</strong> ${escapeHtml(statecraft)}<br>`;
+      if (piece.pieceType === "army" && (piece.strengthCurrent !== undefined || piece.strengthMax !== undefined)) {
+        detailsHtml += `<strong>Strength:</strong> ${escapeHtml(piece.strengthCurrent ?? "?")} / ${escapeHtml(piece.strengthMax ?? "?")}<br>`;
+      }
+      if (piece.pieceType === "character" && piece.wounds !== undefined) {
+        detailsHtml += `<strong>Wounds:</strong> ${escapeHtml(piece.wounds)}<br>`;
+      }
+    } else {
+      detailsHtml += `<span style="opacity:0.78;">Detailed piece stats are hidden because you do not control this piece.</span>`;
     }
 
     const el = getOrCreatePieceTooltip();
@@ -2517,12 +2902,7 @@
       <div>
         <strong style="font-size:17px;">${escapeHtml(piece.name || token.document.name || "World Piece")}</strong>
         <div style="margin-top:6px;">
-          <strong>Type:</strong> ${escapeHtml(piece.pieceType || "Unknown")}<br>
-          <strong>Player Owner:</strong> ${escapeHtml(ownerName)}<br>
-          <strong>Faction:</strong> ${escapeHtml(piece.faction || "None")}<br>
-          <strong>Current Tile:</strong> ${escapeHtml(currentTileName)}<br>
-          <strong>Movement:</strong> ${escapeHtml(movementUsed)} / ${escapeHtml(movementMax)} used — ${escapeHtml(movementRemaining)} remaining<br>
-          ${extra}
+          ${detailsHtml}
         </div>
       </div>
     `;
@@ -2716,6 +3096,7 @@
           <div class="form-group"><label>Movement Points Per Turn</label><input type="number" name="movementMax" value="${escapeHtml(piece.movementMax ?? 3)}" min="0" step="1" style="width:100%;" /></div>
           <div class="form-group"><label>Movement Used</label><input type="number" name="movementUsed" value="${escapeHtml(piece.movementUsed ?? 0)}" min="0" step="1" style="width:100%;" /></div>
           <div class="form-group"><label>Faction / Owner</label><input type="text" name="faction" value="${escapeHtml(piece.faction || "")}" style="width:100%;" /></div>
+          <div class="form-group"><label>Statecraft</label><input type="number" name="statecraft" value="${escapeHtml(piece.statecraft ?? piece.stats?.statecraft ?? "")}" min="0" step="1" style="width:100%;" /><p class="notes">Used for building tier requirements when filled in.</p></div>
           <div class="form-group"><label>Player Owner / Controller</label><select name="ownerUserId" style="width:100%;">${ownerOptions}</select></div>
           <div class="form-group"><label>Token Image Path</label><input type="text" name="imagePath" value="${escapeHtml(token.document.texture?.src || token.actor?.img || "")}" style="width:100%;" /></div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
@@ -2734,6 +3115,7 @@
               movementMax: Math.max(0, Number(form.movementMax.value || 0)),
               movementUsed: Math.max(0, Number(form.movementUsed.value || 0)),
               faction: String(form.faction.value || "").trim(),
+              statecraft: String(form.statecraft.value || "").trim(),
               ownerUserId: String(form.ownerUserId.value || ""),
               imagePath: String(form.imagePath.value || "").trim(),
               width: Math.max(0.25, Number(form.tokenWidth.value || 1)),
@@ -2755,6 +3137,8 @@
     updatedPiece.name = result.name || token.document.name;
     updatedPiece.pieceType = result.pieceType;
     updatedPiece.faction = result.faction;
+    if (result.statecraft === "") delete updatedPiece.statecraft;
+    else updatedPiece.statecraft = Math.max(0, Number(result.statecraft || 0));
     updatedPiece.movementMax = result.movementMax;
     updatedPiece.movementUsed = result.resetMovement ? 0 : Math.min(result.movementUsed, result.movementMax);
     updatedPiece.allowedTileTypes = getAllowedTileTypes(result.pieceType);
@@ -2821,6 +3205,7 @@
           <div class="form-group"><label>Piece Type</label><select name="pieceType" style="width:100%;"><option value="character">Character</option><option value="army" selected>Army</option><option value="fleet">Fleet</option><option value="dragon">Dragon / Flying Unit</option></select></div>
           <div class="form-group"><label>Movement Points Per Turn</label><input type="number" name="movementMax" value="3" min="0" step="1" style="width:100%;" /></div>
           <div class="form-group"><label>Faction / Owner</label><input type="text" name="faction" placeholder="Stark, Lannister, Neutral..." style="width:100%;" /></div>
+          <div class="form-group"><label>Statecraft</label><input type="number" name="statecraft" min="0" step="1" style="width:100%;" placeholder="Optional; used for building tier requirements" /></div>
           <div class="form-group"><label>Player Owner / Controller</label><select name="ownerUserId" style="width:100%;">${playerOwnerOptions}</select><p class="notes">This controls which player can select and move the piece.</p></div>
           <div class="form-group"><label>Token Image Path</label><input type="text" name="imagePath" placeholder="Leave blank for default icon" style="width:100%;" /></div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
@@ -2836,6 +3221,7 @@
               pieceType: normalize(form.pieceType.value || "army"),
               movementMax: Math.max(0, Number(form.movementMax.value || 3)),
               faction: String(form.faction.value || "").trim(),
+              statecraft: String(form.statecraft.value || "").trim(),
               ownerUserId: String(form.ownerUserId.value || ""),
               imagePath: String(form.imagePath.value || "").trim(),
               width: Math.max(0.25, Number(form.tokenWidth.value || 1)),
@@ -2862,6 +3248,7 @@
       name: details.name,
       pieceType: details.pieceType,
       faction: details.faction,
+      ...(details.statecraft !== "" ? { statecraft: Math.max(0, Number(details.statecraft || 0)) } : {}),
       movementMax: details.movementMax,
       movementUsed: 0,
       allowedTileTypes: getAllowedTileTypes(details.pieceType),
@@ -3428,12 +3815,8 @@
     return ledger?.[roundKey]?.users?.[userId] ?? null;
   }
 
-  function buildBuildingOptions(existingBuildings) {
-    const existing = new Set((existingBuildings || []).map(String));
-    return BUILDINGS
-      .filter(building => !existing.has(building))
-      .map(building => `<option value="${escapeHtml(building)}">${escapeHtml(building)}</option>`)
-      .join("");
+  function buildBuildingOptions(existingBuildings, house = {}, piece = {}) {
+    return renderOptionGroups(buildCatalogBuildingOptions(house, piece));
   }
 
   function resourceKey(value) {
@@ -3742,19 +4125,36 @@
   }
 
   function getHouseResourceIncome(house = {}) {
-    // v0.3.2+: Manual base income must stay separate from calculated trade-good/building income.
-    // If the user deliberately clears Manual Base Resource Income, an empty object should be respected.
-    // Older versions sometimes left values in legacy fields like naturalResources/resourceProduction,
-    // which made the Manage Tile Economy dialog refill after the manual field was cleared.
+    // v0.4.1: manual income is its own field. Once deliberately cleared, old legacy fields
+    // must never refill the dialog or income calculation.
+    if (house.manualResourceIncomeCleared === true) return {};
+
     if (Object.prototype.hasOwnProperty.call(house, "manualResourceIncome")) {
       return normalizeResourceMap(house.manualResourceIncome);
     }
 
-    if (Object.prototype.hasOwnProperty.call(house, "resourceIncome")) {
-      return normalizeResourceMap(house.resourceIncome);
-    }
+    // Legacy one-time fallback for tiles created before manualResourceIncome existed.
+    return normalizeResourceMap(
+      house.resourceIncome ??
+      house.resourcesIncome ??
+      house.naturalResources ??
+      house.resourceProduction ??
+      house.baseResourceIncome ??
+      house.manualBaseResourceIncome ??
+      house.manualBaseIncome ??
+      {}
+    );
+  }
 
-    return normalizeResourceMap(house.resourcesIncome ?? house.naturalResources ?? house.resourceProduction);
+  function deleteLegacyManualIncomeFields(house = {}) {
+    delete house.resourceIncome;
+    delete house.resourcesIncome;
+    delete house.naturalResources;
+    delete house.resourceProduction;
+    delete house.baseResourceIncome;
+    delete house.manualBaseResourceIncome;
+    delete house.manualBaseIncome;
+    return house;
   }
 
   function getHouseResourceStockpile(house = {}) {
@@ -3860,8 +4260,21 @@
     return 0;
   }
 
-  function getBuildingRule(building) {
-    return BUILDING_RULES[building] || { cost: {}, income: {} };
+  function getBuildingRule(building, house = {}) {
+    const meta = getBuildingMetaByName(building);
+    if (meta) {
+      return {
+        cost: getBuildingTierCost(meta.level.level, meta.line, house),
+        income: getBuildingIncomeForLevel(meta.line, meta.level, house),
+        effect: getBuildingDisplayEffect(meta.line, meta.level, house),
+        group: meta.line.group,
+        lineKey: meta.line.key,
+        lineLabel: meta.line.label,
+        level: meta.level.level,
+        statecraftRequired: getBuildingStatecraftRequirement(meta.level.level)
+      };
+    }
+    return BUILDING_RULES[building] || { cost: {}, income: {}, effect: "" };
   }
 
   function getActiveBuildingIncome(house = {}, clock = getClock()) {
@@ -3875,7 +4288,7 @@
       const meta = detailsByName.get(String(building));
       const isActive = !meta || roundSortValueFromBuildMeta(meta) <= currentSort;
       if (!isActive) continue;
-      total = addResourceMaps(total, getBuildingRule(building).income);
+      total = addResourceMaps(total, getBuildingRule(building, house).income);
     }
 
     return total;
@@ -4087,10 +4500,16 @@
       throw new Error(getBuildBlockedReason(worldTile, house));
     }
 
-    const existingBuildings = Array.isArray(house.builtBuildings) ? [...house.builtBuildings] : [];
+    const existingBuildings = Array.isArray(house.builtBuildings) ? [...house.builtBuildings].map(String) : [];
+    const targetMeta = getBuildingMetaByName(building);
+    const currentLineState = targetMeta ? getBuildingLineState(house).get(targetMeta.line.key) : null;
+    const isUpgrade = Boolean(targetMeta && currentLineState && Number(targetMeta.level.level) > Number(currentLineState.level.level));
+    const currentSlotCount = getBuildingSlotCount(house);
 
-    if (existingBuildings.length >= 4) throw new Error(`${worldTile.name || "This tile"} already has the maximum of 4 buildings.`);
+    if (!targetMeta && existingBuildings.length >= 4) throw new Error(`${worldTile.name || "This tile"} already has the maximum of 4 buildings.`);
+    if (targetMeta && !currentLineState && currentSlotCount >= 4) throw new Error(`${worldTile.name || "This tile"} already has the maximum of 4 building lines.`);
     if (existingBuildings.includes(building)) throw new Error(`${building} already exists in ${worldTile.name || "this tile"}.`);
+    if (targetMeta && currentLineState && !isUpgrade) throw new Error(`${worldTile.name || "This tile"} already has ${currentLineState.level.name} in the ${targetMeta.line.label} line.`);
 
     const ledger = foundry.utils.deepClone(getBuildLedger());
     const existingBuildThisRound = getAlreadyBuiltForRound(ledger, roundKey, builderUserId);
@@ -4099,19 +4518,17 @@
       throw new Error(`${builderUserName} has already built this turn: ${existingBuildThisRound.building} at ${existingBuildThisRound.tileName}.`);
     }
 
-    const hasMatchingPendingBuild = getPendingBuildRequestsFromPiece(piece).some(request =>
-      request?.status === PENDING_BUILD_STATUS_PENDING &&
-      String(request.roundKey || "") === String(roundKey || "") &&
-      String(request.requesterUserId || "") === String(builderUserId || "") &&
-      String(request.building || "") === String(building || "")
-    );
+    // v0.2.4+: the scene build ledger and pending-build queue are the source of truth for one-build-per-round.
+    // Older piece-level lastBuildRoundKey flags can become stale when a GM rewinds the round clock or edits test data.
 
-    // v0.2.4: the scene build ledger and pending-build queue are the source of truth for one-build-per-round.
-    // Older piece-level lastBuildRoundKey flags can become stale when a GM rewinds the round clock or edits test data,
-    // so they are no longer used as a hard blocker here.
+    const rule = getBuildingRule(building, house);
+    const statecraftRequired = Number(rule.statecraftRequired || 0);
+    const pieceStatecraft = getPieceStatecraft(piece);
+    if (!builderIsGm && pieceStatecraft !== null && statecraftRequired > 0 && pieceStatecraft < statecraftRequired) {
+      throw new Error(`${piece.name || token.document.name} needs Statecraft ${statecraftRequired} to build ${building}, but has ${pieceStatecraft}.`);
+    }
 
     const economyActive = isEconomyEnabled(house);
-    const rule = getBuildingRule(building);
     const currentStockpile = getHouseResourceStockpile(house);
     const buildingCost = normalizeResourceMap(rule.cost);
     const missingResources = economyActive ? getMissingResources(currentStockpile, buildingCost) : {};
@@ -4123,13 +4540,20 @@
     const stockpileAfterCost = economyActive ? spendResources(currentStockpile, buildingCost) : currentStockpile;
     const activation = getNextRoundActivation(clock);
 
-    const updatedBuildings = [...existingBuildings, building].slice(0, 4);
-    const developmentLevel = updatedBuildings.length;
+    const updatedBuildings = getBuiltBuildingsAfterCatalogChange(house, building).slice(0, 4);
+    const updatedBuildingSlots = getBuildingSlotsAfterCatalogChange(house, building);
+    const developmentLevel = Math.min(updatedBuildings.length, 4);
     const developmentLabel = DEVELOPMENT_LEVELS[developmentLevel]?.label || "City";
     const oldPopulation = house.population;
     const population = randomPopulation(developmentLevel);
     const now = new Date().toISOString();
     const dateLabel = getDateLabel(clock);
+    const cleanManualIncome = getHouseResourceIncome(house);
+
+    const buildingData = Array.isArray(house.buildingData) ? house.buildingData : [];
+    const filteredBuildingData = targetMeta
+      ? buildingData.filter(item => getBuildingMetaByName(String(item.name || item.building || ""))?.line?.key !== targetMeta.line.key)
+      : buildingData.filter(item => String(item.name || item.building || "") !== String(building));
 
     const updatedHouse = {
       ...house,
@@ -4141,16 +4565,26 @@
       developmentLabel,
       population,
       builtBuildings: updatedBuildings,
+      buildingSlots: updatedBuildingSlots,
       economyEnabled: economyActive || house.economyEnabled === true,
       resourceStockpile: stockpileAfterCost,
-      manualResourceIncome: getHouseResourceIncome(house),
-      resourceIncome: getHouseResourceIncome(house),
+      manualResourceIncome: cleanManualIncome,
+      manualResourceIncomeCleared: !hasAnyResources(cleanManualIncome),
       buildingData: [
-        ...(Array.isArray(house.buildingData) ? house.buildingData : []).filter(item => String(item.name || item.building || "") !== String(building)),
+        ...filteredBuildingData,
         {
           name: building,
+          building,
+          lineKey: rule.lineKey || "legacy",
+          lineLabel: rule.lineLabel || building,
+          group: rule.group || "Legacy",
+          level: rule.level || 1,
           cost: buildingCost,
           income: normalizeResourceMap(rule.income),
+          effect: rule.effect || "",
+          statecraftRequired,
+          statecraftUsed: pieceStatecraft,
+          upgradedFrom: currentLineState?.level?.name || "",
           builtRoundKey: roundKey,
           builtDateLabel: dateLabel,
           builtByUserId: builderUserId,
@@ -4161,6 +4595,7 @@
       worldTileId: doc.id,
       worldTileName: worldTile.name || "Unnamed Tile",
       lastBuiltBuilding: building,
+      lastBuiltAction: isUpgrade ? "upgrade" : "build",
       lastBuiltRoundKey: roundKey,
       lastBuiltDateLabel: dateLabel,
       lastBuiltByUserId: builderUserId,
@@ -4172,6 +4607,8 @@
         ...(Array.isArray(house.buildLog) ? house.buildLog : []),
         {
           building,
+          action: isUpgrade ? "upgrade" : "build",
+          upgradedFrom: currentLineState?.level?.name || "",
           roundKey,
           dateLabel,
           userId: builderUserId,
@@ -4186,8 +4623,10 @@
       updatedBy: game.user.name
     };
 
+    deleteLegacyManualIncomeFields(updatedHouse);
     syncTreasuryFromResources(updatedHouse);
 
+    await doc.unsetFlag(FLAG_SCOPE, HOUSE_KEY);
     await doc.setFlag(FLAG_SCOPE, HOUSE_KEY, updatedHouse);
 
     const updatedPiece = foundry.utils.deepClone(piece);
@@ -4206,6 +4645,7 @@
     ledger[roundKey].users[builderUserId] = {
       userName: builderUserName,
       building,
+      action: isUpgrade ? "upgrade" : "build",
       tileId: worldTile.id || doc.id,
       tileName: worldTile.name || "Unnamed Tile",
       pieceId: token.document.id,
@@ -4217,19 +4657,21 @@
 
     await ChatMessage.create({
       speaker: ChatMessage.getSpeaker({ alias: "Crown Build" }),
-      content: `<h2>Building Constructed</h2>
+      content: `<h2>${isUpgrade ? "Building Upgraded" : "Building Constructed"}</h2>
         <p><strong>Player:</strong> ${escapeHtml(builderUserName)}</p>
         <p><strong>Piece:</strong> ${escapeHtml(piece.name || token.document.name)}</p>
         <p><strong>Tile:</strong> ${escapeHtml(worldTile.name || "Unnamed Tile")}</p>
         <p><strong>Tile Owner:</strong> ${escapeHtml(getTileOwnerUserName(worldTile, updatedHouse) || "Unassigned")}</p>
         <p><strong>Building:</strong> ${escapeHtml(building)}</p>
+        ${isUpgrade ? `<p><strong>Upgraded From:</strong> ${escapeHtml(currentLineState?.level?.name || "Unknown")}</p>` : ""}
+        ${statecraftRequired ? `<p><strong>Statecraft Required:</strong> ${escapeHtml(statecraftRequired)}${pieceStatecraft !== null ? ` — Piece has ${escapeHtml(pieceStatecraft)}` : " — not checked because no Statecraft is stored on this piece yet"}</p>` : ""}
         ${economyActive ? `<p><strong>Cost Paid:</strong> ${escapeHtml(resourceMapToText(buildingCost))}</p><p><strong>Tile Stockpile:</strong> ${escapeHtml(resourceMapToText(stockpileAfterCost))}</p><p><strong>Building Income Starts:</strong> ${escapeHtml(activation.activeFromDateLabel)} — ${escapeHtml(resourceMapToText(rule.income))}</p>` : `<p><strong>Economy:</strong> Not enabled for this tile, so no resource cost was charged.</p>`}
         <p><strong>Development:</strong> ${escapeHtml(developmentLabel)} (${escapeHtml(developmentLevel)} / 4)</p>
         <p><strong>Population:</strong> ${escapeHtml(Number(population).toLocaleString())}${oldPopulation !== undefined && oldPopulation !== "" ? ` <span style="opacity:0.75;">previously ${escapeHtml(oldPopulation)}</span>` : ""}</p>
         <p><strong>Date:</strong> ${escapeHtml(dateLabel)}</p>`
     });
 
-    ui.notifications.info(`${building} built in ${worldTile.name || "selected tile"}.`);
+    ui.notifications.info(`${building} ${isUpgrade ? "upgraded" : "built"} in ${worldTile.name || "selected tile"}.`);
     return true;
   }
 
@@ -4778,11 +5220,7 @@
     }
 
     const existingBuildings = Array.isArray(house.builtBuildings) ? [...house.builtBuildings] : [];
-
-    if (existingBuildings.length >= 4) {
-      ui.notifications.warn(`${worldTile.name || "This tile"} already has the maximum of 4 buildings.`);
-      return;
-    }
+    const existingBuildingSlots = getBuildingSlotCount(house);
 
     const ledger = foundry.utils.deepClone(getBuildLedger());
     const existingBuildThisRound = getAlreadyBuiltForRound(ledger, roundKey, game.user.id);
@@ -4802,14 +5240,14 @@
     // The player build ledger and pending-build queue handle one-build-per-round.
     // This avoids stale token locks after GM testing, rollback, or manual house edits.
 
-    const buildingOptions = buildBuildingOptions(existingBuildings);
+    const buildingOptions = buildBuildingOptions(existingBuildings, house, piece);
     if (!buildingOptions) {
-      ui.notifications.warn("No available buildings remain for this tile.");
+      ui.notifications.warn("No available buildings or upgrades remain for this tile.");
       return;
     }
 
-    const currentLevel = Math.min(existingBuildings.length, 4);
-    const nextLevel = Math.min(existingBuildings.length + 1, 4);
+    const currentLevel = Math.min(existingBuildingSlots, 4);
+    const nextLevel = Math.min(existingBuildingSlots + 1, 4);
     const currentDevelopment = DEVELOPMENT_LEVELS[currentLevel]?.label || "Ruins";
     const nextDevelopment = DEVELOPMENT_LEVELS[nextLevel]?.label || "City";
     const dateLabel = getDateLabel(clock);
@@ -4824,7 +5262,7 @@
             <strong>Region:</strong> ${escapeHtml(worldTile.region || house.region || "None")}<br>
             <strong>Player Owner:</strong> ${escapeHtml(getTileOwnerUserName(worldTile, house) || (game.user.isGM ? "GM Override" : "Unassigned"))}<br>
             <strong>Date:</strong> ${escapeHtml(dateLabel)}<br>
-            <strong>Buildings:</strong> ${escapeHtml(existingBuildings.length)} / 4<br>
+            <strong>Building Lines:</strong> ${escapeHtml(existingBuildingSlots)} / 4<br>
             <strong>Development:</strong> ${escapeHtml(currentDevelopment)} → ${escapeHtml(nextDevelopment)}<br>
             <strong>Resources:</strong> ${escapeHtml(resourceMapToText(getHouseResourceStockpile(house)))}
           </div>
@@ -4842,11 +5280,13 @@
           </div>
 
           <div style="padding:8px;margin-top:10px;border:1px solid #777;border-radius:6px;">
-            <strong>Building costs/income:</strong><br>
-            ${BUILDINGS.filter(name => !existingBuildings.includes(name)).map(name => `${escapeHtml(name)} — Cost: ${escapeHtml(resourceMapToText(getBuildingRule(name).cost))}; Income next round: ${escapeHtml(resourceMapToText(getBuildingRule(name).income))}`).join("<br>")}
+            <strong>Rules:</strong><br>
+            Building lines can be upgraded. New lines use one of the four building slots. Upgrades replace the old tier and do not consume a new slot.<br>
+            Tier requirements: 1 = Statecraft 5, 2 = Statecraft 10, 3 = Statecraft 12, 4 = Statecraft 16.<br>
+            Costs: Tier 1 = Gold 4, Tier 2 = Gold 12, Tier 3 = Gold 24, Tier 4 = Gold 48.
           </div>
 
-          <p class="notes">Players may place one building per world round. Each tile can hold a maximum of four buildings. Resource costs are enforced once economy is enabled for this tile.</p>
+          <p class="notes">Players may build or upgrade once per world round. Resource costs are enforced once economy is enabled for this tile. If a piece has no Statecraft value saved yet, Statecraft is not enforced for that piece.</p>
         </form>`,
         buttons: {
           build: {
@@ -5021,6 +5461,7 @@
       worldTile.ownerAssignedSource = `Crown Overview Tools ${MODULE_VERSION}`;
 
       await doc.setFlag(FLAG_SCOPE, WORLD_TILE_KEY, worldTile);
+      await doc.unsetFlag(FLAG_SCOPE, HOUSE_KEY);
       await doc.setFlag(FLAG_SCOPE, HOUSE_KEY, house);
 
       updated++;
@@ -5325,14 +5766,17 @@
         Object.keys(house.stockpile ?? {}).some(key => resourceKey(key) !== key) ||
         Object.prototype.hasOwnProperty.call(house, "resourcesIncome") ||
         Object.prototype.hasOwnProperty.call(house, "naturalResources") ||
-        Object.prototype.hasOwnProperty.call(house, "resourceProduction");
+        Object.prototype.hasOwnProperty.call(house, "resourceProduction") ||
+        Object.prototype.hasOwnProperty.call(house, "baseResourceIncome") ||
+        Object.prototype.hasOwnProperty.call(house, "manualBaseResourceIncome") ||
+        Object.prototype.hasOwnProperty.call(house, "manualBaseIncome");
 
       if (!hasLegacyKeys && oldIncomeText === cleanIncomeText && oldStockText === cleanStockText) continue;
 
       const updatedHouse = {
         ...house,
         manualResourceIncome: cleanIncome,
-        resourceIncome: cleanIncome,
+        manualResourceIncomeCleared: !hasAnyResources(cleanIncome),
         resourceStockpile: cleanStockpile,
         treasury: cleanStockpile.Gold ?? house.treasury ?? "",
         resourceRepairedAt: new Date().toISOString(),
@@ -5340,12 +5784,12 @@
         resourceRepairedSource: `Crown Overview Tools ${MODULE_VERSION}`
       };
 
+      deleteLegacyManualIncomeFields(updatedHouse);
       delete updatedHouse.resources;
       delete updatedHouse.stockpile;
-      delete updatedHouse.resourcesIncome;
-      delete updatedHouse.naturalResources;
-      delete updatedHouse.resourceProduction;
+      updatedHouse.buildingSlots = getBuildingSlotsAfterCatalogChange({ builtBuildings: Array.isArray(house.builtBuildings) ? house.builtBuildings : [], buildingSlots: house.buildingSlots || [] }, "");
 
+      await doc.unsetFlag(FLAG_SCOPE, HOUSE_KEY);
       await doc.setFlag(FLAG_SCOPE, HOUSE_KEY, updatedHouse);
       repaired++;
       rows.push(`<li><strong>${escapeHtml(entry.tile.name || "Unnamed Tile")}</strong>: ${escapeHtml(cleanStockText || "No stockpile")}</li>`);
@@ -5508,11 +5952,9 @@
     setHouseTradeGoods(updatedHouse, result.primaryTradeGood, result.secondaryTradeGood);
     const cleanManualIncome = normalizeResourceMap(result.resourceIncome);
     updatedHouse.manualResourceIncome = cleanManualIncome;
-    updatedHouse.resourceIncome = cleanManualIncome;
+    updatedHouse.manualResourceIncomeCleared = !hasAnyResources(cleanManualIncome);
     // Remove old legacy/manual fields that can refill the dialog after the user clears Manual Base Income.
-    delete updatedHouse.resourcesIncome;
-    delete updatedHouse.naturalResources;
-    delete updatedHouse.resourceProduction;
+    deleteLegacyManualIncomeFields(updatedHouse);
     updatedHouse.resourceStockpile = addResourceMaps(normalizeResourceMap(result.resourceStockpile), normalizeResourceMap(result.resourceDelta));
     if (updatedHouse.resourceStockpile.Gold !== undefined) updatedHouse.treasury = updatedHouse.resourceStockpile.Gold;
     updatedHouse.resourceUpdatedAt = new Date().toISOString();
@@ -5520,12 +5962,13 @@
     updatedHouse.version = `Crown Overview Tools ${MODULE_VERSION}`;
     syncTreasuryFromResources(updatedHouse);
 
+    await doc.unsetFlag(FLAG_SCOPE, HOUSE_KEY);
     await doc.setFlag(FLAG_SCOPE, HOUSE_KEY, updatedHouse);
 
     const updatedBreakdown = getTileEconomyBreakdownText(updatedHouse, getClock());
     await ChatMessage.create({
       speaker: ChatMessage.getSpeaker({ alias: "Crown Economy" }),
-      content: `<h2>Tile Economy Updated</h2><p><strong>Tile:</strong> ${escapeHtml(worldTile.name || "Unnamed Tile")}</p><p><strong>Trade Goods:</strong> ${escapeHtml(tradeGoodSummaryText(updatedHouse))}</p><p><strong>Manual Base Income:</strong> ${escapeHtml(resourceMapToText(updatedHouse.resourceIncome))}</p><p><strong>Current Total Income:</strong> ${escapeHtml(updatedBreakdown.totalText)}</p><p><strong>Stockpile:</strong> ${escapeHtml(resourceMapToText(updatedHouse.resourceStockpile))}</p><p><strong>Economy Enabled:</strong> ${updatedHouse.economyEnabled ? "Yes" : "No"}</p>`
+      content: `<h2>Tile Economy Updated</h2><p><strong>Tile:</strong> ${escapeHtml(worldTile.name || "Unnamed Tile")}</p><p><strong>Trade Goods:</strong> ${escapeHtml(tradeGoodSummaryText(updatedHouse))}</p><p><strong>Manual Base Income:</strong> ${escapeHtml(resourceMapToText(updatedHouse.manualResourceIncome))}</p><p><strong>Current Total Income:</strong> ${escapeHtml(updatedBreakdown.totalText)}</p><p><strong>Stockpile:</strong> ${escapeHtml(resourceMapToText(updatedHouse.resourceStockpile))}</p><p><strong>Economy Enabled:</strong> ${updatedHouse.economyEnabled ? "Yes" : "No"}</p>`
     });
 
     ui.notifications.info(`Economy updated for ${worldTile.name || "selected tile"}.`);
@@ -5574,15 +6017,18 @@
       if (!hasAnyResources(income)) continue;
 
       const stockpile = addResourceIncomeToStockpile(getHouseResourceStockpile(house), income);
+      const cleanManualIncome = getHouseResourceIncome(house);
       house.resourceStockpile = stockpile;
-      house.manualResourceIncome = getHouseResourceIncome(house);
-      house.resourceIncome = getHouseResourceIncome(house);
+      house.manualResourceIncome = cleanManualIncome;
+      house.manualResourceIncomeCleared = !hasAnyResources(cleanManualIncome);
+      deleteLegacyManualIncomeFields(house);
       house.lastEconomyCollectedRoundKey = roundKey;
       house.lastEconomyCollectedDateLabel = dateLabel;
       house.lastEconomyCollectedAt = new Date().toISOString();
       house.lastEconomyCollectedBy = game.user.name;
       syncTreasuryFromResources(house);
 
+      await doc.unsetFlag(FLAG_SCOPE, HOUSE_KEY);
       await doc.setFlag(FLAG_SCOPE, HOUSE_KEY, house);
 
       totals = addResourceMaps(totals, income);
@@ -5781,7 +6227,7 @@
         population,
         treasury: cleanNumber(getColumn(row, "Treasury")),
         manualResourceIncome: normalizeResourceMap(getColumn(row, "Resource Income")),
-        resourceIncome: normalizeResourceMap(getColumn(row, "Resource Income")),
+        manualResourceIncomeCleared: !hasAnyResources(normalizeResourceMap(getColumn(row, "Resource Income"))),
         resourceStockpile: normalizeResourceMap(getColumn(row, "Resource Stockpile")),
         economyEnabled: normalize(getColumn(row, "Economy Enabled")) === "yes" || normalize(getColumn(row, "Economy Enabled")) === "true",
         buildingData: (() => { try { const value = getColumn(row, "Building Data"); return value ? JSON.parse(value) : (Array.isArray(existingHouse.buildingData) ? existingHouse.buildingData : []); } catch (_) { return Array.isArray(existingHouse.buildingData) ? existingHouse.buildingData : []; } })(),
@@ -5796,6 +6242,8 @@
         updatedBy: game.user.name
       };
       setHouseTradeGoods(updatedHouse, getColumn(row, "Primary Trade Good") || updatedHouse.primaryExport, getColumn(row, "Secondary Trade Good") || updatedHouse.secondaryExport);
+      updatedHouse.buildingSlots = getBuildingSlotsAfterCatalogChange({ builtBuildings: buildings, buildingSlots: existingHouse.buildingSlots || [] }, "");
+      delete updatedHouse.resourceIncome;
       delete updatedHouse.resourcesIncome;
       delete updatedHouse.naturalResources;
       delete updatedHouse.resourceProduction;
@@ -5813,6 +6261,7 @@
     for (const update of updates) {
       try {
         await update.doc.setFlag(FLAG_SCOPE, WORLD_TILE_KEY, update.world);
+        await update.doc.unsetFlag(FLAG_SCOPE, HOUSE_KEY);
         await update.doc.setFlag(FLAG_SCOPE, HOUSE_KEY, update.house);
         try { await update.doc.update({ text: update.world.name }); } catch (err) { console.warn("Could not update Drawing label:", update.doc.id, err); }
         updatedCount++;
