@@ -1,15 +1,16 @@
-# Crown Overview Tools v0.4.4
+# Crown Overview Tools v0.4.5
 
 Scene-gated strategic overview tools for Crown of Ashes.
 
-## Included in v0.4.4
+## Included in v0.4.5
 
-This version includes all v0.4.3 systems and adds the first pass of strategic diplomacy, tile ownership, armies, and quick sieges.
+This version includes all v0.4.4 systems and adds the first pass of navies/fleets, siege casualties, strategic action locks, public culture/religion visibility, and a merged tile ownership/house editor.
 
 ### Player-facing actions
 
 - Move Piece
 - Summon Army
+- Summon Navy
 - Diplomatic Takeover
 - Siege / Storm
 - Build / Upgrade
@@ -19,9 +20,37 @@ This version includes all v0.4.3 systems and adds the first pass of strategic di
 - Route Tooltip toggle
 - Piece Tooltip toggle
 
+### Tile ownership and house data
+
+The old Assign Tile Owner and Assign House Data workflows are now consolidated into one GM workflow:
+
+- Edit Tile Ownership / House Data
+
+This editor updates both the world tile and house data flags, so the tile ownership CSV can carry the same information.
+
+Supported fields include:
+
+- Ownership Type
+- Controller Player
+- House
+- Lord / Ruler
+- Ruling Character ID
+- Culture
+- Religion
+- Sworn To Type
+- Sworn To Player
+- Marriage Protected
+- Marriage Protected Player
+- Ruler Diplomacy
+- NPC Defender Diplomacy
+- Diplomatic Takeover Allowed
+- Economy and building notes
+
+Culture and Religion now display in the basic tile hover information, so players can see those broad public details without seeing private economy/stat data.
+
 ### Tile ownership CSV
 
-New GM buttons:
+GM buttons:
 
 - Export Tile Ownership CSV
 - Import Tile Ownership CSV
@@ -32,30 +61,11 @@ The ownership CSV matches tiles by:
 2. Drawing ID
 3. Tile Name fallback
 
-New supported ownership columns include:
-
-- Ownership Type
-- Controller Player Name
-- Controller Player User ID
-- Ruling Character Name / Ruler
-- Ruling Character ID
-- Culture
-- Religion
-- Sworn To Type
-- Sworn To Player Name
-- Sworn To Player User ID
-- Marriage Protected
-- Marriage Protected Player Name
-- Marriage Protected Player User ID
-- Ruler Diplomacy
-- NPC Defender Diplomacy
-- Diplomatic Takeover Allowed
-- Public Owner Label
-- Ownership Notes
+Use Tile ID as the source of truth whenever possible.
 
 ### Diplomacy
 
-Diplomatic Takeover now uses a d20 check:
+Diplomatic Takeover uses a d20 check:
 
 ```text
 Diplomacy Roll = d20 + Attacker Diplomacy
@@ -76,28 +86,19 @@ Marriage-protected territories block diplomatic takeover completely.
 
 A successful diplomatic takeover changes the tile controller/allegiance to the acting player, but it does not automatically replace the local ruler.
 
-Players get a public success/failure card. GMs get the hidden math.
+New action rule:
 
-### Characters
-
-Character CSV export now syncs the character's current tile from the token position before exporting.
-
-Character CSV import no longer forces an existing character back to an old location when the location columns are blank. Filled location columns still intentionally move the character.
-
-Character rows now also support Culture and Religion columns.
+- Diplomacy can only be attempted once per character per turn.
+- A failed diplomacy attempt locks that character's movement until movement resets.
 
 ### Armies
-
-New player action:
-
-- Summon Army
 
 Rules implemented:
 
 - One army per character.
 - Maximum army size = character Martial × 250.
 - Summoning creates a pending muster.
-- GM uses Process Army Musters after one turn to spawn the army token.
+- GM uses Process Military Musters after one turn to spawn the army token.
 - Army tokens can follow their linked character when not detached or besieging.
 - Armies store composition, strength, siege engines, and upkeep.
 
@@ -116,11 +117,33 @@ Lancers: 4 Gold, 3 Food
 Heavy Cavalry: 5 Gold, 4 Food
 ```
 
-### Quick Siege / Storm
+### Navies / fleets
 
 New player action:
 
-- Siege / Storm
+- Summon Navy
+
+Rules implemented:
+
+- One navy/fleet per character.
+- Navy tokens are piece type `fleet`.
+- Fleets use sea/port routing.
+- Fleets can carry their linked character token on sea/port movement.
+- Fleet upkeep is calculated from ship composition.
+- GM uses Process Military Musters to spawn pending armies and pending navies.
+
+Upkeep per 5 ships:
+
+```text
+Fishing / Conscripted Vessel: 1 Gold, 1 Food
+Longship: 2 Gold, 1 Food
+Galley: 3 Gold, 2 Food
+War Galley: 4 Gold, 2 Food
+Greatship: 5 Gold, 3 Food
+Dromond: 6 Gold, 3 Food
+```
+
+### Quick Siege / Storm
 
 NPCs and neutral rulers do not need army or garrison tokens. Passive defence comes from settlement development plus fortification level.
 
@@ -154,12 +177,26 @@ Town:   45 / 50 / 55 / 60
 City:   55 / 60 / 65 / 70
 ```
 
-Fortification level is read from the Watchtowers → Holdfasts → Castles building line.
+Fortification level is read from the Watchtowers -> Holdfasts -> Castles building line.
 
 Against player-held tiles:
 
 - If a defending player army is present, the module sends a Pitched Battle card to the GM and does not roll quick siege.
 - If no defending player army is present, the module resolves the quick siege against the tile's passive settlement/fortification DC.
+
+Sieges now apply attacker casualties to the army token and lock that army's movement until movement resets.
+
+Default siege casualties:
+
+```text
+Decisive Storm: 5%
+Successful Storm: 10%
+Foothold: 5%
+Repulsed: 10%
+Bloody Repulse: 20%
+Catastrophe: 30%
+Automatic Catastrophe: 40%
+```
 
 ## Compatibility
 
