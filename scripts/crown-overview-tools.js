@@ -1,6 +1,6 @@
 (() => {
   const MODULE_ID = "crown-overview-tools";
-  const MODULE_VERSION = "0.4.5";
+  const MODULE_VERSION = "0.4.6";
   const FLAG_SCOPE = "world";
   const WORLD_TILE_KEY = "worldTile";
   const WORLD_PIECE_KEY = "worldPiece";
@@ -1640,6 +1640,14 @@
     return { year: nextYear, roundIndex: nextIndex, season: nextRound.season, round: nextRound.round, version: MODULE_VERSION, updatedAt: new Date().toISOString(), updatedBy: game.user.name };
   }
 
+  function rewindClockData(clock) {
+    let previousIndex = Number(clock.roundIndex ?? 0) - 1;
+    let previousYear = Number(clock.year ?? 100);
+    if (previousIndex < 0) { previousIndex = ROUND_ORDER.length - 1; previousYear--; }
+    const previousRound = ROUND_ORDER[previousIndex];
+    return { year: previousYear, roundIndex: previousIndex, season: previousRound.season, round: previousRound.round, version: MODULE_VERSION, updatedAt: new Date().toISOString(), updatedBy: game.user.name };
+  }
+
   function getOrCreateDateBanner() {
     let banner = document.getElementById(DATE_BANNER_ID);
     if (banner) return banner;
@@ -1900,6 +1908,7 @@
         <button data-coa-action="summonNavy">Summon Navy</button>
         <button data-coa-action="diplomaticTakeover">Diplomatic Takeover</button>
         <button data-coa-action="siegeStorm">Siege / Storm</button>
+        <button data-coa-action="dismissSelectedArmy">Dismiss Army / Navy</button>
         <button data-coa-action="buildOnCurrentTile">Build / Upgrade</button>
         <button data-coa-action="showHoldings">My Holdings</button>
         <button data-coa-action="portCrossing">Port Crossing</button>
@@ -4188,6 +4197,13 @@
     const piece = foundry.utils.deepClone(getWorldPiece(characterToken) || {});
     character.pendingArmyMuster = muster;
     piece.pendingArmyMuster = muster;
+    if (muster?.status === "pending") {
+      piece.movementUsed = Math.max(Number(piece.movementUsed || 0), Number(piece.movementMax || 0));
+      piece.movementLockedRoundKey = getCurrentActionRoundKey();
+      piece.movementLockedReason = "Summoned an army this turn.";
+      piece.movementLockedAt = new Date().toISOString();
+      piece.movementLockedBy = game.user.name;
+    }
     await characterToken.document.setFlag(FLAG_SCOPE, WORLD_CHARACTER_KEY, character);
     if (characterToken.actor) await characterToken.actor.setFlag(FLAG_SCOPE, WORLD_CHARACTER_KEY, foundry.utils.deepClone(character));
     await saveWorldPiece(characterToken, piece);
@@ -4313,6 +4329,74 @@
     await ChatMessage.create({ speaker: ChatMessage.getSpeaker({ alias: "Crown Armies" }), content: `<h2>Army Muster Requested</h2><p><strong>Commander:</strong> ${escapeHtml(muster.linkedCharacterName)}</p><p><strong>Army:</strong> ${escapeHtml(muster.armyName)}</p><p><strong>Strength:</strong> ${escapeHtml(muster.totalStrength.toLocaleString())}</p><p><strong>Composition:</strong> ${escapeHtml(armyCompositionText(muster.composition))}</p><p><strong>Upkeep:</strong> ${escapeHtml(resourceMapToText(muster.upkeep))}</p><p><strong>Ready:</strong> ${escapeHtml(muster.readyDateLabel || "next round")}</p>` });
   }
 
+  function getConnectedSeaEntriesForPort(entry) {
+    if (!entry?.tile || !isActivePort(entry.tile)) return [];
+    return getPortSeaIds(entry.tile)
+      .map(id => getEntryById(id))
+      .filter(seaEntry => seaEntry && isSeaTile(seaEntry.tile));
+  }
+
+  function buildConnectedSeaOptionsForPort(entry, selectedId = "") {
+    return getConnectedSeaEntriesForPort(entry).map(seaEntry => {
+      const id = getTileId(seaEntry);
+      const label = `${getTileName(seaEntry)}${seaEntry.tile.region ? " — " + seaEntry.tile.region : ""}`;
+      return `<option value="${escapeHtml(id)}" ${String(id) === String(selectedId) ? "selected" : ""}>${escapeHtml(label)}</option>`;
+    }).join("");
+  }
+
+  async function moveTokenToTileEntryAndSave(token, piece, entry, { lock = false, reason = "Strategic movement", embarkedFleetTokenId = "", embarkedFleetName = "" } = {}) {
+    if (!token || !entry?.tile) return null;
+    const updatedPiece = foundry.utils.deepClone(piece || getWorldPiece(token) || {});
+    updatedPiece.previousTileId = updatedPiece.currentTileId || "";
+    updatedPiece.previousTileName = updatedPiece.currentTileName || "";
+    updatedPiece.currentTileId = getTileId(entry);
+    updatedPiece.currentTileName = getTileName(entry);
+    updatedPiece.currentRegion = entry.tile.region || "";
+    updatedPiece.lastMovedAt = new Date().toISOString();
+    updatedPiece.lastMovedBy = game.user.name;
+    updatedPiece.lastMovedSource = reason;
+    if (lock) {
+      updatedPiece.movementUsed = Math.max(Number(updatedPiece.movementUsed || 0), Number(updatedPiece.movementMax || 0));
+      updatedPiece.movementLockedRoundKey = getCurrentActionRoundKey();
+      updatedPiece.movementLockedReason = reason;
+      updatedPiece.movementLockedAt = new Date().toISOString();
+      updatedPiece.movementLockedBy = game.user.name;
+    }
+    await saveWorldPiece(token, updatedPiece);
+
+    if (isCharacterToken(token)) {
+      const character = foundry.utils.deepClone(getCharacterDataFromToken(token) || {});
+      character.currentTileId = updatedPiece.currentTileId;
+      character.currentTileName = updatedPiece.currentTileName;
+      character.currentRegion = updatedPiece.currentRegion;
+      if (embarkedFleetTokenId) character.embarkedFleetTokenId = embarkedFleetTokenId;
+      if (embarkedFleetName) character.embarkedFleetName = embarkedFleetName;
+      await token.document.setFlag(FLAG_SCOPE, WORLD_CHARACTER_KEY, character);
+      if (token.actor) await token.actor.setFlag(FLAG_SCOPE, WORLD_CHARACTER_KEY, foundry.utils.deepClone(character));
+    }
+
+    const position = getTokenTopLeftForTileSlot(token, entry);
+    await token.document.update({ x: position.x, y: position.y }, { animate: true, worldMovementBypass: true, bypassWorldMovementWatcher: true, navyLaunchBypass: true });
+    return updatedPiece;
+  }
+
+  async function launchNavyFromMuster(characterToken, muster) {
+    const spawned = await spawnNavyTokenFromMuster(characterToken, muster);
+    const seaEntry = spawned.entry;
+    const characterPiece = getWorldPiece(characterToken) || {};
+    await moveTokenToTileEntryAndSave(characterToken, characterPiece, seaEntry, {
+      lock: true,
+      reason: "Summoned a navy and embarked this turn.",
+      embarkedFleetTokenId: spawned.tokenDocument?.id || "",
+      embarkedFleetName: spawned.piece?.name || muster.navyName || "Fleet"
+    });
+    await ChatMessage.create({
+      speaker: ChatMessage.getSpeaker({ alias: "Crown Navies" }),
+      content: `<h2>Navy Launched</h2><p><strong>Commander:</strong> ${escapeHtml(muster.linkedCharacterName)}</p><p><strong>Navy:</strong> ${escapeHtml(muster.navyName)}</p><p><strong>Starting Sea Tile:</strong> ${escapeHtml(getTileName(seaEntry))}</p><p><strong>Ships:</strong> ${escapeHtml(Number(muster.totalShips || 0).toLocaleString())}</p><p><strong>Composition:</strong> ${escapeHtml(navyCompositionText(muster.shipComposition || muster.composition || {}))}</p><p><strong>Upkeep:</strong> ${escapeHtml(resourceMapToText(muster.upkeep))}</p><p><strong>Movement:</strong> The commander and fleet have committed their action and cannot move again until movement resets.</p>`
+    });
+    return spawned;
+  }
+
   async function createNavyMusterRequestForCharacter(characterToken) {
     const character = getCharacterDataFromToken(characterToken);
     const piece = getWorldPiece(characterToken);
@@ -4323,6 +4407,10 @@
     if (existingPending?.status === "pending") { ui.notifications.warn(`${character.characterName || piece.name} already has a pending navy muster.`); return null; }
     const entry = getCurrentTileEntryForToken(characterToken, piece);
     if (!entry) { ui.notifications.warn("The selected character is not currently in a world tile."); return null; }
+    if (!isActivePort(entry.tile)) { ui.notifications.warn("Summon Navy can only be used from an active Port tile."); return null; }
+    const seaEntries = getConnectedSeaEntriesForPort(entry);
+    if (!seaEntries.length) { ui.notifications.warn(`${getTileName(entry)} is a port, but it has no linked sea tile. Use Make / Edit Port first.`); return null; }
+    const defaultSeaId = getTileId(seaEntries[0]);
 
     const result = await new Promise(resolve => {
       new Dialog({
@@ -4331,30 +4419,34 @@
           <div style="padding:8px;margin-bottom:10px;border:1px solid #777;border-radius:6px;">
             <strong>Commander:</strong> ${escapeHtml(character.characterName || piece.name)}<br>
             <strong>Naval Movement:</strong> ${escapeHtml(navalMovement)}<br>
-            <strong>Character Location:</strong> ${escapeHtml(getTileName(entry))}<br>
-            <span class="notes">Navies are fleet tokens. They move by sea/port routes and can carry their linked character with them.</span>
+            <strong>Port:</strong> ${escapeHtml(getTileName(entry))}<br>
+            <strong>Available Sea Tiles:</strong> ${escapeHtml(seaEntries.map(getTileName).join(", "))}<br>
+            <span class="notes">The navy launches immediately into the selected sea tile. The commander embarks and cannot move again until movement resets.</span>
           </div>
+          <div class="form-group"><label>Starting Sea Tile</label><select name="startingSeaTileId" style="width:100%;">${buildConnectedSeaOptionsForPort(entry, defaultSeaId)}</select></div>
           <div class="form-group"><label>Navy Name</label><input type="text" name="navyName" value="${escapeHtml(character.characterName || piece.name)}'s Fleet" style="width:100%;" /></div>
           <div style="display:grid;grid-template-columns:repeat(2, 1fr);gap:8px;">${buildNavyCompositionInputs()}</div>
           <div class="form-group"><label><input type="checkbox" name="carryCharacter" checked /> Fleet carries linked character when moved</label></div>
         </form>`,
         buttons: {
-          save: { label: "Request Navy Muster", callback: html => {
+          save: { label: "Launch Navy", callback: html => {
             const form = html[0].querySelector("form");
-            resolve({ navyName: String(form.navyName.value || "").trim(), composition: readNavyCompositionForm(form), carryCharacter: form.carryCharacter.checked });
+            resolve({ navyName: String(form.navyName.value || "").trim(), composition: readNavyCompositionForm(form), carryCharacter: form.carryCharacter.checked, startingSeaTileId: String(form.startingSeaTileId.value || defaultSeaId) });
           }},
           cancel: { label: "Cancel", callback: () => resolve(null) }
         },
         default: "save"
-      }, { width: 820, height: 780, resizable: true }).render(true);
+      }, { width: 820, height: 830, resizable: true }).render(true);
     });
     if (!result) return null;
     const totalShips = getNavyTotalShips(result.composition);
     if (totalShips <= 0) { ui.notifications.warn("Add at least one ship to summon a navy."); return null; }
+    const seaEntry = getEntryById(result.startingSeaTileId);
+    if (!seaEntry || !isSeaTile(seaEntry.tile)) { ui.notifications.error("Could not find the selected starting sea tile."); return null; }
     const upkeep = calculateNavyUpkeep(result.composition);
     return {
       id: foundry.utils.randomID(16),
-      status: "pending",
+      status: "launch",
       forceType: "fleet",
       navyName: result.navyName || `${character.characterName || piece.name}'s Fleet`,
       linkedCharacterId: character.characterId,
@@ -4374,14 +4466,17 @@
       carryCharacter: result.carryCharacter,
       followCharacter: result.carryCharacter,
       movementMax: Math.max(1, Number(navalMovement || 3)),
-      movementUsed: 0,
-      currentTileId: getTileId(entry),
-      currentTileName: getTileName(entry),
-      currentRegion: entry.tile?.region || "",
+      movementUsed: Math.max(1, Number(navalMovement || 3)),
+      lockMovementOnSummon: true,
+      launchPortId: getTileId(entry),
+      launchPortName: getTileName(entry),
+      currentTileId: getTileId(seaEntry),
+      currentTileName: getTileName(seaEntry),
+      currentRegion: seaEntry.tile?.region || "",
       requestedRoundKey: getRoundKey(getClock()),
       requestedDateLabel: getDateLabel(getClock()),
-      readyRoundKey: getRoundKey(getNextClockData(getClock())),
-      readyDateLabel: getDateLabel(getNextClockData(getClock())),
+      readyRoundKey: getRoundKey(getClock()),
+      readyDateLabel: getDateLabel(getClock()),
       requestedAt: new Date().toISOString()
     };
   }
@@ -4393,17 +4488,19 @@
     const token = selected[0];
     const piece = getWorldPiece(token);
     if (!canUserControlWorldPiece(token, piece)) { ui.notifications.warn("You can only summon navies from characters you control."); return; }
+    const lockedReason = strategicMovementLockReason(piece);
+    if (lockedReason) { ui.notifications.warn(lockedReason); return; }
     const muster = await createNavyMusterRequestForCharacter(token);
     if (!muster) return;
     if (!game.user.isGM) {
       const gm = findActiveGmForScene(canvas.scene?.id);
-      if (!gm) { ui.notifications.warn("No active GM online to receive this navy muster request."); return; }
-      game.socket.emit(SOCKET_NAME, { type: "navyMusterRequest", targetGmId: gm.id, sceneId: canvas.scene?.id, requesterUserId: game.user.id, requesterUserName: game.user.name, tokenId: token.document.id, tokenName: token.document.name, muster });
-      ui.notifications.info(`Navy muster request sent to GM ${gm.name}.`);
+      if (!gm) { ui.notifications.warn("No active GM online to launch this navy."); return; }
+      game.socket.emit(SOCKET_NAME, { type: "navyLaunchRequest", targetGmId: gm.id, sceneId: canvas.scene?.id, requesterUserId: game.user.id, requesterUserName: game.user.name, tokenId: token.document.id, tokenName: token.document.name, muster });
+      ui.notifications.info(`Navy launch request sent to GM ${gm.name}.`);
       return;
     }
-    await savePendingNavyMuster(token, muster);
-    await ChatMessage.create({ speaker: ChatMessage.getSpeaker({ alias: "Crown Navies" }), content: `<h2>Navy Muster Requested</h2><p><strong>Commander:</strong> ${escapeHtml(muster.linkedCharacterName)}</p><p><strong>Navy:</strong> ${escapeHtml(muster.navyName)}</p><p><strong>Ships:</strong> ${escapeHtml(muster.totalShips.toLocaleString())}</p><p><strong>Composition:</strong> ${escapeHtml(navyCompositionText(muster.shipComposition))}</p><p><strong>Upkeep:</strong> ${escapeHtml(resourceMapToText(muster.upkeep))}</p><p><strong>Ready:</strong> ${escapeHtml(muster.readyDateLabel || "next round")}</p>` });
+    await launchNavyFromMuster(token, muster);
+    revealForCurrentPlayerPieces();
   }
 
   async function handleArmyMusterRequest(message) {
@@ -4422,16 +4519,27 @@
     if (message.targetGmId && String(message.targetGmId) !== String(game.user.id)) return;
     if (message.sceneId && String(message.sceneId) !== String(canvas.scene?.id)) return;
     const token = canvas.tokens.placeables.find(token => token.document.id === message.tokenId);
-    if (!token) { ui.notifications.warn(`Navy muster request failed: ${message.tokenName || message.tokenId} not found.`); return; }
-    await savePendingNavyMuster(token, message.muster);
-    ui.notifications.info(`Received navy muster request from ${message.requesterUserName}.`);
-    await ChatMessage.create({ speaker: ChatMessage.getSpeaker({ alias: "Crown Navies" }), content: `<h2>Navy Muster Requested</h2><p><strong>Player:</strong> ${escapeHtml(message.requesterUserName || "Unknown")}</p><p><strong>Commander:</strong> ${escapeHtml(message.muster?.linkedCharacterName || token.document.name)}</p><p><strong>Navy:</strong> ${escapeHtml(message.muster?.navyName || "Fleet")}</p><p><strong>Ships:</strong> ${escapeHtml(Number(message.muster?.totalShips || 0).toLocaleString())}</p><p>Use <strong>Process Military Musters</strong> after one turn to spawn the fleet token.</p>` });
+    if (!token) { ui.notifications.warn(`Navy request failed: ${message.tokenName || message.tokenId} not found.`); return; }
+    try {
+      if (message.type === "navyLaunchRequest" || message.muster?.status === "launch") {
+        await launchNavyFromMuster(token, message.muster);
+        ui.notifications.info(`Launched navy request from ${message.requesterUserName}.`);
+        revealForCurrentPlayerPieces();
+        return;
+      }
+      await savePendingNavyMuster(token, message.muster);
+      ui.notifications.info(`Received navy muster request from ${message.requesterUserName}.`);
+      await ChatMessage.create({ speaker: ChatMessage.getSpeaker({ alias: "Crown Navies" }), content: `<h2>Navy Muster Requested</h2><p><strong>Player:</strong> ${escapeHtml(message.requesterUserName || "Unknown")}</p><p><strong>Commander:</strong> ${escapeHtml(message.muster?.linkedCharacterName || token.document.name)}</p><p><strong>Navy:</strong> ${escapeHtml(message.muster?.navyName || "Fleet")}</p><p><strong>Ships:</strong> ${escapeHtml(Number(message.muster?.totalShips || 0).toLocaleString())}</p><p>Use <strong>Process Military Musters</strong> after one turn to spawn the fleet token.</p>` });
+    } catch (err) {
+      console.error("Navy request failed", err, message);
+      ui.notifications.error(err.message || "Navy request failed.");
+    }
   }
 
   async function spawnArmyTokenFromMuster(characterToken, muster) {
     const character = getCharacterDataFromToken(characterToken) || {};
     const characterPiece = getWorldPiece(characterToken) || {};
-    const entry = getCurrentTileEntryForToken(characterToken, characterPiece) || getTileEntryByNameOrId(muster.currentTileId) || getTileEntryByNameOrId(muster.currentTileName);
+    const entry = getTileEntryByNameOrId(muster.currentTileId) || getTileEntryByNameOrId(muster.currentTileName) || getCurrentTileEntryForToken(characterToken, characterPiece);
     if (!entry) throw new Error(`Could not find muster tile for ${muster.armyName}.`);
     const ownerUser = getUserByIdOrName(muster.ownerUserId, muster.ownerUserName) || getUserByIdOrName(character.playerUserId, character.playerName);
     const image = DEFAULT_IMAGES.army;
@@ -4520,7 +4628,7 @@
   async function spawnNavyTokenFromMuster(characterToken, muster) {
     const character = getCharacterDataFromToken(characterToken) || {};
     const characterPiece = getWorldPiece(characterToken) || {};
-    const entry = getCurrentTileEntryForToken(characterToken, characterPiece) || getTileEntryByNameOrId(muster.currentTileId) || getTileEntryByNameOrId(muster.currentTileName);
+    const entry = getTileEntryByNameOrId(muster.currentTileId) || getTileEntryByNameOrId(muster.currentTileName) || getCurrentTileEntryForToken(characterToken, characterPiece);
     if (!entry) throw new Error(`Could not find muster tile for ${muster.navyName}.`);
     const ownerUser = getUserByIdOrName(muster.ownerUserId, muster.ownerUserName) || getUserByIdOrName(character.playerUserId, character.playerName);
     const image = DEFAULT_IMAGES.fleet;
@@ -4564,6 +4672,13 @@
       musteredAt: now,
       musteredBy: game.user.name
     };
+    if (muster.lockMovementOnSummon) {
+      fleetPiece.movementUsed = Math.max(Number(fleetPiece.movementUsed || 0), Number(fleetPiece.movementMax || 0));
+      fleetPiece.movementLockedRoundKey = getCurrentActionRoundKey();
+      fleetPiece.movementLockedReason = "Summoned / launched navy this turn.";
+      fleetPiece.movementLockedAt = now;
+      fleetPiece.movementLockedBy = game.user.name;
+    }
     const actor = await Actor.create({
       name: fleetPiece.name,
       type: actorType,
@@ -4753,15 +4868,7 @@
     ui.notifications.info(`Updated ${isFleet ? "navy" : "army"}: ${piece.name}.`);
   }
 
-  async function dismissSelectedArmy() {
-    if (!requireOverviewScene()) return;
-    if (!game.user.isGM) { ui.notifications.warn("Only the GM can dismiss armies."); return; }
-    const selected = canvas.tokens.controlled.filter(token => ["army", "fleet"].includes(normalize(getWorldPiece(token)?.pieceType)));
-    if (selected.length !== 1) { ui.notifications.warn("Select exactly one army or navy token to dismiss."); return; }
-    const token = selected[0];
-    const confirmed = await Dialog.confirm({ title: "Dismiss Army / Navy?", content: `<p>Dismiss <strong>${escapeHtml(token.document.name)}</strong> from the map?</p>`, yes: () => true, no: () => false, defaultYes: false });
-    if (!confirmed) return;
-    const piece = getWorldPiece(token) || {};
+  async function dismissForceToken(token, piece = getWorldPiece(token)) {
     const characterToken = getCharacterTokenById(piece.linkedCharacterId || piece.commanderCharacterId);
     if (characterToken) {
       const character = foundry.utils.deepClone(getCharacterDataFromToken(characterToken) || {});
@@ -4770,12 +4877,46 @@
       if (character.pendingNavyMuster) delete character.pendingNavyMuster;
       if (charPiece.pendingArmyMuster) delete charPiece.pendingArmyMuster;
       if (charPiece.pendingNavyMuster) delete charPiece.pendingNavyMuster;
+      if (character.embarkedFleetTokenId === token.document.id) { delete character.embarkedFleetTokenId; delete character.embarkedFleetName; }
       await characterToken.document.setFlag(FLAG_SCOPE, WORLD_CHARACTER_KEY, character);
       if (characterToken.actor) await characterToken.actor.setFlag(FLAG_SCOPE, WORLD_CHARACTER_KEY, foundry.utils.deepClone(character));
       await saveWorldPiece(characterToken, charPiece);
     }
     await token.document.delete();
     ui.notifications.info(`Dismissed ${normalize(piece.pieceType) === "fleet" ? "navy" : "army"}: ${piece.name || token.document.name}.`);
+  }
+
+  async function requestGmDismissForce(token, piece) {
+    const gm = findActiveGmForScene(canvas.scene?.id);
+    if (!gm) { ui.notifications.warn("No active GM online to dismiss this force."); return; }
+    game.socket.emit(SOCKET_NAME, { type: "dismissForceRequest", targetGmId: gm.id, sceneId: canvas.scene?.id, requesterUserId: game.user.id, requesterUserName: game.user.name, tokenId: token.document.id, tokenName: token.document.name });
+    ui.notifications.info(`Dismiss request sent to GM ${gm.name}.`);
+  }
+
+  async function handleDismissForceRequest(message) {
+    if (!game.user.isGM) return;
+    if (message.targetGmId && String(message.targetGmId) !== String(game.user.id)) return;
+    if (message.sceneId && String(message.sceneId) !== String(canvas.scene?.id)) return;
+    const token = canvas.tokens.placeables.find(token => token.document.id === message.tokenId);
+    if (!token) { ui.notifications.warn(`Dismiss request failed: ${message.tokenName || message.tokenId} not found.`); return; }
+    const piece = getWorldPiece(token) || {};
+    const ownerId = String(piece.ownerUserId || piece.playerOwnerUserId || "");
+    if (ownerId && String(ownerId) !== String(message.requesterUserId || "")) { ui.notifications.warn(`${message.requesterUserName || "Player"} cannot dismiss ${piece.name || token.document.name}; they do not own it.`); return; }
+    await dismissForceToken(token, piece);
+    await ChatMessage.create({ speaker: ChatMessage.getSpeaker({ alias: "Crown Forces" }), content: `<h2>Force Dismissed</h2><p><strong>Player:</strong> ${escapeHtml(message.requesterUserName || "Unknown")}</p><p><strong>Force:</strong> ${escapeHtml(piece.name || token.document.name)}</p>` });
+  }
+
+  async function dismissSelectedArmy() {
+    if (!requireOverviewScene()) return;
+    const selected = canvas.tokens.controlled.filter(token => ["army", "fleet"].includes(normalize(getWorldPiece(token)?.pieceType)));
+    if (selected.length !== 1) { ui.notifications.warn("Select exactly one army or navy token to dismiss."); return; }
+    const token = selected[0];
+    const piece = getWorldPiece(token) || {};
+    if (!canUserControlWorldPiece(token, piece)) { ui.notifications.warn("You can only dismiss armies or navies you control."); return; }
+    const confirmed = await Dialog.confirm({ title: "Dismiss Army / Navy?", content: `<p>Dismiss <strong>${escapeHtml(token.document.name)}</strong> from the map?</p><p class="notes">This stops its upkeep from being charged in future rounds.</p>`, yes: () => true, no: () => false, defaultYes: false });
+    if (!confirmed) return;
+    if (!game.user.isGM) { await requestGmDismissForce(token, piece); return; }
+    await dismissForceToken(token, piece);
   }
 
   function getFortificationLevelForHouse(house = {}) {
@@ -4885,22 +5026,15 @@
     await entry.drawing.document.setFlag(FLAG_SCOPE, HOUSE_KEY, house);
   }
 
-  async function siegeStorm() {
-    if (!requireOverviewScene()) return;
-    const selected = canvas.tokens.controlled.filter(token => normalize(getWorldPiece(token)?.pieceType) === "army");
-    if (selected.length !== 1) { ui.notifications.warn("Select exactly one army token on the target tile."); return; }
-    const token = selected[0];
-    const piece = foundry.utils.deepClone(getWorldPiece(token));
-    if (!canUserControlWorldPiece(token, piece)) { ui.notifications.warn("You can only siege with an army you control."); return; }
-    const entry = getCurrentTileEntryForToken(token, piece);
-    if (!entry) { ui.notifications.warn("The selected army is not currently inside a world tile."); return; }
+  async function resolveSiegeStorm({ token, piece, entry, options, actingUserId = game.user.id, actingUserName = game.user.name } = {}) {
+    if (!token || !piece || !entry?.tile) throw new Error("Missing army or target tile for siege.");
     const house = getHouseData(entry.drawing) || {};
     const ownerId = getTileOwnerUserId(entry.tile, house);
     const ownerName = getTileOwnerUserName(entry.tile, house);
-    const attackerOwnerId = piece.ownerUserId || piece.playerOwnerUserId || game.user.id;
+    const attackerOwnerId = piece.ownerUserId || piece.playerOwnerUserId || actingUserId || game.user.id;
     const siegeRoundKey = getCurrentActionRoundKey();
-    if (piece.lastSiegeRoundKey && String(piece.lastSiegeRoundKey) === String(siegeRoundKey)) { ui.notifications.warn("This army has already attempted a siege this turn."); return; }
-    if (ownerId && String(ownerId) === String(attackerOwnerId)) { ui.notifications.warn(`${getTileName(entry)} is already controlled by this army's owner.`); return; }
+    if (piece.lastSiegeRoundKey && String(piece.lastSiegeRoundKey) === String(siegeRoundKey)) throw new Error("This army has already attempted a siege this turn.");
+    if (ownerId && String(ownerId) === String(attackerOwnerId)) throw new Error(`${getTileName(entry)} is already controlled by this army's owner.`);
 
     const defendingArmies = getDefendingArmiesOnTile(entry, attackerOwnerId);
     if (ownerId && defendingArmies.length) {
@@ -4908,8 +5042,100 @@
       const content = `<h2>Pitched Battle Declared</h2><p><strong>Location:</strong> ${escapeHtml(getTileName(entry))}</p><p><strong>Attacker:</strong> ${escapeHtml(piece.name || token.document.name)} — ${escapeHtml(Number(piece.strengthCurrent || piece.totalStrength || 0).toLocaleString())} men</p><p><strong>Defender:</strong> ${defendingArmies.map(t => `${escapeHtml(t.document.name)} — ${escapeHtml(Number(getWorldPiece(t)?.strengthCurrent || getWorldPiece(t)?.totalStrength || 0).toLocaleString())} men`).join("<br>")}</p><p>Resolve manually, simulate, or move to the battle minigame. Quick Siege is not rolled while a defending player army is present.</p>`;
       await ChatMessage.create({ speaker: ChatMessage.getSpeaker({ alias: "Crown Siege" }), whisper: gmUsers.length ? gmUsers : undefined, content });
       ui.notifications.info("Defending army present: pitched battle card sent to GM.");
-      return;
+      return null;
     }
+
+    const result = options || { siegeEngines: Math.max(0, Number(piece.siegeEngines || 0)), siegeTurns: Math.max(1, Number(piece.siegeTurns || 1)) };
+    const linkedCommander = getCharacterTokenById(piece.linkedCharacterId || piece.commanderCharacterId);
+    const martial = Number(piece.commanderMartial || (linkedCommander ? getCharacterMartialValue(linkedCommander) : 0) || 0);
+    const strength = Number(piece.strengthCurrent || piece.totalStrength || 0);
+    const settlementKey = getSiegeSettlementKey(house);
+    const fortLevel = getFortificationLevelForHouse(house);
+    const settlementDc = SIEGE_DC_TABLE[settlementKey]?.[fortLevel] ?? 15;
+    const martialBonus = martial * 2;
+    const manpowerBonus = getSiegeManpowerBonus(strength);
+    const engineBonus = getSiegeEngineBonus(result.siegeEngines);
+    const durationBonus = getSiegeDurationBonus(result.siegeTurns);
+    const footholdBonus = Number(piece.footholdBonus || 0);
+    const rawChance = 50 + martialBonus + manpowerBonus + engineBonus + durationBonus + footholdBonus - settlementDc;
+    const chance = Math.max(5, Math.min(95, Math.round(rawChance * 100) / 100));
+    const roll = await new Roll("1d100").evaluate({ async: true });
+    const d100 = Number(roll.total || 0);
+    const outcome = getSiegeOutcome(d100, chance);
+
+    const updatedPiece = foundry.utils.deepClone(piece || {});
+    const casualties = calculateSiegeCasualties(strength, outcome);
+    updatedPiece.siegeEngines = result.siegeEngines;
+    updatedPiece.siegeTurns = outcome.success ? 1 : Number(result.siegeTurns || 1) + 1;
+    updatedPiece.siegeStatus = outcome.success ? "resolved" : "under siege";
+    updatedPiece.footholdBonus = outcome.foothold ? 10 : 0;
+    updatedPiece.detached = !outcome.success;
+    updatedPiece.followCharacter = outcome.success ? updatedPiece.followCharacter : false;
+    updatedPiece.strengthCurrent = casualties.after;
+    updatedPiece.lastSiegeRoundKey = siegeRoundKey;
+    updatedPiece.lastSiegeOutcome = outcome.key;
+    updatedPiece.lastSiegeAt = new Date().toISOString();
+    updatedPiece.movementUsed = Math.max(Number(updatedPiece.movementUsed || 0), Number(updatedPiece.movementMax || 0));
+    updatedPiece.movementLockedRoundKey = siegeRoundKey;
+    updatedPiece.movementLockedReason = "This army committed a siege this turn.";
+    await saveWorldPiece(token, updatedPiece);
+
+    if (outcome.success) await applyTileControllerFromVictory(entry, updatedPiece, actingUserId || attackerOwnerId || game.user.id, actingUserName || updatedPiece.ownerUserName || updatedPiece.playerOwnerUserName || game.user.name, "Siege");
+
+    await ChatMessage.create({
+      speaker: ChatMessage.getSpeaker({ alias: "Crown Siege" }),
+      content: `<h2>Quick Siege — ${escapeHtml(outcome.label)}</h2>
+        <p><strong>Army:</strong> ${escapeHtml(updatedPiece.name || token.document.name)}</p>
+        <p><strong>Target:</strong> ${escapeHtml(getTileName(entry))}</p>
+        <p><strong>Roll:</strong> ${escapeHtml(d100)} on d100</p>
+        <p><strong>Storm Chance:</strong> ${escapeHtml(chance)}%</p>
+        <p><strong>Formula:</strong> 50 + Martial ${escapeHtml(martial)}×2 (${escapeHtml(martialBonus)}) + Manpower ${escapeHtml(manpowerBonus)} + Engines ${escapeHtml(engineBonus)} + Duration ${escapeHtml(durationBonus)}${footholdBonus ? ` + Foothold ${escapeHtml(footholdBonus)}` : ""} - DC ${escapeHtml(settlementDc)}</p>
+        <p><strong>Settlement:</strong> ${escapeHtml(siegeSettlementLabel(settlementKey))}; <strong>Fortification:</strong> ${escapeHtml(fortLevel)}</p>
+        <p>${escapeHtml(outcome.text)}</p>
+        <p><strong>Attacker Casualties:</strong> ${escapeHtml(casualties.percent)}% — ${escapeHtml(casualties.lost.toLocaleString())} lost. <strong>Strength Remaining:</strong> ${escapeHtml(casualties.after.toLocaleString())} / ${escapeHtml(Number(updatedPiece.strengthMax || updatedPiece.totalStrength || casualties.before).toLocaleString())}</p>
+        <p><strong>Movement:</strong> Siege committed; this army cannot move again until movement resets.</p>
+        ${outcome.success ? `<p><strong>Control:</strong> ${escapeHtml(getTileName(entry))} now changes allegiance to ${escapeHtml(actingUserName || updatedPiece.ownerUserName || updatedPiece.playerOwnerUserName || game.user.name)}. The local ruler is not automatically replaced.</p>` : `<p><strong>Next Attempt:</strong> Siege turns will count as ${escapeHtml(updatedPiece.siegeTurns)}.${outcome.foothold ? " Foothold +10% has been stored." : ""}</p>`}`
+    });
+    revealForCurrentPlayerPieces();
+    return outcome;
+  }
+
+  async function requestGmSiegeStorm({ token, piece, entry, options }) {
+    const gm = findActiveGmForScene(canvas.scene?.id);
+    if (!gm) { ui.notifications.warn("No active GM online to resolve the siege."); return false; }
+    game.socket.emit(SOCKET_NAME, {
+      type: "siegeStormRequest",
+      targetGmId: gm.id,
+      sceneId: canvas.scene?.id,
+      requesterUserId: game.user.id,
+      requesterUserName: game.user.name,
+      tokenId: token.document.id,
+      tokenName: token.document.name,
+      drawingId: entry.drawing.document.id,
+      tileId: getTileId(entry),
+      tileName: getTileName(entry),
+      options
+    });
+    ui.notifications.info(`Siege / Storm request sent to GM ${gm.name}.`);
+    return true;
+  }
+
+  async function siegeStorm() {
+    if (!requireOverviewScene()) return;
+    const selected = canvas.tokens.controlled.filter(token => normalize(getWorldPiece(token)?.pieceType) === "army");
+    if (selected.length !== 1) { ui.notifications.warn("Select exactly one army token on the target tile."); return; }
+    const token = selected[0];
+    const piece = foundry.utils.deepClone(getWorldPiece(token));
+    if (!canUserControlWorldPiece(token, piece)) { ui.notifications.warn("You can only siege with an army you control."); return; }
+    const lockedReason = strategicMovementLockReason(piece);
+    if (lockedReason) { ui.notifications.warn(lockedReason); return; }
+    const entry = getCurrentTileEntryForToken(token, piece);
+    if (!entry) { ui.notifications.warn("The selected army is not currently inside a world tile."); return; }
+    const house = getHouseData(entry.drawing) || {};
+    const ownerId = getTileOwnerUserId(entry.tile, house);
+    const ownerName = getTileOwnerUserName(entry.tile, house);
+    const attackerOwnerId = piece.ownerUserId || piece.playerOwnerUserId || game.user.id;
+    if (ownerId && String(ownerId) === String(attackerOwnerId)) { ui.notifications.warn(`${getTileName(entry)} is already controlled by this army's owner.`); return; }
 
     const defaultTurns = Math.max(1, Number(piece.siegeTurns || 1));
     const defaultEngines = Math.max(0, Number(piece.siegeEngines || 0));
@@ -4930,64 +5156,37 @@
           </div>
           <div class="form-group"><label>Siege Engines</label><input type="number" name="siegeEngines" value="${escapeHtml(defaultEngines)}" min="0" step="1" style="width:100%;" /></div>
           <div class="form-group"><label>Turns Under Siege</label><input type="number" name="siegeTurns" value="${escapeHtml(defaultTurns)}" min="1" step="1" style="width:100%;" /></div>
-          <p class="notes">Quick Siege uses the tile's settlement and fortification DC only. NPCs do not need army or garrison tokens.</p>
+          <p class="notes">Quick Siege uses settlement + fortification only. If a player-owned tile has a defending army present, the GM gets a pitched battle alert instead.</p>
         </form>`,
         buttons: { roll: { label: "Roll Storm", callback: html => { const form = html[0].querySelector("form"); resolve({ siegeEngines: Math.max(0, Number(form.siegeEngines.value || 0)), siegeTurns: Math.max(1, Number(form.siegeTurns.value || 1)) }); }}, cancel: { label: "Cancel", callback: () => resolve(null) } },
         default: "roll"
       }, { width: 620, height: 520, resizable: true }).render(true);
     });
     if (!result) return;
+    if (!game.user.isGM) { await requestGmSiegeStorm({ token, piece, entry, options: result }); return; }
+    try {
+      await resolveSiegeStorm({ token, piece, entry, options: result, actingUserId: game.user.id, actingUserName: game.user.name });
+    } catch (err) {
+      ui.notifications.error(err.message || "Siege / Storm failed.");
+      console.error(err);
+    }
+  }
 
-    const linkedCommander = getCharacterTokenById(piece.linkedCharacterId || piece.commanderCharacterId);
-    const martial = Number(piece.commanderMartial || (linkedCommander ? getCharacterMartialValue(linkedCommander) : 0) || 0);
-    const strength = Number(piece.strengthCurrent || piece.totalStrength || 0);
-    const settlementKey = getSiegeSettlementKey(house);
-    const fortLevel = getFortificationLevelForHouse(house);
-    const settlementDc = SIEGE_DC_TABLE[settlementKey]?.[fortLevel] ?? 15;
-    const martialBonus = martial * 2;
-    const manpowerBonus = getSiegeManpowerBonus(strength);
-    const engineBonus = getSiegeEngineBonus(result.siegeEngines);
-    const durationBonus = getSiegeDurationBonus(result.siegeTurns);
-    const footholdBonus = Number(piece.footholdBonus || 0);
-    const rawChance = 50 + martialBonus + manpowerBonus + engineBonus + durationBonus + footholdBonus - settlementDc;
-    const chance = Math.max(5, Math.min(95, Math.round(rawChance * 100) / 100));
-    const roll = await new Roll("1d100").evaluate({ async: true });
-    const d100 = Number(roll.total || 0);
-    const outcome = getSiegeOutcome(d100, chance);
-
-    const casualties = calculateSiegeCasualties(strength, outcome);
-    piece.siegeEngines = result.siegeEngines;
-    piece.siegeTurns = outcome.success ? 1 : result.siegeTurns + 1;
-    piece.siegeStatus = outcome.success ? "resolved" : "under siege";
-    piece.footholdBonus = outcome.foothold ? 10 : 0;
-    piece.detached = !outcome.success;
-    piece.followCharacter = outcome.success ? piece.followCharacter : false;
-    piece.strengthCurrent = casualties.after;
-    piece.lastSiegeRoundKey = siegeRoundKey;
-    piece.lastSiegeOutcome = outcome.key;
-    piece.lastSiegeAt = new Date().toISOString();
-    piece.movementUsed = Math.max(Number(piece.movementUsed || 0), Number(piece.movementMax || 0));
-    piece.movementLockedRoundKey = siegeRoundKey;
-    piece.movementLockedReason = "This army committed a siege this turn.";
-    await saveWorldPiece(token, piece);
-
-    if (outcome.success) await applyTileControllerFromVictory(entry, piece, attackerOwnerId || game.user.id, piece.ownerUserName || piece.playerOwnerUserName || game.user.name, "Siege");
-
-    await ChatMessage.create({
-      speaker: ChatMessage.getSpeaker({ alias: "Crown Siege" }),
-      content: `<h2>Quick Siege — ${escapeHtml(outcome.label)}</h2>
-        <p><strong>Army:</strong> ${escapeHtml(piece.name || token.document.name)}</p>
-        <p><strong>Target:</strong> ${escapeHtml(getTileName(entry))}</p>
-        <p><strong>Roll:</strong> ${escapeHtml(d100)} on d100</p>
-        <p><strong>Storm Chance:</strong> ${escapeHtml(chance)}%</p>
-        <p><strong>Formula:</strong> 50 + Martial ${escapeHtml(martial)}×2 (${escapeHtml(martialBonus)}) + Manpower ${escapeHtml(manpowerBonus)} + Engines ${escapeHtml(engineBonus)} + Duration ${escapeHtml(durationBonus)}${footholdBonus ? ` + Foothold ${escapeHtml(footholdBonus)}` : ""} - DC ${escapeHtml(settlementDc)}</p>
-        <p><strong>Settlement:</strong> ${escapeHtml(siegeSettlementLabel(settlementKey))}; <strong>Fortification:</strong> ${escapeHtml(fortLevel)}</p>
-        <p>${escapeHtml(outcome.text)}</p>
-        <p><strong>Attacker Casualties:</strong> ${escapeHtml(casualties.percent)}% — ${escapeHtml(casualties.lost.toLocaleString())} lost. <strong>Strength Remaining:</strong> ${escapeHtml(casualties.after.toLocaleString())} / ${escapeHtml(Number(piece.strengthMax || piece.totalStrength || casualties.before).toLocaleString())}</p>
-        <p><strong>Movement:</strong> Siege committed; this army cannot move again until movement resets.</p>
-        ${outcome.success ? `<p><strong>Control:</strong> ${escapeHtml(getTileName(entry))} now changes allegiance to ${escapeHtml(piece.ownerUserName || piece.playerOwnerUserName || game.user.name)}. The local ruler is not automatically replaced.</p>` : `<p><strong>Next Attempt:</strong> Siege turns will count as ${escapeHtml(piece.siegeTurns)}.${outcome.foothold ? " Foothold +10% has been stored." : ""}</p>`}`
-    });
-    revealForCurrentPlayerPieces();
+  async function handleSiegeStormRequest(message) {
+    if (!game.user.isGM) return;
+    if (message.targetGmId && String(message.targetGmId) !== String(game.user.id)) return;
+    if (message.sceneId && String(message.sceneId) !== String(canvas.scene?.id)) return;
+    const token = canvas.tokens.placeables.find(token => token.document.id === message.tokenId);
+    if (!token) { ui.notifications.warn(`Siege request failed: token ${message.tokenName || message.tokenId} not found.`); return; }
+    const piece = foundry.utils.deepClone(getWorldPiece(token) || {});
+    const entry = getEntryById(message.drawingId) || getEntryById(message.tileId) || getCurrentTileEntryForToken(token, piece);
+    try {
+      await resolveSiegeStorm({ token, piece, entry, options: message.options || {}, actingUserId: message.requesterUserId, actingUserName: message.requesterUserName });
+      ui.notifications.info(`Resolved siege request from ${message.requesterUserName}.`);
+    } catch (err) {
+      ui.notifications.error(err.message || "Siege request failed.");
+      console.error("Siege request failed", err, message);
+    }
   }
 
   function getDiplomacyValue(piece = {}, character = {}) {
@@ -5533,6 +5732,7 @@
 
   async function roundClock() {
     if (!requireOverviewScene()) return;
+    if (!game.user.isGM) { ui.notifications.warn("Only the GM can adjust the world clock."); return; }
     let clock = getClock();
     if (!clock) {
       clock = getDefaultClock();
@@ -5543,28 +5743,48 @@
     }
     const currentLabel = getDateLabel(clock);
     const nextClock = advanceClockData(clock);
-    const nextLabel = getDateLabel(nextClock);
+    const previousClock = rewindClockData(clock);
     const result = await new Promise(resolve => {
       new Dialog({
         title: "World Round Clock",
-        content: `<div style="text-align:center;padding:12px;"><div style="font-size:14px;opacity:0.8;margin-bottom:5px;">Current Date</div><div style="font-size:28px;font-weight:bold;margin-bottom:16px;">${escapeHtml(currentLabel)}</div><div style="padding:10px;border:1px solid #777;border-radius:6px;margin-bottom:12px;"><strong>Next Round:</strong><br>${escapeHtml(nextLabel)}</div><p class="notes">Advancing the round resets <strong>all World Piece movement</strong> to 0 used.</p></div>`,
+        content: `<div style="text-align:center;padding:12px;"><div style="font-size:14px;opacity:0.8;margin-bottom:5px;">Current Date</div><div style="font-size:28px;font-weight:bold;margin-bottom:16px;">${escapeHtml(currentLabel)}</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:10px;border:1px solid #777;border-radius:6px;margin-bottom:12px;"><div><strong>Previous:</strong><br>${escapeHtml(getDateLabel(previousClock))}</div><div><strong>Next:</strong><br>${escapeHtml(getDateLabel(nextClock))}</div></div><p class="notes">Advance/back changes the campaign clock. Advancing collects economy and charges active army/navy upkeep once for the new round. Use Reset Economy Ledger if you reset/rewind during testing and need to collect again.</p></div>`,
         buttons: {
-          advance: { label: "Advance Round", callback: () => resolve("advance") },
+          advance: { label: "Advance Round + Economy", callback: () => resolve("advance") },
+          back: { label: "Go Back One Round", callback: () => resolve("back") },
+          collect: { label: "Collect Current Round", callback: () => resolve("collect") },
+          resetLedger: { label: "Reset Economy Ledger", callback: () => resolve("resetLedger") },
           resetMovement: { label: "Reset Movement Only", callback: () => resolve("resetMovement") },
           resetClock: { label: "Reset Clock", callback: () => resolve("resetClock") },
           cancel: { label: "Cancel", callback: () => resolve(null) }
         },
         default: "advance"
-      }, { width: 520, height: 410, resizable: true }).render(true);
+      }, { width: 620, height: 500, resizable: true }).render(true);
     });
     if (!result) return;
     if (result === "resetMovement") { await resetMovement(); return; }
+    if (result === "collect") { await collectEconomyForRound(clock, { scope: "all", force: false, silent: false }); return; }
+    if (result === "resetLedger") {
+      const confirmed = await Dialog.confirm({ title: "Reset Economy Ledger?", content: `<p>This clears collection locks so the current/all rounds can be collected again.</p><p><strong>Use this only for testing or corrections.</strong></p>`, yes: () => true, no: () => false, defaultYes: false });
+      if (!confirmed) return;
+      await clearEconomyLedger("all");
+      await ChatMessage.create({ speaker: ChatMessage.getSpeaker({ alias: "Crown Economy" }), content: `<h2>Economy Ledger Reset</h2><p>All economy collection ledger entries were cleared. Income can now be collected again for any round.</p>` });
+      ui.notifications.info("Economy ledger reset.");
+      return;
+    }
     if (result === "resetClock") {
-      const confirmed = await Dialog.confirm({ title: "Reset World Clock?", content: "<p>This will reset the campaign clock to <strong>Spring 1, 100 AF</strong> and reset movement.</p>" });
+      const confirmed = await Dialog.confirm({ title: "Reset World Clock?", content: "<p>This will reset the campaign clock to <strong>Spring 1, 100 AF</strong> and reset movement. It does <strong>not</strong> clear the economy ledger unless you use Reset Economy Ledger.</p>", yes: () => true, no: () => false, defaultYes: false });
       if (!confirmed) return;
       const newClock = getDefaultClock();
       await saveClock(newClock);
       await resetMovement();
+      return;
+    }
+    if (result === "back") {
+      const oldClock = foundry.utils.deepClone(clock);
+      const newClock = rewindClockData(clock);
+      await saveClock(newClock);
+      await resetMovement();
+      await ChatMessage.create({ speaker: ChatMessage.getSpeaker({ alias: "World Round Clock" }), content: `<h2>Round Rewound</h2><p><strong>Previous:</strong> ${escapeHtml(getDateLabel(oldClock))}</p><p><strong>Current:</strong> ${escapeHtml(getDateLabel(newClock))}</p><p>Movement has been reset. Economy was not automatically collected while rewinding.</p>` });
       return;
     }
     if (result === "advance") {
@@ -5573,7 +5793,7 @@
       await saveClock(newClock);
       await resetMovement();
       const economySummary = await collectEconomyForRound(newClock, { scope: "all", force: false, silent: false });
-      await ChatMessage.create({ speaker: ChatMessage.getSpeaker({ alias: "World Round Clock" }), content: `<h2>Round Advanced</h2><p><strong>Previous:</strong> ${escapeHtml(getDateLabel(oldClock))}</p><p><strong>Current:</strong> ${escapeHtml(getDateLabel(newClock))}</p><p>All World Pieces now have their full movement available.</p><p><strong>Economy:</strong> ${economySummary.skipped ? "Already collected" : `${escapeHtml(economySummary.applied)} tile(s) paid ${escapeHtml(resourceMapToText(economySummary.totals))}`}</p>` });
+      await ChatMessage.create({ speaker: ChatMessage.getSpeaker({ alias: "World Round Clock" }), content: `<h2>Round Advanced</h2><p><strong>Previous:</strong> ${escapeHtml(getDateLabel(oldClock))}</p><p><strong>Current:</strong> ${escapeHtml(getDateLabel(newClock))}</p><p>All World Pieces now have their full movement available.</p><p><strong>Economy:</strong> ${economySummary.skipped ? "Already collected" : `${escapeHtml(economySummary.applied)} tile(s) paid ${escapeHtml(resourceMapToText(economySummary.totals))}`}</p><p><strong>Military Upkeep:</strong> ${escapeHtml(resourceMapToText(economySummary.militaryUpkeep || {}, "None"))}</p>` });
     }
   }
 
@@ -6536,6 +6756,26 @@
     await canvas.scene.setFlag(FLAG_SCOPE, ECONOMY_LEDGER_KEY, ledger);
   }
 
+
+  async function clearEconomyLedger(scope = "all") {
+    if (scope === "all") {
+      await canvas.scene.unsetFlag(FLAG_SCOPE, ECONOMY_LEDGER_KEY);
+      return { cleared: "all" };
+    }
+    const clock = getClock();
+    const roundKey = getRoundKey(clock);
+    const ledger = foundry.utils.deepClone(getEconomyLedger() || {});
+    let cleared = 0;
+    for (const key of Object.keys(ledger)) {
+      if (!roundKey || key.startsWith(`${roundKey}|`)) {
+        delete ledger[key];
+        cleared++;
+      }
+    }
+    await saveEconomyLedger(ledger);
+    return { cleared };
+  }
+
   function getNextRoundActivation(clock = getClock()) {
     const next = getNextClockData(clock) || getDefaultClock();
     return {
@@ -6933,8 +7173,16 @@
         await handleArmyMusterRequest(message);
         return;
       }
-      if (message.type === "navyMusterRequest") {
+      if (message.type === "navyMusterRequest" || message.type === "navyLaunchRequest") {
         await handleNavyMusterRequest(message);
+        return;
+      }
+      if (message.type === "siegeStormRequest") {
+        await handleSiegeStormRequest(message);
+        return;
+      }
+      if (message.type === "dismissForceRequest") {
+        await handleDismissForceRequest(message);
         return;
       }
     });
@@ -8232,6 +8480,93 @@
     return entries;
   }
 
+  function getForceOwnerId(piece = {}) {
+    return String(piece.ownerUserId || piece.playerOwnerUserId || piece.requesterUserId || "").trim();
+  }
+
+  function getForceOwnerName(piece = {}) {
+    return String(piece.ownerUserName || piece.playerOwnerUserName || piece.requesterUserName || "").trim();
+  }
+
+  function getMilitaryForceUpkeep(piece = {}) {
+    const type = normalize(piece.pieceType || piece.forceType || "");
+    if (type === "fleet" || type === "navy") return hasAnyResources(piece.upkeep) ? normalizeResourceMap(piece.upkeep) : calculateNavyUpkeep(getNavyComposition(piece));
+    if (type === "army") return hasAnyResources(piece.upkeep) ? normalizeResourceMap(piece.upkeep) : calculateArmyUpkeep(getArmyComposition(piece));
+    return {};
+  }
+
+  function isActiveMilitaryForceForUpkeep(token) {
+    const piece = getWorldPiece(token) || {};
+    const type = normalize(piece.pieceType || piece.forceType || "");
+    if (!['army', 'fleet', 'navy'].includes(type)) return false;
+    if (normalize(piece.status || '') === 'dismissed') return false;
+    if (Number(piece.strengthCurrent ?? piece.totalStrength ?? 1) <= 0) return false;
+    return hasAnyResources(getMilitaryForceUpkeep(piece));
+  }
+
+  async function applyResourceDeltaToTile(entry, deltaMap, reason = "Resource adjustment") {
+    if (!entry?.drawing?.document) return {};
+    const house = foundry.utils.deepClone(getHouseData(entry.drawing) || {});
+    const stockpile = addResourceMaps(getHouseResourceStockpile(house), deltaMap);
+    house.resourceStockpile = stockpile;
+    house.resourceUpdatedAt = new Date().toISOString();
+    house.resourceUpdatedBy = game.user.name;
+    house.resourceUpdatedReason = reason;
+    syncTreasuryFromResources(house);
+    await entry.drawing.document.unsetFlag(FLAG_SCOPE, HOUSE_KEY);
+    await entry.drawing.document.setFlag(FLAG_SCOPE, HOUSE_KEY, house);
+    return stockpile;
+  }
+
+  async function debitMilitaryUpkeepForRound(clock = getClock(), { scope = "all", userId = "", silent = false } = {}) {
+    const includeUpkeep = scope === "all" || scope === "player";
+    if (!includeUpkeep) return { applied: 0, totals: {}, lines: [], skipped: true };
+
+    const ownerFilter = scope === "player" ? String(userId || "").trim() : "";
+    const forces = getMilitaryForceTokens().filter(isActiveMilitaryForceForUpkeep).filter(token => {
+      if (!ownerFilter) return true;
+      return String(getForceOwnerId(getWorldPiece(token) || "")) === ownerFilter;
+    });
+
+    let totals = {};
+    const ownerCosts = new Map();
+    const lines = [];
+
+    for (const token of forces) {
+      const piece = getWorldPiece(token) || {};
+      const upkeep = getMilitaryForceUpkeep(piece);
+      if (!hasAnyResources(upkeep)) continue;
+      const ownerId = getForceOwnerId(piece);
+      const ownerName = getForceOwnerName(piece) || game.users.get(ownerId)?.name || "Unassigned";
+      if (!ownerCosts.has(ownerId || ownerName)) ownerCosts.set(ownerId || ownerName, { ownerId, ownerName, cost: {}, forceLines: [] });
+      const bucket = ownerCosts.get(ownerId || ownerName);
+      bucket.cost = addResourceMaps(bucket.cost, upkeep);
+      bucket.forceLines.push(`${piece.name || token.document.name}: ${resourceMapToText(upkeep)}`);
+      totals = addResourceMaps(totals, upkeep);
+    }
+
+    let applied = 0;
+    const failed = [];
+
+    for (const bucket of ownerCosts.values()) {
+      const entries = getEconomyTilesForScope("player", bucket.ownerId).filter(entry => !isSeaByTile(entry.tile));
+      const treasuryEntry = entries.find(entry => isEconomyEnabled(getHouseData(entry.drawing) || {})) || entries[0];
+      if (!treasuryEntry) {
+        failed.push(`${bucket.ownerName || bucket.ownerId || "Unknown"}: no controlled tile stockpile found for ${resourceMapToText(bucket.cost)}`);
+        continue;
+      }
+      const negativeCost = {};
+      for (const [key, value] of Object.entries(normalizeResourceMap(bucket.cost))) negativeCost[key] = -Number(value || 0);
+      await applyResourceDeltaToTile(treasuryEntry, negativeCost, `Military upkeep for ${getDateLabel(clock)}`);
+      applied++;
+      lines.push(`<li><strong>${escapeHtml(bucket.ownerName || bucket.ownerId || "Unknown")}</strong>: -${escapeHtml(resourceMapToText(bucket.cost))} from ${escapeHtml(getTileName(treasuryEntry))}<br><span style="opacity:0.85;">${bucket.forceLines.map(escapeHtml).join("; ")}</span></li>`);
+    }
+
+    for (const line of failed) lines.push(`<li><strong>Unpaid:</strong> ${escapeHtml(line)}</li>`);
+    if (!silent && lines.length) ui.notifications.info(`Military upkeep applied: ${resourceMapToText(totals)}.`);
+    return { applied, totals, lines, failed, skipped: false };
+  }
+
   async function collectEconomyForRound(clock = getClock(), { scope = "all", userId = "", force = false, silent = false } = {}) {
     if (!clock) throw new Error("World Round Clock is not initialized.");
 
@@ -8279,6 +8614,8 @@
       lines.push(`<li><strong>${escapeHtml(entry.tile.name || "Unnamed Tile")}</strong>: +${escapeHtml(resourceMapToText(income))}</li>`);
     }
 
+    const upkeepSummary = await debitMilitaryUpkeepForRound(clock, { scope, userId, silent: true });
+
     ledger[ledgerKey] = {
       collected: true,
       scope,
@@ -8289,6 +8626,8 @@
       seasonMultiplier,
       applied,
       totals,
+      militaryUpkeep: upkeepSummary.totals || {},
+      upkeepApplied: upkeepSummary.applied || 0,
       collectedAt: new Date().toISOString(),
       collectedBy: game.user.name
     };
@@ -8297,12 +8636,12 @@
     if (!silent) {
       await ChatMessage.create({
         speaker: ChatMessage.getSpeaker({ alias: "Crown Economy" }),
-        content: `<h2>Economy Collected</h2><p><strong>Date:</strong> ${escapeHtml(dateLabel)}</p><p><strong>Season Multiplier:</strong> ${escapeHtml(seasonMultiplier)}</p><p><strong>Tiles Paid:</strong> ${escapeHtml(applied)}</p><p><strong>Total Income:</strong> ${escapeHtml(resourceMapToText(totals))}</p><ul>${lines.join("") || "<li>No economy-enabled tiles produced resources.</li>"}</ul>`
+        content: `<h2>Economy Collected</h2><p><strong>Date:</strong> ${escapeHtml(dateLabel)}</p><p><strong>Season Multiplier:</strong> ${escapeHtml(seasonMultiplier)}</p><p><strong>Tiles Paid:</strong> ${escapeHtml(applied)}</p><p><strong>Total Income:</strong> ${escapeHtml(resourceMapToText(totals))}</p><ul>${lines.join("") || "<li>No economy-enabled tiles produced resources.</li>"}</ul><h3>Military Upkeep</h3><p><strong>Total Upkeep:</strong> ${escapeHtml(resourceMapToText(upkeepSummary.totals || {}, "None"))}</p><ul>${(upkeepSummary.lines || []).join("") || "<li>No active armies or navies charged upkeep for this scope.</li>"}</ul>`
       });
       ui.notifications.info(`Economy collected for ${dateLabel}: ${resourceMapToText(totals)}.`);
     }
 
-    return { applied, skipped: false, totals, dateLabel };
+    return { applied, skipped: false, totals, militaryUpkeep: upkeepSummary.totals || {}, upkeepApplied: upkeepSummary.applied || 0, dateLabel };
   }
 
   async function collectEconomy() {
@@ -8316,7 +8655,7 @@
       new Dialog({
         title: "Collect Economy",
         content: `<form>
-          <p>Collect resource income into tile stockpiles for the current world round.</p>
+          <p>Collect resource income into tile stockpiles for the current world round. All/player scopes also charge active army and navy upkeep once for the round.</p>
           <div class="form-group">
             <label>Scope</label>
             <select name="scope" style="width:100%;">
