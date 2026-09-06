@@ -1,8 +1,8 @@
 {
   "id": "crown-overview-tools",
   "title": "Crown Overview Tools",
-  "description": "Scene-gated strategic overview map tools for Crown of Ashes. v0.5.1 updates the Duel system to follow the corrected Roll Everything output-fix script.",
-  "version": "0.5.1",
+  "description": "Scene-gated strategic overview map tools for Crown of Ashes. v0.5.3 adds army embark/disembark transport with navy capacity limits.",
+  "version": "0.5.3",
   "authors": [
     {
       "name": "Beyond Fandome"
@@ -20,6 +20,6 @@
   ],
   "url": "https://github.com/beyondfandome/crown-overview-tools",
   "manifest": "https://raw.githubusercontent.com/beyondfandome/crown-overview-tools/main/module.json",
-  "download": "https://github.com/beyondfandome/crown-overview-tools/releases/download/v0.5.1/crown-overview-tools-v0.5.1.zip",
+  "download": "https://github.com/beyondfandome/crown-overview-tools/releases/download/v0.5.3/crown-overview-tools-v0.5.3.zip",
   "socket": true
 }

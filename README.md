@@ -1,4 +1,30 @@
-# Crown Overview Tools v0.5.0
+# Crown Overview Tools v0.5.3
+
+## v0.5.3 — Army embarkation and naval transport
+
+- Adds player-facing `Embark Army` and `Disembark Army` actions.
+- `Embark Army` works from an army token or the character commanding that army.
+- Embark checks adjacent sea tiles for a navy/fleet controlled by the same player.
+- Armies can only embark from land/port tiles onto a navy in an adjacent sea tile.
+- Each ship can carry 100 troops. Fleet carrying capacity is total active ships × 100.
+- If the army is too large for the available ships, the module warns the player; continuing embarks only the troops that fit and dismisses the surplus from the field, removing their upkeep.
+- Embarked armies are stored as navy cargo and hidden on the map; move the navy token to transport them.
+- The army commander character embarks with the army and is carried with the navy.
+- `Disembark Army` can be run from the army, its commander character, or the carrying navy.
+- Disembark shows adjacent land/port landing tiles from the navy's current sea tile.
+- Embarking and disembarking lock the army/commander movement for the current turn.
+- Non-GM embark/disembark requests route through the active GM client.
+- Commander-in-Chief trait support is reserved for a later rule pass.
+
+## v0.5.2 — Diplomacy defender targeting + Spread Selected
+
+- Fixes Diplomatic Takeover incorrectly using random visiting character tokens as defenders.
+- NPC/Neutral tiles now use explicit `NPC Defender Diplomacy` / `Ruler Diplomacy` unless an explicit ruling/defender character ID is set.
+- Player-owned tiles only use defending character tokens controlled by that tile's owner.
+- Blank diplomacy CSV cells no longer block fallback to another filled diplomacy field.
+- Adds player-facing `Spread Selected` action to separate stacked Crown pieces.
+- Non-GM spread requests route through the active GM client and only move pieces the requesting player controls.
+- Spread Selected also syncs character/world-piece tile IDs when it spreads pieces inside a tile.
 
 ## v0.5.1 — Duel output-fix script alignment
 

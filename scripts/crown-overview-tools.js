@@ -1,6 +1,6 @@
 (() => {
   const MODULE_ID = "crown-overview-tools";
-  const MODULE_VERSION = "0.5.1";
+  const MODULE_VERSION = "0.5.3";
   const FLAG_SCOPE = "world";
   const WORLD_TILE_KEY = "worldTile";
   const WORLD_PIECE_KEY = "worldPiece";
@@ -1962,8 +1962,11 @@
       <div class="coa-panel-section coa-panel-player-section">
         <div class="coa-panel-section-title">Player Actions</div>
         <button data-coa-action="pathMove">Move Piece</button>
+        <button data-coa-action="spreadSelected">Spread Selected</button>
         <button data-coa-action="summonArmy">Summon Army</button>
         <button data-coa-action="summonNavy">Summon Navy</button>
+        <button data-coa-action="embarkArmy">Embark Army</button>
+        <button data-coa-action="disembarkArmy">Disembark Army</button>
         <button data-coa-action="diplomaticTakeover">Diplomatic Takeover</button>
         <button data-coa-action="siegeStorm">Siege / Storm</button>
         <button data-coa-action="duel">Duel</button>
@@ -3011,6 +3014,7 @@
       await token.document.update({ x: position.x, y: position.y }, { animate: true, worldMovementBypass: true, bypassWorldMovementWatcher: true, clickMoveBypass: true });
       await moveLinkedArmyToCharacter(token, currentPiece, entry);
       await moveLinkedCharacterWithFleet(token, currentPiece, entry);
+      await moveEmbarkedArmiesWithFleet(token, currentPiece, entry);
 
       if (pauseMs > 0) await new Promise(resolve => setTimeout(resolve, pauseMs));
     }
@@ -5181,6 +5185,586 @@
     await characterToken.document.update({ x: pos.x, y: pos.y }, { animate: true, worldMovementBypass: true, bypassWorldMovementWatcher: true, fleetCarryBypass: true });
   }
 
+  function getSceneTokenById(tokenId) {
+    const id = String(tokenId || "").trim();
+    if (!id) return null;
+    return canvas.tokens.get(id) || canvas.tokens.placeables.find(token => String(token.document.id) === id) || null;
+  }
+
+  function getPieceOwnerId(piece = {}) {
+    return String(piece.ownerUserId || piece.playerOwnerUserId || piece.controllerPlayerUserId || "").trim();
+  }
+
+  function getPieceOwnerName(piece = {}) {
+    return String(piece.ownerUserName || piece.playerOwnerUserName || piece.controllerPlayerName || "").trim();
+  }
+
+  function isArmyPieceToken(token) {
+    return normalize(getWorldPiece(token)?.pieceType) === "army";
+  }
+
+  function isFleetPieceToken(token) {
+    return normalize(getWorldPiece(token)?.pieceType) === "fleet";
+  }
+
+  function getArmyCommanderToken(armyPiece = {}) {
+    return getCharacterTokenById(armyPiece.linkedCharacterId || armyPiece.commanderCharacterId || "");
+  }
+
+  function getArmyTokenForCommander(characterToken) {
+    const character = getCharacterDataFromToken(characterToken) || {};
+    const piece = getWorldPiece(characterToken) || {};
+    const id = character.characterId || piece.characterId || piece.linkedCharacterId || "";
+    if (!id) return null;
+    return getExistingArmyForCharacter(id);
+  }
+
+  function getFleetTokenById(tokenId) {
+    const token = getSceneTokenById(tokenId);
+    if (!token || !isFleetPieceToken(token)) return null;
+    return token;
+  }
+
+  function getArmyTokenById(tokenId) {
+    const token = getSceneTokenById(tokenId);
+    if (!token || !isArmyPieceToken(token)) return null;
+    return token;
+  }
+
+  function getSelectedArmyOrCommanderArmy() {
+    const selectedArmies = canvas.tokens.controlled.filter(isArmyPieceToken);
+    if (selectedArmies.length === 1) return selectedArmies[0];
+    if (selectedArmies.length > 1) throw new Error("Select only one army, or select the character commanding the army.");
+    const selectedCharacters = canvas.tokens.controlled.filter(token => isCharacterToken(token));
+    if (selectedCharacters.length !== 1) throw new Error("Select one army token, or select the character who commands the army.");
+    const armyToken = getArmyTokenForCommander(selectedCharacters[0]);
+    if (!armyToken) throw new Error(`${getCharacterDataFromToken(selectedCharacters[0])?.characterName || selectedCharacters[0].document.name} does not have an active army token.`);
+    return armyToken;
+  }
+
+  function getSeaEntriesAdjacentToEntry(entry) {
+    if (!entry?.tile) return [];
+    const seen = new Set();
+    const results = [];
+    const add = candidate => {
+      if (!candidate?.tile || !isSeaTile(candidate.tile)) return;
+      const id = String(getTileId(candidate) || "");
+      if (!id || seen.has(id)) return;
+      seen.add(id);
+      results.push(candidate);
+    };
+
+    for (const id of getAdjacentIds(entry.tile)) add(getEntryById(id));
+    if (isActivePort(entry.tile)) for (const seaEntry of getConnectedSeaEntriesForPort(entry)) add(seaEntry);
+    return results;
+  }
+
+  function getLandEntriesAdjacentToSeaEntry(seaEntry) {
+    if (!seaEntry?.tile) return [];
+    const seen = new Set();
+    const results = [];
+    const seaId = String(getTileId(seaEntry) || "");
+    const add = candidate => {
+      if (!candidate?.tile || !isLandLike(candidate.tile) || isSeaTile(candidate.tile)) return;
+      const id = String(getTileId(candidate) || "");
+      if (!id || seen.has(id)) return;
+      seen.add(id);
+      results.push(candidate);
+    };
+
+    for (const id of getAdjacentIds(seaEntry.tile)) add(getEntryById(id));
+    for (const entry of getWorldTileEntries()) {
+      if (!isActivePort(entry.tile)) continue;
+      const portSeaIds = getPortSeaIds(entry.tile).map(String);
+      if (portSeaIds.includes(seaId)) add(entry);
+    }
+    return results.sort((a, b) => String(a.tile.region || "").localeCompare(String(b.tile.region || "")) || getTileName(a).localeCompare(getTileName(b)));
+  }
+
+  function getFleetTransportCapacity(fleetPiece = {}) {
+    const composition = getNavyComposition(fleetPiece);
+    const totalShips = Number(fleetPiece.strengthCurrent ?? fleetPiece.totalShips ?? getNavyTotalShips(composition) ?? 0);
+    return Math.max(0, Math.floor(totalShips) * 100);
+  }
+
+  function getEmbarkedArmyTokensForFleet(fleetToken) {
+    const fleetId = String(fleetToken?.document?.id || "");
+    if (!fleetId) return [];
+    return getArmyTokens().filter(token => String(getWorldPiece(token)?.embarkedFleetTokenId || "") === fleetId || String(getWorldPiece(token)?.transportFleetTokenId || "") === fleetId);
+  }
+
+  function getFleetUsedTransportCapacity(fleetToken, excludeArmyTokenId = "") {
+    const exclude = String(excludeArmyTokenId || "");
+    return getEmbarkedArmyTokensForFleet(fleetToken).reduce((total, armyToken) => {
+      if (exclude && String(armyToken.document.id) === exclude) return total;
+      const army = getWorldPiece(armyToken) || {};
+      return total + Math.max(0, Number(army.strengthCurrent ?? army.totalStrength ?? getArmyTotalStrength(getArmyComposition(army)) ?? 0));
+    }, 0);
+  }
+
+  function getArmyCurrentStrength(piece = {}) {
+    return Math.max(0, Math.floor(Number(piece.strengthCurrent ?? piece.totalStrength ?? getArmyTotalStrength(getArmyComposition(piece)) ?? 0)));
+  }
+
+  function scaleArmyCompositionToMen(composition = {}, targetMen = 0) {
+    const original = getArmyTotalStrength(composition);
+    const target = Math.max(0, Math.floor(Number(targetMen || 0)));
+    const result = {};
+    for (const troop of ARMY_TROOP_TYPES) result[troop.key] = 0;
+    if (!original || !target) return result;
+    if (original <= target) {
+      for (const troop of ARMY_TROOP_TYPES) result[troop.key] = Math.max(0, Math.floor(Number(composition[troop.key] || 0)));
+      return result;
+    }
+
+    const step = 50;
+    const ratio = target / original;
+    let used = 0;
+    const remainders = [];
+    for (const troop of ARMY_TROOP_TYPES) {
+      const raw = Math.max(0, Number(composition[troop.key] || 0)) * ratio;
+      const rounded = Math.min(Math.max(0, Number(composition[troop.key] || 0)), Math.floor(raw / step) * step);
+      result[troop.key] = rounded;
+      used += rounded;
+      remainders.push({ key: troop.key, original: Math.max(0, Number(composition[troop.key] || 0)), remainder: raw - rounded });
+    }
+
+    remainders.sort((a, b) => b.remainder - a.remainder);
+    while (used + step <= target) {
+      const next = remainders.find(item => result[item.key] + step <= item.original);
+      if (!next) break;
+      result[next.key] += step;
+      used += step;
+      next.remainder = 0;
+      remainders.sort((a, b) => b.remainder - a.remainder);
+    }
+
+    return result;
+  }
+
+  function getArmyTransportInfo(armyPiece = {}, fleetToken = null) {
+    const fleetPiece = fleetToken ? getWorldPiece(fleetToken) || {} : {};
+    const capacity = fleetToken ? getFleetTransportCapacity(fleetPiece) : 0;
+    const used = fleetToken ? getFleetUsedTransportCapacity(fleetToken, armyPiece.tokenId || "") : 0;
+    const remaining = Math.max(0, capacity - used);
+    const currentMen = getArmyCurrentStrength(armyPiece);
+    return { capacity, used, remaining, currentMen, embarkMen: Math.min(currentMen, remaining), surplusMen: Math.max(0, currentMen - remaining) };
+  }
+
+  function buildFleetOptionHtml(fleets, selectedId = "") {
+    return fleets.map(item => {
+      const fleetToken = item.token || item;
+      const fleet = getWorldPiece(fleetToken) || {};
+      const capacity = getFleetTransportCapacity(fleet);
+      const used = getFleetUsedTransportCapacity(fleetToken);
+      const remaining = Math.max(0, capacity - used);
+      const entry = item.entry || getCurrentTileEntryForToken(fleetToken, fleet) || getTileById(fleet.currentTileId);
+      const label = `${fleet.name || fleetToken.document.name} — ${getTileName(entry)} — ${remaining.toLocaleString()} / ${capacity.toLocaleString()} capacity free`;
+      return `<option value="${escapeHtml(fleetToken.document.id)}" ${String(fleetToken.document.id) === String(selectedId) ? "selected" : ""}>${escapeHtml(label)}</option>`;
+    }).join("");
+  }
+
+  function findOwnedAdjacentFleetsForArmy(armyToken, armyPiece = getWorldPiece(armyToken), actingUserId = game.user.id) {
+    const armyEntry = getCurrentTileEntryForToken(armyToken, armyPiece) || getTileById(armyPiece.currentTileId);
+    if (!armyEntry?.tile) return [];
+    const seaIds = new Set(getSeaEntriesAdjacentToEntry(armyEntry).map(entry => String(getTileId(entry))));
+    return getFleetTokens().map(token => {
+      const fleet = getWorldPiece(token) || {};
+      const fleetEntry = getCurrentTileEntryForToken(token, fleet) || getTileById(fleet.currentTileId);
+      return { token, fleet, entry: fleetEntry };
+    }).filter(item => {
+      if (!item.entry?.tile || !seaIds.has(String(getTileId(item.entry)))) return false;
+      if (getFleetTransportCapacity(item.fleet) - getFleetUsedTransportCapacity(item.token, armyToken.document.id) <= 0) return false;
+      if (game.user.isGM) return true;
+      const ownerId = getPieceOwnerId(item.fleet);
+      if (ownerId && String(ownerId) === String(actingUserId || "")) return true;
+      return canUserControlWorldPieceForUser(item.token, item.fleet, game.users.get(actingUserId) || game.user);
+    });
+  }
+
+  function getDisembarkableArmiesForSelection() {
+    const selectedArmies = canvas.tokens.controlled.filter(isArmyPieceToken);
+    if (selectedArmies.length === 1) {
+      const army = getWorldPiece(selectedArmies[0]) || {};
+      if (army.embarkedFleetTokenId) return [selectedArmies[0]];
+      throw new Error(`${army.name || selectedArmies[0].document.name} is not embarked on a navy.`);
+    }
+    const selectedCharacters = canvas.tokens.controlled.filter(token => isCharacterToken(token));
+    if (selectedCharacters.length === 1) {
+      const armyToken = getArmyTokenForCommander(selectedCharacters[0]);
+      if (!armyToken) throw new Error(`${getCharacterDataFromToken(selectedCharacters[0])?.characterName || selectedCharacters[0].document.name} does not command an active army.`);
+      const army = getWorldPiece(armyToken) || {};
+      if (!army.embarkedFleetTokenId) throw new Error(`${army.name || armyToken.document.name} is not embarked on a navy.`);
+      return [armyToken];
+    }
+    const selectedFleets = canvas.tokens.controlled.filter(isFleetPieceToken);
+    if (selectedFleets.length === 1) {
+      const armies = getEmbarkedArmyTokensForFleet(selectedFleets[0]);
+      if (!armies.length) throw new Error(`${selectedFleets[0].document.name} has no embarked army.`);
+      return armies;
+    }
+    throw new Error("Select the army, the army commander, or the carrying navy.");
+  }
+
+  async function updateCharacterEmbarkState(characterToken, destinationEntry, fleetToken, fleetPiece, { lock = true, clear = false, reason = "Embarked by navy" } = {}) {
+    if (!characterToken || !destinationEntry?.tile) return;
+    const character = foundry.utils.deepClone(getCharacterDataFromToken(characterToken) || {});
+    const charPiece = foundry.utils.deepClone(getWorldPiece(characterToken) || {});
+    const tileId = getTileId(destinationEntry);
+    const tileName = getTileName(destinationEntry);
+    character.currentTileId = tileId;
+    character.currentTileName = tileName;
+    character.currentRegion = destinationEntry.tile.region || "";
+    charPiece.previousTileId = charPiece.currentTileId || "";
+    charPiece.previousTileName = charPiece.currentTileName || "";
+    charPiece.currentTileId = tileId;
+    charPiece.currentTileName = tileName;
+    charPiece.currentRegion = destinationEntry.tile.region || "";
+    if (clear) {
+      delete character.embarkedFleetTokenId;
+      delete character.embarkedFleetName;
+      delete character.embarkedArmyTokenId;
+      delete charPiece.embarkedFleetTokenId;
+      delete charPiece.embarkedFleetName;
+      delete charPiece.embarkedArmyTokenId;
+    } else if (fleetToken) {
+      character.embarkedFleetTokenId = fleetToken.document.id;
+      character.embarkedFleetName = fleetPiece?.name || fleetToken.document.name;
+      charPiece.embarkedFleetTokenId = fleetToken.document.id;
+      charPiece.embarkedFleetName = fleetPiece?.name || fleetToken.document.name;
+    }
+    charPiece.lastMovedAt = new Date().toISOString();
+    charPiece.lastMovedBy = game.user.name;
+    charPiece.lastMovedSource = reason;
+    if (lock) {
+      charPiece.movementUsed = Math.max(Number(charPiece.movementUsed || 0), Number(charPiece.movementMax || 0));
+      charPiece.movementLockedRoundKey = getCurrentActionRoundKey();
+      charPiece.movementLockedReason = reason;
+      charPiece.movementLockedAt = new Date().toISOString();
+      charPiece.movementLockedBy = game.user.name;
+    }
+    await characterToken.document.setFlag(FLAG_SCOPE, WORLD_CHARACTER_KEY, character);
+    if (characterToken.actor) await characterToken.actor.setFlag(FLAG_SCOPE, WORLD_CHARACTER_KEY, foundry.utils.deepClone(character));
+    await saveWorldPiece(characterToken, charPiece);
+    const pos = getTokenTopLeftForTileSlot(characterToken, destinationEntry);
+    await characterToken.document.update({ x: pos.x, y: pos.y }, { animate: true, worldMovementBypass: true, bypassWorldMovementWatcher: true, embarkBypass: true });
+  }
+
+  async function applyEmbarkArmyToFleet(armyToken, fleetToken, { actingUserId = game.user.id, actingUserName = game.user.name } = {}) {
+    const army = foundry.utils.deepClone(getWorldPiece(armyToken) || {});
+    const fleet = foundry.utils.deepClone(getWorldPiece(fleetToken) || {});
+    if (normalize(army.pieceType) !== "army") throw new Error("Embark Army needs an army token or its commanding character.");
+    if (normalize(fleet.pieceType) !== "fleet") throw new Error("Embark Army needs a navy/fleet in an adjacent sea tile.");
+    if (army.embarkedFleetTokenId) throw new Error(`${army.name || armyToken.document.name} is already embarked.`);
+
+    const actingUser = game.users.get(actingUserId) || { id: actingUserId, name: actingUserName, isGM: false };
+    if (!canUserControlWorldPieceForUser(armyToken, army, actingUser)) throw new Error(`${actingUserName} does not control ${army.name || armyToken.document.name}.`);
+    if (!canUserControlWorldPieceForUser(fleetToken, fleet, actingUser)) throw new Error(`${actingUserName} does not control ${fleet.name || fleetToken.document.name}.`);
+
+    const armyEntry = getCurrentTileEntryForToken(armyToken, army) || getTileById(army.currentTileId);
+    const fleetEntry = getCurrentTileEntryForToken(fleetToken, fleet) || getTileById(fleet.currentTileId);
+    if (!armyEntry?.tile || !isLandLike(armyEntry.tile) || isSeaTile(armyEntry.tile)) throw new Error("The army must be on a land/port tile to embark.");
+    if (!fleetEntry?.tile || !isSeaTile(fleetEntry.tile)) throw new Error("The navy must be in a sea tile adjacent to the army.");
+    const adjacentSeaIds = new Set(getSeaEntriesAdjacentToEntry(armyEntry).map(entry => String(getTileId(entry))));
+    if (!adjacentSeaIds.has(String(getTileId(fleetEntry)))) throw new Error(`${fleet.name || fleetToken.document.name} is not in an adjacent sea tile.`);
+
+    const capacity = getFleetTransportCapacity(fleet);
+    const used = getFleetUsedTransportCapacity(fleetToken, armyToken.document.id);
+    const remaining = Math.max(0, capacity - used);
+    if (remaining <= 0) throw new Error(`${fleet.name || fleetToken.document.name} has no transport capacity left.`);
+
+    let composition = getArmyComposition(army);
+    let currentStrength = getArmyCurrentStrength(army);
+    if (currentStrength <= 0) throw new Error(`${army.name || armyToken.document.name} has no remaining strength to embark.`);
+    if (getArmyTotalStrength(composition) > currentStrength) composition = scaleArmyCompositionToMen(composition, currentStrength);
+
+    let embarkedStrength = currentStrength;
+    let surplus = 0;
+    let returnedManpower = 0;
+    if (currentStrength > remaining) {
+      embarkedStrength = remaining;
+      surplus = currentStrength - remaining;
+      const confirmed = await Dialog.confirm({
+        title: "Fleet Capacity Exceeded",
+        content: `<p><strong>${escapeHtml(fleet.name || fleetToken.document.name)}</strong> can carry only <strong>${escapeHtml(remaining.toLocaleString())}</strong> more troops.</p><p><strong>${escapeHtml(army.name || armyToken.document.name)}</strong> has <strong>${escapeHtml(currentStrength.toLocaleString())}</strong> troops.</p><p>If you continue, <strong>${escapeHtml(embarkedStrength.toLocaleString())}</strong> will embark and <strong>${escapeHtml(surplus.toLocaleString())}</strong> surplus troops will be dismissed from the field, removing their upkeep.</p>`,
+        yes: () => true,
+        no: () => false,
+        defaultYes: false
+      });
+      if (!confirmed) return null;
+      composition = scaleArmyCompositionToMen(composition, embarkedStrength);
+      const commanderForReturn = getArmyCommanderToken(army);
+      if (commanderForReturn && surplus > 0) {
+        try { returnedManpower = await changeHouseManpower(commanderForReturn, surplus); }
+        catch (err) { console.warn("Could not return surplus embarked troops to manpower pool", err); }
+      }
+    }
+
+    const now = new Date().toISOString();
+    army.previousTileId = army.currentTileId || "";
+    army.previousTileName = army.currentTileName || "";
+    army.currentTileId = getTileId(fleetEntry);
+    army.currentTileName = getTileName(fleetEntry);
+    army.currentRegion = fleetEntry.tile.region || "";
+    army.embarked = true;
+    army.embarkedFleetTokenId = fleetToken.document.id;
+    army.embarkedFleetName = fleet.name || fleetToken.document.name;
+    army.transportFleetTokenId = fleetToken.document.id;
+    army.transportFleetName = fleet.name || fleetToken.document.name;
+    army.embarkedAt = now;
+    army.embarkedBy = actingUserName;
+    army.composition = composition;
+    army.armyComposition = composition;
+    army.totalStrength = embarkedStrength;
+    army.strengthCurrent = embarkedStrength;
+    army.strengthMax = embarkedStrength;
+    army.upkeep = calculateArmyUpkeep(composition);
+    army.movementUsed = Math.max(Number(army.movementUsed || 0), Number(army.movementMax || 0));
+    army.movementLockedRoundKey = getCurrentActionRoundKey();
+    army.movementLockedReason = "Embarked on a navy this turn.";
+    army.detached = true;
+    army.followCharacter = false;
+    await saveWorldPiece(armyToken, army);
+
+    const fleetEmbarked = Array.isArray(fleet.embarkedArmies) ? fleet.embarkedArmies.filter(item => String(item.armyTokenId || "") !== String(armyToken.document.id)) : [];
+    fleetEmbarked.push({
+      armyTokenId: armyToken.document.id,
+      armyName: army.name || armyToken.document.name,
+      commanderCharacterId: army.linkedCharacterId || army.commanderCharacterId || "",
+      commanderName: army.linkedCharacterName || army.commanderName || "",
+      strength: embarkedStrength,
+      embarkedAt: now,
+      embarkedBy: actingUserName
+    });
+    fleet.embarkedArmies = fleetEmbarked;
+    fleet.transportCapacity = capacity;
+    fleet.transportUsed = used + embarkedStrength;
+    fleet.updatedAt = now;
+    fleet.updatedBy = game.user.name;
+    await saveWorldPiece(fleetToken, fleet);
+
+    const armyPos = getTokenTopLeftForTileSlot(armyToken, fleetEntry);
+    await armyToken.document.update({ x: armyPos.x, y: armyPos.y, hidden: true }, { animate: true, worldMovementBypass: true, bypassWorldMovementWatcher: true, embarkArmyBypass: true });
+
+    const commanderToken = getArmyCommanderToken(army);
+    if (commanderToken) {
+      await updateCharacterEmbarkState(commanderToken, fleetEntry, fleetToken, fleet, { lock: true, reason: `Embarked with ${army.name || armyToken.document.name}.` });
+      const commanderCharacter = foundry.utils.deepClone(getCharacterDataFromToken(commanderToken) || {});
+      const commanderPiece = foundry.utils.deepClone(getWorldPiece(commanderToken) || {});
+      commanderCharacter.embarkedArmyTokenId = armyToken.document.id;
+      commanderPiece.embarkedArmyTokenId = armyToken.document.id;
+      await commanderToken.document.setFlag(FLAG_SCOPE, WORLD_CHARACTER_KEY, commanderCharacter);
+      if (commanderToken.actor) await commanderToken.actor.setFlag(FLAG_SCOPE, WORLD_CHARACTER_KEY, foundry.utils.deepClone(commanderCharacter));
+      await saveWorldPiece(commanderToken, commanderPiece);
+    }
+
+    await ChatMessage.create({
+      speaker: ChatMessage.getSpeaker({ alias: "Crown Embarkation" }),
+      content: `<h2>Army Embarked</h2><p><strong>Army:</strong> ${escapeHtml(army.name || armyToken.document.name)}</p><p><strong>Navy:</strong> ${escapeHtml(fleet.name || fleetToken.document.name)}</p><p><strong>From:</strong> ${escapeHtml(getTileName(armyEntry))}</p><p><strong>Sea Tile:</strong> ${escapeHtml(getTileName(fleetEntry))}</p><p><strong>Embarked Troops:</strong> ${escapeHtml(embarkedStrength.toLocaleString())}</p>${surplus ? `<p><strong>Surplus Dismissed:</strong> ${escapeHtml(surplus.toLocaleString())}${returnedManpower ? ` (${escapeHtml(returnedManpower.toLocaleString())} returned to manpower pool)` : ""}</p>` : ""}<p><strong>Army Upkeep Now:</strong> ${escapeHtml(resourceMapToText(army.upkeep))}</p><p>The army is now cargo. Move the navy to transport it.</p>`
+    });
+    revealForCurrentPlayerPieces();
+    return { army, fleet };
+  }
+
+  async function embarkArmy() {
+    if (!requireOverviewScene()) return;
+    let armyToken;
+    try { armyToken = getSelectedArmyOrCommanderArmy(); }
+    catch (err) { ui.notifications.warn(err.message || "Select an army or army commander."); return; }
+    const army = getWorldPiece(armyToken) || {};
+    if (!canUserControlWorldPiece(armyToken, army)) { ui.notifications.warn("You can only embark armies you control."); return; }
+    const lockedReason = strategicMovementLockReason(army);
+    if (lockedReason) { ui.notifications.warn(lockedReason); return; }
+    const fleets = findOwnedAdjacentFleetsForArmy(armyToken, army, game.user.id);
+    if (!fleets.length) { ui.notifications.warn("No owned navy with spare capacity was found in an adjacent sea tile."); return; }
+    const selectedFleetId = fleets[0].token.document.id;
+    const fleetId = fleets.length === 1 ? selectedFleetId : await new Promise(resolve => {
+      new Dialog({
+        title: "Embark Army",
+        content: `<form><p>Select the adjacent navy to embark onto.</p><div class="form-group"><label>Navy</label><select name="fleetTokenId" style="width:100%;">${buildFleetOptionHtml(fleets, selectedFleetId)}</select></div></form>`,
+        buttons: { embark: { label: "Embark", callback: html => resolve(String(html[0].querySelector("form").fleetTokenId.value || selectedFleetId)) }, cancel: { label: "Cancel", callback: () => resolve(null) } },
+        default: "embark"
+      }).render(true);
+    });
+    if (!fleetId) return;
+    if (!game.user.isGM) {
+      const gm = findActiveGmForScene(canvas.scene?.id);
+      if (!gm) { ui.notifications.warn("No active GM online to embark this army."); return; }
+      game.socket.emit(SOCKET_NAME, { type: "embarkArmyRequest", targetGmId: gm.id, sceneId: canvas.scene?.id, requesterUserId: game.user.id, requesterUserName: game.user.name, armyTokenId: armyToken.document.id, armyTokenName: armyToken.document.name, fleetTokenId: fleetId });
+      ui.notifications.info(`Embark Army request sent to GM ${gm.name}.`);
+      return;
+    }
+    await applyEmbarkArmyToFleet(armyToken, getFleetTokenById(fleetId), { actingUserId: game.user.id, actingUserName: game.user.name });
+  }
+
+  async function handleEmbarkArmyRequest(message) {
+    if (!game.user.isGM) return;
+    if (message.targetGmId && String(message.targetGmId) !== String(game.user.id)) return;
+    if (message.sceneId && String(message.sceneId) !== String(canvas.scene?.id)) return;
+    const armyToken = getArmyTokenById(message.armyTokenId);
+    const fleetToken = getFleetTokenById(message.fleetTokenId);
+    if (!armyToken || !fleetToken) { ui.notifications.warn(`Embark request failed: army or navy token not found.`); return; }
+    try { await applyEmbarkArmyToFleet(armyToken, fleetToken, { actingUserId: message.requesterUserId, actingUserName: message.requesterUserName || "Player" }); }
+    catch (err) {
+      console.error("Embark Army request failed", err, message);
+      ui.notifications.error(err.message || "Embark Army request failed.");
+      await ChatMessage.create({ speaker: ChatMessage.getSpeaker({ alias: "Crown Embarkation" }), whisper: ChatMessage.getWhisperRecipients("GM").map(u => u.id), content: `<h2>Embark Army Failed</h2><p><strong>Player:</strong> ${escapeHtml(message.requesterUserName || "Unknown")}</p><p><strong>Reason:</strong> ${escapeHtml(err.message || err)}</p>` });
+    }
+  }
+
+  function buildDisembarkArmyOptions(armies, selectedId = "") {
+    return armies.map(token => {
+      const army = getWorldPiece(token) || {};
+      const label = `${army.name || token.document.name} — ${getArmyCurrentStrength(army).toLocaleString()} troops`;
+      return `<option value="${escapeHtml(token.document.id)}" ${String(token.document.id) === String(selectedId) ? "selected" : ""}>${escapeHtml(label)}</option>`;
+    }).join("");
+  }
+
+  function buildDisembarkTileOptions(entries, selectedId = "") {
+    return entries.map(entry => {
+      const id = getTileId(entry);
+      const label = `${getTileName(entry)}${entry.tile.region ? " — " + entry.tile.region : ""}`;
+      return `<option value="${escapeHtml(id)}" ${String(id) === String(selectedId) ? "selected" : ""}>${escapeHtml(label)}</option>`;
+    }).join("");
+  }
+
+  async function applyDisembarkArmyFromFleet(armyToken, destinationEntry, { actingUserId = game.user.id, actingUserName = game.user.name } = {}) {
+    const army = foundry.utils.deepClone(getWorldPiece(armyToken) || {});
+    if (normalize(army.pieceType) !== "army") throw new Error("Disembark Army needs an embarked army.");
+    if (!army.embarkedFleetTokenId) throw new Error(`${army.name || armyToken.document.name} is not embarked on a navy.`);
+    const fleetToken = getFleetTokenById(army.embarkedFleetTokenId);
+    if (!fleetToken) throw new Error("Could not find the navy carrying this army.");
+    const fleet = foundry.utils.deepClone(getWorldPiece(fleetToken) || {});
+    const actingUser = game.users.get(actingUserId) || { id: actingUserId, name: actingUserName, isGM: false };
+    if (!canUserControlWorldPieceForUser(armyToken, army, actingUser)) throw new Error(`${actingUserName} does not control ${army.name || armyToken.document.name}.`);
+    if (!canUserControlWorldPieceForUser(fleetToken, fleet, actingUser)) throw new Error(`${actingUserName} does not control ${fleet.name || fleetToken.document.name}.`);
+    if (!destinationEntry?.tile || !isLandLike(destinationEntry.tile) || isSeaTile(destinationEntry.tile)) throw new Error("Choose a land/port tile to disembark onto.");
+    const fleetEntry = getCurrentTileEntryForToken(fleetToken, fleet) || getTileById(fleet.currentTileId);
+    const legalIds = new Set(getLandEntriesAdjacentToSeaEntry(fleetEntry).map(entry => String(getTileId(entry))));
+    if (!legalIds.has(String(getTileId(destinationEntry)))) throw new Error(`${getTileName(destinationEntry)} is not adjacent to the carrying navy's sea tile.`);
+
+    const now = new Date().toISOString();
+    const oldFleetName = army.embarkedFleetName || fleet.name || fleetToken.document.name;
+    army.previousTileId = army.currentTileId || "";
+    army.previousTileName = army.currentTileName || "";
+    army.currentTileId = getTileId(destinationEntry);
+    army.currentTileName = getTileName(destinationEntry);
+    army.currentRegion = destinationEntry.tile.region || "";
+    army.embarked = false;
+    delete army.embarkedFleetTokenId;
+    delete army.embarkedFleetName;
+    delete army.transportFleetTokenId;
+    delete army.transportFleetName;
+    army.disembarkedAt = now;
+    army.disembarkedBy = actingUserName;
+    army.movementUsed = Math.max(Number(army.movementUsed || 0), Number(army.movementMax || 0));
+    army.movementLockedRoundKey = getCurrentActionRoundKey();
+    army.movementLockedReason = "Disembarked from a navy this turn.";
+    army.detached = false;
+    army.followCharacter = true;
+    await saveWorldPiece(armyToken, army);
+
+    fleet.embarkedArmies = Array.isArray(fleet.embarkedArmies) ? fleet.embarkedArmies.filter(item => String(item.armyTokenId || "") !== String(armyToken.document.id)) : [];
+    fleet.transportCapacity = getFleetTransportCapacity(fleet);
+    fleet.transportUsed = getFleetUsedTransportCapacity(fleetToken, armyToken.document.id);
+    fleet.updatedAt = now;
+    fleet.updatedBy = game.user.name;
+    await saveWorldPiece(fleetToken, fleet);
+
+    const armyPos = getTokenTopLeftForTileSlot(armyToken, destinationEntry);
+    await armyToken.document.update({ x: armyPos.x, y: armyPos.y, hidden: false }, { animate: true, worldMovementBypass: true, bypassWorldMovementWatcher: true, disembarkArmyBypass: true });
+
+    const commanderToken = getArmyCommanderToken(army);
+    if (commanderToken) {
+      await updateCharacterEmbarkState(commanderToken, destinationEntry, fleetToken, fleet, { lock: true, clear: true, reason: `Disembarked with ${army.name || armyToken.document.name}.` });
+    }
+
+    await ChatMessage.create({
+      speaker: ChatMessage.getSpeaker({ alias: "Crown Embarkation" }),
+      content: `<h2>Army Disembarked</h2><p><strong>Army:</strong> ${escapeHtml(army.name || armyToken.document.name)}</p><p><strong>From Navy:</strong> ${escapeHtml(oldFleetName)}</p><p><strong>Landing:</strong> ${escapeHtml(getTileName(destinationEntry))}</p><p><strong>Troops:</strong> ${escapeHtml(getArmyCurrentStrength(army).toLocaleString())}</p><p>The army and its commander have committed their action and cannot move again until movement resets.</p>`
+    });
+    revealForCurrentPlayerPieces();
+    return { army, fleet };
+  }
+
+  async function disembarkArmy() {
+    if (!requireOverviewScene()) return;
+    let armies;
+    try { armies = getDisembarkableArmiesForSelection(); }
+    catch (err) { ui.notifications.warn(err.message || "Select an embarked army, its commander, or the carrying navy."); return; }
+    armies = armies.filter(token => canUserControlWorldPiece(token, getWorldPiece(token)));
+    if (!armies.length) { ui.notifications.warn("No embarked army you control was found."); return; }
+    const defaultArmyId = armies[0].document.id;
+    const defaultArmy = getWorldPiece(armies[0]) || {};
+    const fleetToken = getFleetTokenById(defaultArmy.embarkedFleetTokenId);
+    if (!fleetToken) { ui.notifications.warn("Could not find the carrying navy."); return; }
+    const fleet = getWorldPiece(fleetToken) || {};
+    if (!canUserControlWorldPiece(fleetToken, fleet)) { ui.notifications.warn("You must control the carrying navy to disembark this army."); return; }
+    const fleetEntry = getCurrentTileEntryForToken(fleetToken, fleet) || getTileById(fleet.currentTileId);
+    const landingEntries = getLandEntriesAdjacentToSeaEntry(fleetEntry);
+    if (!landingEntries.length) { ui.notifications.warn("No adjacent land/port tiles are available for disembarkation."); return; }
+    const defaultLandingId = getTileId(landingEntries[0]);
+    const result = await new Promise(resolve => {
+      new Dialog({
+        title: "Disembark Army",
+        content: `<form><p>Choose the embarked army and landing tile.</p><div class="form-group"><label>Army</label><select name="armyTokenId" style="width:100%;">${buildDisembarkArmyOptions(armies, defaultArmyId)}</select></div><div class="form-group"><label>Landing Tile</label><select name="destinationTileId" style="width:100%;">${buildDisembarkTileOptions(landingEntries, defaultLandingId)}</select></div></form>`,
+        buttons: { land: { label: "Disembark", callback: html => { const form = html[0].querySelector("form"); resolve({ armyTokenId: String(form.armyTokenId.value || defaultArmyId), destinationTileId: String(form.destinationTileId.value || defaultLandingId) }); } }, cancel: { label: "Cancel", callback: () => resolve(null) } },
+        default: "land"
+      }, { width: 620, height: 420, resizable: true }).render(true);
+    });
+    if (!result) return;
+    if (!game.user.isGM) {
+      const gm = findActiveGmForScene(canvas.scene?.id);
+      if (!gm) { ui.notifications.warn("No active GM online to disembark this army."); return; }
+      game.socket.emit(SOCKET_NAME, { type: "disembarkArmyRequest", targetGmId: gm.id, sceneId: canvas.scene?.id, requesterUserId: game.user.id, requesterUserName: game.user.name, armyTokenId: result.armyTokenId, destinationTileId: result.destinationTileId });
+      ui.notifications.info(`Disembark Army request sent to GM ${gm.name}.`);
+      return;
+    }
+    const armyToken = getArmyTokenById(result.armyTokenId);
+    const destinationEntry = getEntryById(result.destinationTileId);
+    await applyDisembarkArmyFromFleet(armyToken, destinationEntry, { actingUserId: game.user.id, actingUserName: game.user.name });
+  }
+
+  async function handleDisembarkArmyRequest(message) {
+    if (!game.user.isGM) return;
+    if (message.targetGmId && String(message.targetGmId) !== String(game.user.id)) return;
+    if (message.sceneId && String(message.sceneId) !== String(canvas.scene?.id)) return;
+    const armyToken = getArmyTokenById(message.armyTokenId);
+    const destinationEntry = getEntryById(message.destinationTileId);
+    if (!armyToken || !destinationEntry) { ui.notifications.warn(`Disembark request failed: army or destination not found.`); return; }
+    try { await applyDisembarkArmyFromFleet(armyToken, destinationEntry, { actingUserId: message.requesterUserId, actingUserName: message.requesterUserName || "Player" }); }
+    catch (err) {
+      console.error("Disembark Army request failed", err, message);
+      ui.notifications.error(err.message || "Disembark Army request failed.");
+      await ChatMessage.create({ speaker: ChatMessage.getSpeaker({ alias: "Crown Embarkation" }), whisper: ChatMessage.getWhisperRecipients("GM").map(u => u.id), content: `<h2>Disembark Army Failed</h2><p><strong>Player:</strong> ${escapeHtml(message.requesterUserName || "Unknown")}</p><p><strong>Reason:</strong> ${escapeHtml(err.message || err)}</p>` });
+    }
+  }
+
+  async function moveEmbarkedArmiesWithFleet(fleetToken, fleetPiece, destinationEntry) {
+    if (!fleetToken || normalize(fleetPiece?.pieceType) !== "fleet" || !destinationEntry?.tile) return;
+    const armies = getEmbarkedArmyTokensForFleet(fleetToken);
+    for (const armyToken of armies) {
+      const army = foundry.utils.deepClone(getWorldPiece(armyToken) || {});
+      army.previousTileId = army.currentTileId || "";
+      army.previousTileName = army.currentTileName || "";
+      army.currentTileId = getTileId(destinationEntry);
+      army.currentTileName = getTileName(destinationEntry);
+      army.currentRegion = destinationEntry.tile.region || "";
+      army.lastMovedAt = new Date().toISOString();
+      army.lastMovedBy = game.user.name;
+      army.lastMovedSource = `Embarked aboard ${fleetPiece.name || fleetToken.document.name}`;
+      await saveWorldPiece(armyToken, army);
+      const pos = getTokenTopLeftForTileSlot(armyToken, destinationEntry);
+      await armyToken.document.update({ x: pos.x, y: pos.y, hidden: true }, { animate: false, worldMovementBypass: true, bypassWorldMovementWatcher: true, fleetCargoBypass: true });
+
+      const commanderToken = getArmyCommanderToken(army);
+      if (commanderToken) {
+        await updateCharacterEmbarkState(commanderToken, destinationEntry, fleetToken, fleetPiece, { lock: false, reason: `Carried by ${fleetPiece.name || fleetToken.document.name}.` });
+      }
+    }
+  }
+
+
   async function editSelectedArmy() {
     if (!requireOverviewScene()) return;
     if (!game.user.isGM) { ui.notifications.warn("Only the GM can edit armies."); return; }
@@ -5579,19 +6163,97 @@
     return value === "" ? 0 : Number(value);
   }
 
-  function findDefenderCharacterForTile(entry, attackerToken, actingUserId) {
+  function getFirstNumberOrBlank(...values) {
+    for (const value of values) {
+      const parsed = numberOrBlank(value);
+      if (parsed !== "") return Number(parsed);
+    }
+    return "";
+  }
+
+  function getCharacterIdentityForToken(token) {
+    const piece = getWorldPiece(token) || {};
+    const character = getCharacterDataFromToken(token) || {};
+    return String(character.characterId || character.id || piece.characterId || piece.linkedCharacterId || token?.document?.id || "").trim();
+  }
+
+  function characterTokenMatchesId(token, wantedId) {
+    const target = String(wantedId || "").trim();
+    if (!target) return false;
+    const piece = getWorldPiece(token) || {};
+    const character = getCharacterDataFromToken(token) || {};
+    const ids = [
+      character.characterId,
+      character.id,
+      piece.characterId,
+      piece.linkedCharacterId,
+      token?.document?.id,
+      token?.actor?.id
+    ].map(value => String(value || "").trim()).filter(Boolean);
+    return ids.includes(target);
+  }
+
+  function isCharacterTokenOnTile(token, tileId) {
+    const piece = getWorldPiece(token) || {};
+    const character = getCharacterDataFromToken(token) || {};
+    const wanted = String(tileId || "").trim();
+    if (!wanted) return false;
+    if (String(character.currentTileId || "").trim() === wanted) return true;
+    if (String(piece.currentTileId || "").trim() === wanted) return true;
+    return String(getCurrentTileEntryForToken(token, piece)?.tile?.id || "").trim() === wanted;
+  }
+
+  function isCharacterTokenOwnedBy(token, userId, userName = "") {
+    const piece = getWorldPiece(token) || {};
+    const character = getCharacterDataFromToken(token) || {};
+    const wantedId = String(userId || "").trim();
+    const wantedName = normalize(userName || "");
+    const ids = [character.playerUserId, character.ownerUserId, piece.playerOwnerUserId, piece.ownerUserId]
+      .map(value => String(value || "").trim())
+      .filter(Boolean);
+    if (wantedId && ids.includes(wantedId)) return true;
+    const names = [character.playerName, character.ownerUserName, piece.playerOwnerUserName, piece.ownerUserName]
+      .map(value => normalize(value || ""))
+      .filter(Boolean);
+    return Boolean(wantedName && names.includes(wantedName));
+  }
+
+  function sortDefenderCandidatesByDiplomacy(candidates) {
+    return candidates.sort((a, b) => getDiplomacyValue(getWorldPiece(b), getCharacterDataFromToken(b)) - getDiplomacyValue(getWorldPiece(a), getCharacterDataFromToken(a)));
+  }
+
+  function findDefenderCharacterForTile(entry, attackerToken, actingUserId, worldTile = entry?.tile || {}, house = {}) {
     const tileId = getTileId(entry);
-    const candidates = getCharacterTokens().filter(token => {
+    const sameTileCharacters = getCharacterTokens().filter(token => {
       if (token.document.id === attackerToken.document.id) return false;
-      const piece = getWorldPiece(token) || {};
-      const character = getCharacterDataFromToken(token);
-      const sameTile = String(character.currentTileId || piece.currentTileId || "") === String(tileId || "") || getCurrentTileEntryForToken(token, piece)?.tile?.id === tileId;
-      if (!sameTile) return false;
-      if (actingUserId && String(character.playerUserId || piece.playerOwnerUserId || piece.ownerUserId || "") === String(actingUserId)) return false;
-      return true;
+      return isCharacterTokenOnTile(token, tileId);
     });
-    candidates.sort((a, b) => getDiplomacyValue(getWorldPiece(b), getCharacterDataFromToken(b)) - getDiplomacyValue(getWorldPiece(a), getCharacterDataFromToken(a)));
-    return candidates[0] || null;
+
+    const explicitDefenderIds = [
+      house.npcDefenderCharacterId,
+      worldTile.npcDefenderCharacterId,
+      house.rulingCharacterId,
+      worldTile.rulingCharacterId
+    ].map(value => String(value || "").trim()).filter(Boolean);
+
+    if (explicitDefenderIds.length) {
+      const explicitMatches = sameTileCharacters.filter(token => explicitDefenderIds.some(id => characterTokenMatchesId(token, id)));
+      if (explicitMatches.length) return sortDefenderCandidatesByDiplomacy(explicitMatches)[0] || null;
+    }
+
+    const currentOwnerId = getTileOwnerUserId(worldTile, house);
+    const currentOwnerName = getTileOwnerUserName(worldTile, house);
+    const ownershipType = normalize(inferOwnershipType(worldTile, house));
+
+    if (ownershipType === "player" && (currentOwnerId || currentOwnerName)) {
+      const ownerCandidates = sameTileCharacters.filter(token => {
+        if (actingUserId && String(actingUserId) === String(currentOwnerId || "")) return false;
+        return isCharacterTokenOwnedBy(token, currentOwnerId, currentOwnerName);
+      });
+      if (ownerCandidates.length) return sortDefenderCandidatesByDiplomacy(ownerCandidates)[0] || null;
+    }
+
+    return null;
   }
 
   function getTextComparisonModifier(attackerValue, defenderValue, sameLabel, differentLabel) {
@@ -5604,7 +6266,14 @@
 
   function getDefenderDiplomacyValue(house = {}, worldTile = {}, defenderToken = null) {
     if (defenderToken) return getDiplomacyValue(getWorldPiece(defenderToken), getCharacterDataFromToken(defenderToken));
-    const value = numberOrBlank(house.npcDefenderDiplomacy ?? house.npcDiplomacy ?? house.rulerDiplomacy ?? worldTile.npcDefenderDiplomacy ?? worldTile.npcDiplomacy ?? worldTile.rulerDiplomacy ?? 3);
+    const value = getFirstNumberOrBlank(
+      house.npcDefenderDiplomacy,
+      house.npcDiplomacy,
+      house.rulerDiplomacy,
+      worldTile.npcDefenderDiplomacy,
+      worldTile.npcDiplomacy,
+      worldTile.rulerDiplomacy
+    );
     return value === "" ? 3 : Number(value);
   }
 
@@ -5633,7 +6302,7 @@
       throw new Error(`${tileName} is marriage-protected by ${protectedBy}; diplomacy is blocked.`);
     }
 
-    const defenderToken = findDefenderCharacterForTile(entry, token, actingUserId);
+    const defenderToken = findDefenderCharacterForTile(entry, token, actingUserId, worldTile, house);
     const defenderPiece = defenderToken ? getWorldPiece(defenderToken) : null;
     const defenderCharacter = defenderToken ? getCharacterDataFromToken(defenderToken) : null;
     const defenderName = defenderCharacter?.characterName || house.npcDefenderName || house.lord || `${tileName} NPC Defender`;
@@ -7913,6 +8582,18 @@
         await handleDuelRequest(message);
         return;
       }
+      if (message.type === "spreadSelectedRequest") {
+        await handleSpreadSelectedRequest(message);
+        return;
+      }
+      if (message.type === "embarkArmyRequest") {
+        await handleEmbarkArmyRequest(message);
+        return;
+      }
+      if (message.type === "disembarkArmyRequest") {
+        await handleDisembarkArmyRequest(message);
+        return;
+      }
       if (message.type === "dismissForceRequest") {
         await handleDismissForceRequest(message);
         return;
@@ -9584,6 +10265,221 @@
     ui.notifications.info(`Realm import complete — ${updatedCount} updated, ${failedCount} failed.`);
   }
 
+  function isCrownOverviewToken(token) {
+    return Boolean(getWorldPiece(token)) || isCharacterToken(token);
+  }
+
+  function getSpreadOffsetForIndex(index, count, gridSize) {
+    if (count <= 1) return { x: 0, y: 0 };
+    if (count === 2) return { x: (index === 0 ? -0.45 : 0.45) * gridSize, y: 0 };
+    if (count === 3) {
+      const pattern = [
+        { x: 0, y: -0.55 * gridSize },
+        { x: -0.55 * gridSize, y: 0.45 * gridSize },
+        { x: 0.55 * gridSize, y: 0.45 * gridSize }
+      ];
+      return pattern[index] || { x: 0, y: 0 };
+    }
+    const radius = gridSize * Math.max(0.65, Math.min(1.65, count / 5));
+    const angle = -Math.PI / 2 + (Math.PI * 2 * index) / count;
+    return { x: Math.cos(angle) * radius, y: Math.sin(angle) * radius };
+  }
+
+  function getSpreadTileEntryForToken(token) {
+    const piece = getWorldPiece(token) || {};
+    return getCurrentTileEntryForToken(token, piece) || (piece.currentTileId ? getTileById(piece.currentTileId) : null);
+  }
+
+  function getSpreadTileIdForToken(token) {
+    const entry = getSpreadTileEntryForToken(token);
+    if (entry) return getTileId(entry);
+    const piece = getWorldPiece(token) || {};
+    const character = getWorldCharacter(token) || {};
+    return String(piece.currentTileId || character.currentTileId || "").trim();
+  }
+
+  function syncTokenLocationFlags(token, entry) {
+    if (!token || !entry) return Promise.resolve();
+    const tileId = getTileId(entry);
+    const tileName = getTileName(entry);
+    const region = entry.tile?.region || "";
+    const tasks = [];
+
+    const piece = foundry.utils.deepClone(getWorldPiece(token) || {});
+    if (Object.keys(piece).length) {
+      piece.currentTileId = tileId;
+      piece.currentTileName = tileName;
+      piece.currentRegion = region;
+      tasks.push(saveWorldPiece(token, piece));
+    }
+
+    const character = foundry.utils.deepClone(getWorldCharacter(token) || {});
+    if (character.characterName || character.characterId) {
+      character.currentTileId = tileId;
+      character.currentTileName = tileName;
+      character.currentRegion = region;
+      tasks.push(token.document.setFlag(FLAG_SCOPE, WORLD_CHARACTER_KEY, character));
+      if (token.actor) tasks.push(token.actor.setFlag(FLAG_SCOPE, WORLD_CHARACTER_KEY, foundry.utils.deepClone(character)));
+    }
+
+    return Promise.all(tasks);
+  }
+
+  async function spreadTokenGroup(tokens, entry = null) {
+    const cleanTokens = Array.from(new Map(tokens.filter(Boolean).map(token => [token.document.id, token])).values());
+    if (cleanTokens.length <= 1) return 0;
+
+    cleanTokens.sort((a, b) => String(a.name || "").localeCompare(String(b.name || "")));
+    const gridSize = getGridSize();
+    const center = entry ? getDrawingCenter(entry) : cleanTokens.reduce((acc, token) => {
+      const point = getTokenCenter(token);
+      acc.x += point.x;
+      acc.y += point.y;
+      return acc;
+    }, { x: 0, y: 0 });
+
+    if (!entry) {
+      center.x = center.x / cleanTokens.length;
+      center.y = center.y / cleanTokens.length;
+    }
+
+    const updates = cleanTokens.map((token, index) => {
+      const offset = getSpreadOffsetForIndex(index, cleanTokens.length, gridSize);
+      const topLeft = getTokenTopLeftForPoint(token, { x: center.x + offset.x, y: center.y + offset.y });
+      return { _id: token.document.id, x: Math.round(topLeft.x), y: Math.round(topLeft.y) };
+    });
+
+    await canvas.scene.updateEmbeddedDocuments("Token", updates, {
+      animate: false,
+      crownSpreadSelected: true,
+      bypassCrownMovementWatcher: true,
+      bypassWorldMovementWatcher: true,
+      worldMovementBypass: true,
+      teleport: true
+    });
+
+    if (entry) {
+      for (const token of cleanTokens) await syncTokenLocationFlags(token, entry);
+    }
+
+    return cleanTokens.length;
+  }
+
+  async function spreadSelectedForUser({ tokenIds = [], tileId = "", expandTile = false, actingUserId = game.user.id, actingUserName = game.user.name } = {}) {
+    const actingUser = game.users.get(actingUserId) || { id: actingUserId, name: actingUserName, isGM: false };
+    let targets = [];
+
+    const ids = Array.isArray(tokenIds) ? tokenIds.map(id => String(id || "").trim()).filter(Boolean) : [];
+    if (ids.length) {
+      targets = ids.map(id => canvas.tokens.get(id)).filter(Boolean).filter(isCrownOverviewToken);
+    }
+
+    if (expandTile && tileId) {
+      const targetEntry = getTileById(tileId);
+      targets = canvas.tokens.placeables.filter(token => {
+        if (!isCrownOverviewToken(token)) return false;
+        if (!canUserControlWorldPieceForUser(token, getWorldPiece(token) || {}, actingUser)) return false;
+        return String(getSpreadTileIdForToken(token) || "") === String(tileId || "");
+      });
+      if (!targets.length && ids.length) targets = ids.map(id => canvas.tokens.get(id)).filter(Boolean).filter(isCrownOverviewToken);
+      return await spreadTokenGroup(targets, targetEntry);
+    }
+
+    targets = targets.filter(token => canUserControlWorldPieceForUser(token, getWorldPiece(token) || {}, actingUser));
+
+    if (targets.length <= 1 && ids.length === 1) {
+      const token = canvas.tokens.get(ids[0]);
+      const inferredTileId = getSpreadTileIdForToken(token);
+      if (inferredTileId) return await spreadSelectedForUser({ tokenIds: ids, tileId: inferredTileId, expandTile: true, actingUserId, actingUserName });
+    }
+
+    const groups = new Map();
+    for (const token of targets) {
+      const tokenTileId = getSpreadTileIdForToken(token) || "manual";
+      if (!groups.has(tokenTileId)) groups.set(tokenTileId, []);
+      groups.get(tokenTileId).push(token);
+    }
+
+    let moved = 0;
+    for (const [groupTileId, groupTokens] of groups.entries()) {
+      const entry = groupTileId !== "manual" ? getTileById(groupTileId) : null;
+      moved += await spreadTokenGroup(groupTokens, entry);
+    }
+    return moved;
+  }
+
+  async function requestGmSpreadSelected({ tokenIds = [], tileId = "", expandTile = false } = {}) {
+    const gm = game.users.find(user => user.isGM && user.active);
+    if (!gm) throw new Error("A GM must be logged in to spread pieces safely.");
+    game.socket.emit(SOCKET_NAME, {
+      type: "spreadSelectedRequest",
+      requesterUserId: game.user.id,
+      requesterUserName: game.user.name,
+      tokenIds,
+      tileId,
+      expandTile
+    });
+    ui.notifications.info(`Spread request sent to GM ${gm.name}.`);
+  }
+
+  async function spreadSelected() {
+    if (!requireOverviewScene()) return;
+    const selectedTokens = canvas.tokens.controlled.filter(isCrownOverviewToken);
+    const selectedDrawings = canvas.drawings.controlled.filter(drawing => Boolean(getWorldTile(drawing)));
+
+    let tokenIds = selectedTokens.map(token => token.document.id);
+    let tileId = "";
+    let expandTile = false;
+
+    if (selectedTokens.length >= 2) {
+      expandTile = false;
+    } else if (selectedTokens.length === 1) {
+      tileId = getSpreadTileIdForToken(selectedTokens[0]);
+      expandTile = true;
+    } else if (game.user.isGM && selectedDrawings.length === 1) {
+      tileId = getTileId({ drawing: selectedDrawings[0], tile: getWorldTile(selectedDrawings[0]) });
+      expandTile = true;
+    } else {
+      ui.notifications.warn("Select 2+ Crown pieces, one stacked Crown piece, or as GM select one tile drawing.");
+      return;
+    }
+
+    try {
+      let moved = 0;
+      if (!game.user.isGM) {
+        await requestGmSpreadSelected({ tokenIds, tileId, expandTile });
+        return;
+      }
+      moved = await spreadSelectedForUser({ tokenIds, tileId, expandTile, actingUserId: game.user.id, actingUserName: game.user.name });
+      if (moved <= 1) ui.notifications.info("Only one eligible Crown piece found, nothing to spread.");
+      else ui.notifications.info(`Spread ${moved} Crown piece(s).`);
+    } catch (err) {
+      ui.notifications.error(err.message || "Spread Selected failed.");
+      console.error("Spread Selected failed", err);
+    }
+  }
+
+  async function handleSpreadSelectedRequest(message) {
+    if (!game.user.isGM) return;
+    try {
+      const moved = await spreadSelectedForUser({
+        tokenIds: message.tokenIds || [],
+        tileId: message.tileId || "",
+        expandTile: Boolean(message.expandTile),
+        actingUserId: message.requesterUserId,
+        actingUserName: message.requesterUserName
+      });
+      await ChatMessage.create({
+        speaker: ChatMessage.getSpeaker({ alias: "Crown Overview" }),
+        whisper: ChatMessage.getWhisperRecipients("GM").map(user => user.id),
+        content: `<h2>Spread Selected</h2><p><strong>Player:</strong> ${escapeHtml(message.requesterUserName || "Unknown")}</p><p><strong>Moved:</strong> ${escapeHtml(moved)}</p>`
+      });
+    } catch (err) {
+      ui.notifications.error(err.message || "Spread Selected request failed.");
+      console.error("Spread Selected request failed", err, message);
+    }
+  }
+
   async function hideTileText() {
     if (!requireOverviewScene()) return;
     const tileDrawings = canvas.drawings.placeables.filter(drawing => Boolean(getWorldTile(drawing)) && !drawing.document.getFlag(FLAG_SCOPE, "worldTileLabel"));
@@ -9627,6 +10523,7 @@
     start: startSceneFeatures,
     stop: stopSceneFeatures,
     pathMove,
+    spreadSelected,
     toggleClickMove,
     toggleRouteTooltip,
     togglePieceTooltip,
@@ -9635,6 +10532,8 @@
     showHoldings,
     summonArmy,
     summonNavy,
+    embarkArmy,
+    disembarkArmy,
     diplomaticTakeover,
     siegeStorm,
     duel,
