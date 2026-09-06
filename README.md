@@ -1,49 +1,35 @@
-# Crown Overview Tools v0.4.2
+# Crown Overview Tools v0.4.3
 
-Strategic overview-map tools for Foundry VTT Crown of Ashes scenes.
+Scene-gated Crown of Ashes world-map tools for Foundry VTT.
 
-## Included in v0.4.2
+## v0.4.3
 
-- Includes the previously planned v0.4.0 systems and the v0.4.1 cleaned building catalogue, so you can install this directly from v0.3.x.
-- Hard fix for Manual Base Resource Income clearing.
-  - Clearing the field now stays cleared.
-  - Legacy manual income fields are removed on save/repair/import/collection.
-- Final 3-tier building catalogue.
-  - Normal building lines have Tier 1, Tier 2, Tier 3 only.
-  - Roads are one-and-done.
-  - Building upgrades replace the previous tier instead of consuming another slot.
-  - Tiles keep a four building-line limit.
-  - Tier costs: 4 / 12 / 24 Gold.
-  - Statecraft requirements: 5 / 10 / 12.
-- Buildings now use flat output.
-  - Trade goods provide natural Gold/Food income.
-  - Buildings no longer receive matching-export bonuses.
-  - Mine remains the best pure-gold line.
-  - Foundry remains strong at +4/+8/+12 Gold.
-  - Foundry, Blacksmith, and Armorer also keep troop-support effects for the future recruitment system.
-  - Stone gives lower Gold plus infrastructure/fortification discounts.
-  - Influence buildings provide +1 additional Influence per upgrade tier, shown as 1/2/3 total Influence.
-- Create/Edit World Piece now includes optional Statecraft.
-- Player visibility improvements.
-  - Player-owned holdings reveal like controlled character pieces.
-  - Owned holdings reveal their tile plus linked/adjacent tiles.
-- Player information privacy.
-  - Non-owners see only top-level tile info, owner/ruler, and travel summary.
-  - Detailed economy, population, buildings, and stockpiles are hidden unless the player owns the holding or is GM.
-  - Non-owned world-piece tooltips hide detailed stats.
+Adds the first character-management pass and reorganizes the Crown Overview panel.
 
-## Scene gate
+Included:
+- Adds Create Character
+- Adds Edit / Assign Character
+- Adds Import Character CSV
+- Adds Export Character CSV
+- Adds Diplomatic Takeover to the player-facing action section
+- Combines character editing and location assignment into one GM workflow
+- Character tokens now support editable GM stats: Statecraft, Intrigue, Lore, Prowess, Martial, Diplomacy, movement, wounds, command points, traits, quirks, public notes, and GM notes
+- Character CSV format is one character per row for large imports, e.g. 20 players x 3 characters
+- Diplomatic Takeover compares the selected character's Diplomacy against the defending NPC/character Diplomacy
+- Players do not see hidden NPC stats; GMs receive the exact comparison in a whispered chat card
+- Reorders the panel into player actions first, then GM character, world-piece, tile/economy, and map/data sections
+- Keeps all v0.4.2 building, economy, visibility, privacy, manual-income, and Foundry/Armorer troop-support updates
 
-The module runs on:
+## Install
 
-- Crown of Ashes
-- Crown of Ashes (Copy)
+Use this manifest URL in Foundry:
 
-Or on scenes explicitly flagged by the module.
+```
+https://raw.githubusercontent.com/beyondfandome/crown-overview-tools/main/module.json
+```
 
+Release asset for this version:
 
-## v0.4.2 hotfix
-
-- Restores the Foundry / Blacksmith / Armorer troop-support effects alongside their Gold income.
-- These effects are stored as building metadata and shown in the build UI.
-- Recruitment/conversion enforcement is still handled by the military-building system/future recruitment tools; this patch preserves the design intent so the line is not gold-only.
+```
+crown-overview-tools-v0.4.3.zip
+```

@@ -106,3 +106,12 @@
   max-width: 100%;
   overflow-wrap: anywhere;
 }
+
+#coa-overview-panel .coa-panel-section-title {
+  margin: 1px 0 5px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(247, 226, 181, 0.82);
+}

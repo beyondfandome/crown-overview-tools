@@ -1,9 +1,10 @@
 (() => {
   const MODULE_ID = "crown-overview-tools";
-  const MODULE_VERSION = "0.4.2";
+  const MODULE_VERSION = "0.4.3";
   const FLAG_SCOPE = "world";
   const WORLD_TILE_KEY = "worldTile";
   const WORLD_PIECE_KEY = "worldPiece";
+  const WORLD_CHARACTER_KEY = "worldCharacter";
   const HOUSE_KEY = "houseData";
   const ROUND_CLOCK_KEY = "worldRoundClock";
   const SCENE_MODE_KEY = "overviewMapMode";
@@ -37,6 +38,48 @@
     fleet: "icons/svg/anchor.svg",
     dragon: "icons/svg/wing.svg"
   };
+
+  const CHARACTER_STAT_KEYS = ["statecraft", "intrigue", "lore", "prowess", "martial", "diplomacy"];
+  const CHARACTER_SECONDARY_STAT_KEYS = ["marriageDiplomacy", "navalMovement", "landMovement", "wounds", "fertility", "commandPoints", "favouredWeaponBonus"];
+  const CHARACTER_CSV_COLUMNS = [
+    ["Character ID", "characterId"],
+    ["Player Name", "playerName"],
+    ["Player User ID", "playerUserId"],
+    ["Owner Type", "ownerType"],
+    ["Character Slot", "characterSlot"],
+    ["Character Role", "characterRole"],
+    ["Character Name", "characterName"],
+    ["House", "house"],
+    ["Age", "age"],
+    ["Height / Weight", "heightWeight"],
+    ["Preferred Weapons", "preferredWeapons"],
+    ["Marriage", "marriage"],
+    ["Issue / Children", "issueChildren"],
+    ["Current Tile Name", "currentTileName"],
+    ["Current Tile ID", "currentTileId"],
+    ["Current Region", "currentRegion"],
+    ["Token Name", "tokenName"],
+    ["Token Image", "tokenImage"],
+    ["Status", "status"],
+    ["Visibility", "visibility"],
+    ["Statecraft", "statecraft"],
+    ["Intrigue", "intrigue"],
+    ["Lore", "lore"],
+    ["Prowess", "prowess"],
+    ["Martial", "martial"],
+    ["Diplomacy", "diplomacy"],
+    ["Marriage Diplomacy", "marriageDiplomacy"],
+    ["Naval Movement", "navalMovement"],
+    ["Land Movement", "landMovement"],
+    ["Wounds", "wounds"],
+    ["Fertility", "fertility"],
+    ["Command Points", "commandPoints"],
+    ["Favoured Weapon Bonus", "favouredWeaponBonus"],
+    ["Traits", "traits"],
+    ["Quirks", "quirks"],
+    ["Public Notes", "publicNotes"],
+    ["GM Notes", "gmNotes"]
+  ];
 
   const ROUND_ORDER = [
     { season: "Spring", round: 1 },
@@ -1704,27 +1747,41 @@
     if (!isOverviewScene()) { document.getElementById(PANEL_ID)?.remove(); return; }
     const panel = getOrCreatePanel();
     const gmButtons = game.user.isGM ? `
-      <div class="coa-panel-section">
-        <button data-coa-action="roundClock">Round Clock</button>
-        <button data-coa-action="resetMovement">Reset Movement</button>
-        <button data-coa-action="resetBuildCapacity">Reset Build Uses</button>
-        <button data-coa-action="repairBuildLocks">Repair Build Locks</button>
-        <button data-coa-action="processPendingBuilds">Process Pending Builds</button>
+      <div class="coa-panel-section coa-panel-gm-section">
+        <div class="coa-panel-section-title">GM: Characters</div>
+        <button data-coa-action="createCharacter">Create Character</button>
+        <button data-coa-action="editSelectedCharacter">Edit / Assign Character</button>
+        <button data-coa-action="importCharacterCsv">Import Character CSV</button>
+        <button data-coa-action="exportCharacterCsv">Export Character CSV</button>
+      </div>
+      <div class="coa-panel-section coa-panel-gm-section">
+        <div class="coa-panel-section-title">GM: World Pieces</div>
         <button data-coa-action="createPiece">Create World Piece</button>
+        <button data-coa-action="editWorldPiece">Edit World Piece</button>
+        <button data-coa-action="assignPieceOwner">Assign Piece Owner</button>
+        <button data-coa-action="resetMovement">Reset Movement</button>
+      </div>
+      <div class="coa-panel-section coa-panel-gm-section">
+        <div class="coa-panel-section-title">GM: Tiles & Economy</div>
+        <button data-coa-action="roundClock">Round Clock</button>
+        <button data-coa-action="processPendingBuilds">Process Pending Builds</button>
+        <button data-coa-action="collectEconomy">Collect Economy</button>
+        <button data-coa-action="assignTileOwner">Assign Tile Owner</button>
+        <button data-coa-action="assignHouse">Assign House Data</button>
+        <button data-coa-action="manageTileEconomy">Manage Tile Economy</button>
+        <button data-coa-action="manageMarketForces">Manage Market Forces</button>
+      </div>
+      <div class="coa-panel-section coa-panel-gm-section">
+        <div class="coa-panel-section-title">GM: Map Tools</div>
         <button data-coa-action="linkTiles">Link Selected Tiles</button>
         <button data-coa-action="unlinkTiles">Unlink Selected Tiles</button>
         <button data-coa-action="viewLinks">View Tile Links</button>
         <button data-coa-action="togglePort">Make / Edit Port</button>
-        <button data-coa-action="assignTileOwner">Assign Tile Owner</button>
-        <button data-coa-action="assignPieceOwner">Assign Piece Owner</button>
-        <button data-coa-action="editWorldPiece">Edit World Piece</button>
-        <button data-coa-action="assignHouse">Assign House Data</button>
-        <button data-coa-action="manageTileEconomy">Manage Tile Economy</button>
-        <button data-coa-action="manageMarketForces">Manage Market Forces</button>
-        <button data-coa-action="collectEconomy">Collect Economy</button>
+        <button data-coa-action="resetBuildCapacity">Reset Build Uses</button>
+        <button data-coa-action="repairBuildLocks">Repair Build Locks</button>
         <button data-coa-action="repairEconomyData">Repair Economy Data</button>
-        <button data-coa-action="importRealm">Import CSV</button>
-        <button data-coa-action="exportRealm">Export CSV</button>
+        <button data-coa-action="importRealm">Import Realm CSV</button>
+        <button data-coa-action="exportRealm">Export Realm CSV</button>
         <button data-coa-action="hideTileText">Hide Original Tile Text</button>
       </div>
     ` : "";
@@ -1736,14 +1793,16 @@
         </div>
         <button type="button" class="coa-panel-reset" data-coa-panel-reset title="Reset panel position">↺</button>
       </div>
-      <div class="coa-panel-section">
+      <div class="coa-panel-section coa-panel-player-section">
+        <div class="coa-panel-section-title">Player Actions</div>
         <button data-coa-action="pathMove">Move Piece</button>
+        <button data-coa-action="diplomaticTakeover">Diplomatic Takeover</button>
+        <button data-coa-action="buildOnCurrentTile">Build / Upgrade</button>
+        <button data-coa-action="showHoldings">My Holdings</button>
+        <button data-coa-action="portCrossing">Port Crossing</button>
         <button data-coa-action="toggleClickMove">Click Move: ${globalThis[CLICK_MOVE_KEY] ? "On" : "Off"}</button>
         <button data-coa-action="toggleRouteTooltip">Route Tooltip: ${globalThis[ROUTE_TOOLTIP_KEY] ? "On" : "Off"}</button>
         <button data-coa-action="togglePieceTooltip">Piece Tooltip: ${globalThis[PIECE_TOOLTIP_KEY] ? "On" : "Off"}</button>
-        <button data-coa-action="portCrossing">Port Crossing</button>
-        <button data-coa-action="buildOnCurrentTile">Build</button>
-        <button data-coa-action="showHoldings">My Holdings</button>
       </div>
       ${gmButtons}
     `;
@@ -3006,6 +3065,773 @@
     }
 
     return updatedPiece;
+  }
+
+
+  function numberOrBlank(value) {
+    if (value === null || value === undefined || String(value).trim() === "") return "";
+    const number = Number(String(value).replaceAll(",", "").trim());
+    return Number.isFinite(number) ? number : "";
+  }
+
+  function getWorldCharacter(token) {
+    return token?.document?.getFlag(FLAG_SCOPE, WORLD_CHARACTER_KEY) || token?.actor?.getFlag?.(FLAG_SCOPE, WORLD_CHARACTER_KEY) || null;
+  }
+
+  function isCharacterToken(token) {
+    const piece = getWorldPiece(token);
+    if (normalize(piece?.pieceType) === "character") return true;
+    return Boolean(getWorldCharacter(token));
+  }
+
+  function getCharacterTokens() {
+    return canvas.tokens.placeables.filter(token => isCharacterToken(token));
+  }
+
+  function getCharacterStats(piece = {}, character = {}) {
+    const sourceStats = { ...(character.stats || {}), ...(piece.stats || {}) };
+    for (const key of CHARACTER_STAT_KEYS) {
+      if (piece[key] !== undefined && piece[key] !== "") sourceStats[key] = piece[key];
+      if (character[key] !== undefined && character[key] !== "") sourceStats[key] = character[key];
+    }
+    const stats = {};
+    for (const key of CHARACTER_STAT_KEYS) stats[key] = numberOrBlank(sourceStats[key]);
+    return stats;
+  }
+
+  function getCharacterSecondaryStats(piece = {}, character = {}) {
+    const sourceStats = { ...(character.secondaryStats || {}), ...(piece.secondaryStats || {}) };
+    const aliases = {
+      marriageDiplomacy: [character.marriageDiplomacy, piece.marriageDiplomacy],
+      navalMovement: [character.navalMovement, piece.navalMovement],
+      landMovement: [character.landMovement, piece.landMovement, piece.movementMax],
+      wounds: [character.wounds, piece.wounds],
+      fertility: [character.fertility, piece.fertility],
+      commandPoints: [character.commandPoints, piece.commandPoints],
+      favouredWeaponBonus: [character.favouredWeaponBonus, piece.favouredWeaponBonus]
+    };
+    const stats = {};
+    for (const key of CHARACTER_SECONDARY_STAT_KEYS) {
+      let value = sourceStats[key];
+      for (const alias of aliases[key] || []) {
+        if ((value === undefined || value === "") && alias !== undefined && alias !== "") value = alias;
+      }
+      stats[key] = numberOrBlank(value);
+    }
+    return stats;
+  }
+
+  function getCharacterDataFromToken(token) {
+    const piece = getWorldPiece(token) || {};
+    const stored = getWorldCharacter(token) || piece.characterData || {};
+    const entry = getCurrentTileEntryForToken(token, piece);
+    const stats = getCharacterStats(piece, stored);
+    const secondaryStats = getCharacterSecondaryStats(piece, stored);
+    const ownerUserId = stored.playerUserId || stored.ownerUserId || piece.playerOwnerUserId || piece.ownerUserId || "";
+    const ownerUser = ownerUserId ? game.users.get(ownerUserId) : null;
+    return {
+      characterId: stored.characterId || piece.characterId || token.document.id,
+      playerName: stored.playerName || piece.playerOwnerUserName || piece.ownerUserName || ownerUser?.name || "",
+      playerUserId: ownerUserId,
+      ownerType: stored.ownerType || piece.ownerType || (ownerUserId ? "Player" : "NPC"),
+      characterSlot: stored.characterSlot || piece.characterSlot || "",
+      characterRole: stored.characterRole || piece.characterRole || "",
+      characterName: stored.characterName || piece.characterName || piece.name || token.document.name,
+      house: stored.house || piece.house || piece.faction || "",
+      age: stored.age || piece.age || "",
+      heightWeight: stored.heightWeight || piece.heightWeight || "",
+      preferredWeapons: stored.preferredWeapons || piece.preferredWeapons || "",
+      marriage: stored.marriage || piece.marriage || "",
+      issueChildren: stored.issueChildren || piece.issueChildren || "",
+      currentTileName: stored.currentTileName || piece.currentTileName || entry?.tile?.name || "",
+      currentTileId: stored.currentTileId || piece.currentTileId || entry?.tile?.id || "",
+      currentRegion: stored.currentRegion || piece.currentRegion || entry?.tile?.region || "",
+      tokenName: token.document.name || stored.tokenName || piece.name || "",
+      tokenImage: token.document.texture?.src || stored.tokenImage || token.actor?.img || "",
+      status: stored.status || piece.status || "Alive",
+      visibility: stored.visibility || piece.visibility || (ownerUserId ? "Owner+GM" : "GM Only"),
+      statecraft: stats.statecraft,
+      intrigue: stats.intrigue,
+      lore: stats.lore,
+      prowess: stats.prowess,
+      martial: stats.martial,
+      diplomacy: stats.diplomacy,
+      marriageDiplomacy: secondaryStats.marriageDiplomacy,
+      navalMovement: secondaryStats.navalMovement,
+      landMovement: secondaryStats.landMovement,
+      wounds: secondaryStats.wounds,
+      fertility: secondaryStats.fertility,
+      commandPoints: secondaryStats.commandPoints,
+      favouredWeaponBonus: secondaryStats.favouredWeaponBonus,
+      traits: stored.traits || piece.traits || "",
+      quirks: stored.quirks || piece.quirks || "",
+      publicNotes: stored.publicNotes || piece.publicNotes || "",
+      gmNotes: stored.gmNotes || piece.gmNotes || ""
+    };
+  }
+
+  function buildAllTileOptions(selectedTileId = "") {
+    const entries = getWorldTileEntries().sort((a, b) => String(a.tile.region || "").localeCompare(String(b.tile.region || "")) || getTileName(a).localeCompare(getTileName(b)));
+    return entries.map(entry => {
+      const id = getTileId(entry);
+      const label = `${getTileName(entry)}${entry.tile.region ? " — " + entry.tile.region : ""}`;
+      return `<option value="${escapeHtml(id)}" ${String(id) === String(selectedTileId) ? "selected" : ""}>${escapeHtml(label)}</option>`;
+    }).join("");
+  }
+
+  function getTileEntryByNameOrId(value) {
+    const text = String(value || "").trim();
+    if (!text) return null;
+    return getTileById(text) || getWorldTileEntries().find(entry => normalize(getTileName(entry)) === normalize(text) || normalize(entry.tile?.name) === normalize(text)) || null;
+  }
+
+  function characterCsvValue(row, headers, ...names) {
+    const normalizedHeaders = headers.map(header => normalize(String(header).replace(/[_/]+/g, " ")));
+    for (const name of names) {
+      const target = normalize(String(name).replace(/[_/]+/g, " "));
+      let index = normalizedHeaders.indexOf(target);
+      if (index !== -1) return row[index] ?? "";
+      index = headers.indexOf(name);
+      if (index !== -1) return row[index] ?? "";
+    }
+    return "";
+  }
+
+  function getUserFromCharacterDetails(details = {}) {
+    const id = String(details.playerUserId || details.ownerUserId || "").trim();
+    if (id && game.users.get(id)) return game.users.get(id);
+    const name = normalize(details.playerName || details.ownerUserName || "");
+    if (!name) return null;
+    return game.users.contents.find(user => normalize(user.name) === name) || null;
+  }
+
+  function normalizeCharacterDetails(raw = {}, fallback = {}) {
+    const details = { ...fallback, ...raw };
+    const stats = {};
+    const secondaryStats = {};
+    for (const key of CHARACTER_STAT_KEYS) stats[key] = numberOrBlank(details[key]);
+    for (const key of CHARACTER_SECONDARY_STAT_KEYS) secondaryStats[key] = numberOrBlank(details[key]);
+    const characterName = String(details.characterName || details.name || details.tokenName || "").trim();
+    return {
+      characterId: String(details.characterId || fallback.characterId || characterName || foundry.utils.randomID()).trim(),
+      playerName: String(details.playerName || "").trim(),
+      playerUserId: String(details.playerUserId || "").trim(),
+      ownerType: String(details.ownerType || (details.playerUserId ? "Player" : "NPC")).trim() || "NPC",
+      characterSlot: String(details.characterSlot || "").trim(),
+      characterRole: String(details.characterRole || "").trim(),
+      characterName,
+      house: String(details.house || "").trim(),
+      age: String(details.age || "").trim(),
+      heightWeight: String(details.heightWeight || "").trim(),
+      preferredWeapons: String(details.preferredWeapons || "").trim(),
+      marriage: String(details.marriage || "").trim(),
+      issueChildren: String(details.issueChildren || "").trim(),
+      currentTileName: String(details.currentTileName || "").trim(),
+      currentTileId: String(details.currentTileId || "").trim(),
+      currentRegion: String(details.currentRegion || "").trim(),
+      tokenName: String(details.tokenName || characterName || "").trim(),
+      tokenImage: String(details.tokenImage || "").trim(),
+      status: String(details.status || "Alive").trim() || "Alive",
+      visibility: String(details.visibility || (details.playerUserId ? "Owner+GM" : "GM Only")).trim(),
+      stats,
+      secondaryStats,
+      statecraft: stats.statecraft,
+      intrigue: stats.intrigue,
+      lore: stats.lore,
+      prowess: stats.prowess,
+      martial: stats.martial,
+      diplomacy: stats.diplomacy,
+      marriageDiplomacy: secondaryStats.marriageDiplomacy,
+      navalMovement: secondaryStats.navalMovement,
+      landMovement: secondaryStats.landMovement,
+      wounds: secondaryStats.wounds,
+      fertility: secondaryStats.fertility,
+      commandPoints: secondaryStats.commandPoints,
+      favouredWeaponBonus: secondaryStats.favouredWeaponBonus,
+      traits: String(details.traits || "").trim(),
+      quirks: String(details.quirks || "").trim(),
+      publicNotes: String(details.publicNotes || "").trim(),
+      gmNotes: String(details.gmNotes || "").trim()
+    };
+  }
+
+  function buildCharacterForm(details = {}, selectedTileId = "") {
+    const users = getPlayerUsers();
+    const ownerUserId = details.playerUserId || details.ownerUserId || "";
+    const ownerOptions = [`<option value="" ${!ownerUserId ? "selected" : ""}>NPC / Neutral / GM only</option>`, ...users.map(user => `<option value="${escapeHtml(user.id)}" ${String(user.id) === String(ownerUserId) ? "selected" : ""}>${escapeHtml(user.name)}</option>`)].join("");
+    const ownerType = details.ownerType || (ownerUserId ? "Player" : "NPC");
+    const visibility = details.visibility || (ownerUserId ? "Owner+GM" : "GM Only");
+    return `<form>
+      <div style="padding:8px;margin-bottom:10px;border:1px solid #777;border-radius:6px;">
+        <strong>Character instructions:</strong><br>
+        Choose a map tile for the character's location. The GM can see and edit all stats. Players only see full stats for their own characters.
+      </div>
+      <div class="form-group"><label>Character ID</label><input type="text" name="characterId" value="${escapeHtml(details.characterId || "")}" placeholder="Stable ID for CSV import/export" style="width:100%;" /></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div class="form-group"><label>Character Name</label><input type="text" name="characterName" value="${escapeHtml(details.characterName || "")}" style="width:100%;" /></div>
+        <div class="form-group"><label>House</label><input type="text" name="house" value="${escapeHtml(details.house || "")}" style="width:100%;" /></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div class="form-group"><label>Player Owner / Controller</label><select name="playerUserId" style="width:100%;">${ownerOptions}</select></div>
+        <div class="form-group"><label>Owner Type</label><select name="ownerType" style="width:100%;"><option ${ownerType === "Player" ? "selected" : ""}>Player</option><option ${ownerType === "NPC" ? "selected" : ""}>NPC</option><option ${ownerType === "Neutral" ? "selected" : ""}>Neutral</option></select></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div class="form-group"><label>Character Slot</label><input type="number" name="characterSlot" value="${escapeHtml(details.characterSlot || "")}" min="1" step="1" style="width:100%;" /></div>
+        <div class="form-group"><label>Role</label><input type="text" name="characterRole" value="${escapeHtml(details.characterRole || "")}" placeholder="Main, Heir, Advisor, NPC Defender..." style="width:100%;" /></div>
+      </div>
+      <div class="form-group"><label>Location / Tile</label><select name="currentTileId" style="width:100%;">${buildAllTileOptions(selectedTileId || details.currentTileId || "")}</select><p class="notes">Editing a character's location moves the token to this tile and updates its stored location.</p></div>
+      <div style="display:grid;grid-template-columns:repeat(3, 1fr);gap:10px;">
+        <div class="form-group"><label>Status</label><input type="text" name="status" value="${escapeHtml(details.status || "Alive")}" style="width:100%;" /></div>
+        <div class="form-group"><label>Visibility</label><select name="visibility" style="width:100%;"><option ${visibility === "Public" ? "selected" : ""}>Public</option><option ${visibility === "Owner+GM" ? "selected" : ""}>Owner+GM</option><option ${visibility === "GM Only" ? "selected" : ""}>GM Only</option></select></div>
+        <div class="form-group"><label>Age</label><input type="text" name="age" value="${escapeHtml(details.age || "")}" style="width:100%;" /></div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(6, 1fr);gap:8px;">
+        ${CHARACTER_STAT_KEYS.map(key => `<div class="form-group"><label>${escapeHtml(titleCase(key))}</label><input type="number" name="${escapeHtml(key)}" value="${escapeHtml(details[key] ?? "")}" step="1" style="width:100%;" /></div>`).join("")}
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(4, 1fr);gap:8px;">
+        <div class="form-group"><label>Land Move</label><input type="number" name="landMovement" value="${escapeHtml(details.landMovement ?? details.movementMax ?? 3)}" step="1" style="width:100%;" /></div>
+        <div class="form-group"><label>Naval Move</label><input type="number" name="navalMovement" value="${escapeHtml(details.navalMovement ?? 3)}" step="1" style="width:100%;" /></div>
+        <div class="form-group"><label>Wounds</label><input type="number" name="wounds" value="${escapeHtml(details.wounds ?? 0)}" step="1" style="width:100%;" /></div>
+        <div class="form-group"><label>Command Points</label><input type="number" name="commandPoints" value="${escapeHtml(details.commandPoints ?? "")}" step="0.1" style="width:100%;" /></div>
+        <div class="form-group"><label>Marriage Dip.</label><input type="number" name="marriageDiplomacy" value="${escapeHtml(details.marriageDiplomacy ?? "")}" step="1" style="width:100%;" /></div>
+        <div class="form-group"><label>Fertility</label><input type="number" name="fertility" value="${escapeHtml(details.fertility ?? "")}" step="1" style="width:100%;" /></div>
+        <div class="form-group"><label>Weapon Bonus</label><input type="number" name="favouredWeaponBonus" value="${escapeHtml(details.favouredWeaponBonus ?? "")}" step="1" style="width:100%;" /></div>
+        <div class="form-group"><label>Token Image</label><input type="text" name="tokenImage" value="${escapeHtml(details.tokenImage || "")}" style="width:100%;" /></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div class="form-group"><label>Height / Weight</label><input type="text" name="heightWeight" value="${escapeHtml(details.heightWeight || "")}" style="width:100%;" /></div>
+        <div class="form-group"><label>Preferred Weapons</label><input type="text" name="preferredWeapons" value="${escapeHtml(details.preferredWeapons || "")}" style="width:100%;" /></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div class="form-group"><label>Marriage</label><input type="text" name="marriage" value="${escapeHtml(details.marriage || "")}" style="width:100%;" /></div>
+        <div class="form-group"><label>Issue / Children</label><input type="text" name="issueChildren" value="${escapeHtml(details.issueChildren || "")}" style="width:100%;" /></div>
+      </div>
+      <div class="form-group"><label>Traits</label><textarea name="traits" style="width:100%;height:50px;">${escapeHtml(details.traits || "")}</textarea></div>
+      <div class="form-group"><label>Quirks</label><textarea name="quirks" style="width:100%;height:50px;">${escapeHtml(details.quirks || "")}</textarea></div>
+      <div class="form-group"><label>Public Notes</label><textarea name="publicNotes" style="width:100%;height:50px;">${escapeHtml(details.publicNotes || "")}</textarea></div>
+      <div class="form-group"><label>GM Notes</label><textarea name="gmNotes" style="width:100%;height:60px;">${escapeHtml(details.gmNotes || "")}</textarea></div>
+    </form>`;
+  }
+
+  function readCharacterForm(html, fallback = {}) {
+    const form = html[0].querySelector("form");
+    const get = name => form?.[name]?.value ?? "";
+    const details = {
+      characterId: get("characterId"),
+      playerUserId: get("playerUserId"),
+      ownerType: get("ownerType"),
+      characterSlot: get("characterSlot"),
+      characterRole: get("characterRole"),
+      characterName: get("characterName"),
+      house: get("house"),
+      age: get("age"),
+      heightWeight: get("heightWeight"),
+      preferredWeapons: get("preferredWeapons"),
+      marriage: get("marriage"),
+      issueChildren: get("issueChildren"),
+      currentTileId: get("currentTileId"),
+      tokenImage: get("tokenImage"),
+      status: get("status"),
+      visibility: get("visibility"),
+      traits: get("traits"),
+      quirks: get("quirks"),
+      publicNotes: get("publicNotes"),
+      gmNotes: get("gmNotes")
+    };
+    for (const key of CHARACTER_STAT_KEYS) details[key] = get(key);
+    for (const key of CHARACTER_SECONDARY_STAT_KEYS) details[key] = get(key);
+    return normalizeCharacterDetails(details, fallback);
+  }
+
+  async function saveCharacterFlags(token, details, entry, ownerUser = null) {
+    const normalized = normalizeCharacterDetails(details);
+    const currentPiece = foundry.utils.deepClone(getWorldPiece(token) || {});
+    const characterData = {
+      ...normalized,
+      playerUserId: ownerUser?.id || "",
+      playerName: ownerUser?.name || normalized.playerName || "",
+      ownerUserId: ownerUser?.id || "",
+      ownerUserName: ownerUser?.name || "",
+      currentTileId: entry ? getTileId(entry) : normalized.currentTileId,
+      currentTileName: entry ? getTileName(entry) : normalized.currentTileName,
+      currentRegion: entry?.tile?.region || normalized.currentRegion || "",
+      updatedAt: new Date().toISOString(),
+      updatedBy: game.user.name,
+      updatedSource: `Crown Overview Tools ${MODULE_VERSION}`
+    };
+
+    const movementMax = numberOrBlank(characterData.landMovement) === "" ? Number(currentPiece.movementMax || 3) : Number(characterData.landMovement);
+    const updatedPiece = {
+      ...currentPiece,
+      name: characterData.characterName || token.document.name,
+      characterName: characterData.characterName || token.document.name,
+      characterId: characterData.characterId,
+      pieceType: "character",
+      faction: characterData.house,
+      house: characterData.house,
+      ownerType: characterData.ownerType,
+      characterSlot: characterData.characterSlot,
+      characterRole: characterData.characterRole,
+      status: characterData.status,
+      visibility: characterData.visibility,
+      stats: characterData.stats,
+      secondaryStats: characterData.secondaryStats,
+      statecraft: characterData.statecraft,
+      diplomacy: characterData.diplomacy,
+      martial: characterData.martial,
+      intrigue: characterData.intrigue,
+      lore: characterData.lore,
+      prowess: characterData.prowess,
+      wounds: characterData.wounds,
+      landMovement: characterData.landMovement,
+      navalMovement: characterData.navalMovement,
+      movementMax,
+      movementUsed: Math.min(Number(currentPiece.movementUsed || 0), movementMax),
+      allowedTileTypes: getAllowedTileTypes("character"),
+      currentTileId: characterData.currentTileId,
+      currentTileName: characterData.currentTileName,
+      currentRegion: characterData.currentRegion,
+      ownerUserId: ownerUser?.id || "",
+      ownerUserName: ownerUser?.name || "",
+      playerOwnerUserId: ownerUser?.id || "",
+      playerOwnerUserName: ownerUser?.name || "",
+      characterData,
+      version: `Crown Overview Tools ${MODULE_VERSION}`,
+      updatedAt: new Date().toISOString(),
+      updatedBy: game.user.name
+    };
+
+    await token.document.setFlag(FLAG_SCOPE, WORLD_CHARACTER_KEY, characterData);
+    if (token.actor) await token.actor.setFlag(FLAG_SCOPE, WORLD_CHARACTER_KEY, foundry.utils.deepClone(characterData));
+    await saveWorldPiece(token, updatedPiece);
+    await applyWorldPieceOwner(token, updatedPiece, ownerUser, true);
+    await token.document.update({ name: updatedPiece.name, ...(characterData.tokenImage ? { texture: { src: characterData.tokenImage } } : {}) }, { worldMovementBypass: true, bypassWorldMovementWatcher: true });
+    if (token.actor) await token.actor.update({ name: updatedPiece.name, ...(characterData.tokenImage ? { img: characterData.tokenImage } : {}) });
+    return { characterData, piece: updatedPiece };
+  }
+
+  async function spawnCharacterToken(details, entry, ownerUser = null) {
+    if (!entry) throw new Error("No destination tile selected for the character.");
+    const normalized = normalizeCharacterDetails(details);
+    if (!normalized.characterName) throw new Error("Character name is required.");
+    const image = normalized.tokenImage || DEFAULT_IMAGES.character;
+    const folder = await getOrCreateWorldMapFolder();
+    const actorType = getSafeActorType();
+    const characterData = {
+      ...normalized,
+      playerUserId: ownerUser?.id || "",
+      playerName: ownerUser?.name || normalized.playerName || "",
+      ownerUserId: ownerUser?.id || "",
+      ownerUserName: ownerUser?.name || "",
+      currentTileId: getTileId(entry),
+      currentTileName: getTileName(entry),
+      currentRegion: entry.tile?.region || "",
+      tokenImage: image,
+      createdAt: new Date().toISOString(),
+      createdBy: game.user.name,
+      createdSource: `Crown Overview Tools ${MODULE_VERSION}`
+    };
+    const movementMax = numberOrBlank(characterData.landMovement) === "" ? 3 : Number(characterData.landMovement);
+    const pieceData = {
+      name: characterData.characterName,
+      characterName: characterData.characterName,
+      characterId: characterData.characterId,
+      pieceType: "character",
+      faction: characterData.house,
+      house: characterData.house,
+      ownerType: characterData.ownerType,
+      characterSlot: characterData.characterSlot,
+      characterRole: characterData.characterRole,
+      status: characterData.status,
+      visibility: characterData.visibility,
+      stats: characterData.stats,
+      secondaryStats: characterData.secondaryStats,
+      statecraft: characterData.statecraft,
+      diplomacy: characterData.diplomacy,
+      martial: characterData.martial,
+      intrigue: characterData.intrigue,
+      lore: characterData.lore,
+      prowess: characterData.prowess,
+      wounds: characterData.wounds,
+      landMovement: characterData.landMovement,
+      navalMovement: characterData.navalMovement,
+      movementMax,
+      movementUsed: 0,
+      allowedTileTypes: getAllowedTileTypes("character"),
+      currentTileId: characterData.currentTileId,
+      currentTileName: characterData.currentTileName,
+      currentRegion: characterData.currentRegion,
+      ownerUserId: ownerUser?.id || "",
+      ownerUserName: ownerUser?.name || "",
+      playerOwnerUserId: ownerUser?.id || "",
+      playerOwnerUserName: ownerUser?.name || "",
+      characterData,
+      version: `Crown Overview Tools ${MODULE_VERSION}`,
+      spawnedAt: new Date().toISOString(),
+      spawnedBy: game.user.name
+    };
+
+    const actor = await Actor.create({
+      name: characterData.characterName,
+      type: actorType,
+      folder: folder.id,
+      img: image,
+      flags: { [FLAG_SCOPE]: { [WORLD_PIECE_KEY]: foundry.utils.deepClone(pieceData), [WORLD_CHARACTER_KEY]: foundry.utils.deepClone(characterData) } },
+      prototypeToken: {
+        name: characterData.characterName,
+        actorLink: true,
+        width: 1,
+        height: 1,
+        disposition: ownerUser ? CONST.TOKEN_DISPOSITIONS.FRIENDLY : CONST.TOKEN_DISPOSITIONS.NEUTRAL,
+        sight: { enabled: true },
+        texture: { src: image },
+        flags: { [FLAG_SCOPE]: { [WORLD_PIECE_KEY]: foundry.utils.deepClone(pieceData), [WORLD_CHARACTER_KEY]: foundry.utils.deepClone(characterData) } }
+      }
+    });
+
+    if (ownerUser) {
+      const ownership = foundry.utils.deepClone(actor.ownership || {});
+      for (const user of getPlayerUsers()) ownership[user.id] = CONST.DOCUMENT_OWNERSHIP_LEVELS.NONE;
+      ownership[ownerUser.id] = CONST.DOCUMENT_OWNERSHIP_LEVELS.OWNER;
+      await actor.update({ ownership });
+    }
+
+    const center = getDrawingCenter(entry);
+    const gridSize = getGridSize();
+    const tokenData = actor.prototypeToken.toObject();
+    tokenData.actorId = actor.id;
+    tokenData.actorLink = true;
+    tokenData.name = characterData.characterName;
+    tokenData.x = center.x - gridSize / 2;
+    tokenData.y = center.y - gridSize / 2;
+    tokenData.width = 1;
+    tokenData.height = 1;
+    tokenData.hidden = false;
+    tokenData.sight = tokenData.sight || {};
+    tokenData.sight.enabled = true;
+    tokenData.texture = tokenData.texture || {};
+    tokenData.texture.src = image;
+    tokenData.flags = tokenData.flags || {};
+    tokenData.flags[FLAG_SCOPE] = tokenData.flags[FLAG_SCOPE] || {};
+    tokenData.flags[FLAG_SCOPE][WORLD_PIECE_KEY] = foundry.utils.deepClone(pieceData);
+    tokenData.flags[FLAG_SCOPE][WORLD_CHARACTER_KEY] = foundry.utils.deepClone(characterData);
+    await canvas.scene.createEmbeddedDocuments("Token", [tokenData]);
+    return { actor, characterData, piece: pieceData };
+  }
+
+  async function createCharacter() {
+    if (!requireOverviewScene()) return;
+    if (!game.user.isGM) { ui.notifications.warn("Only the GM can create characters."); return; }
+    const selectedTile = canvas.drawings.controlled.find(drawing => Boolean(getWorldTile(drawing)));
+    const selectedEntry = selectedTile ? { drawing: selectedTile, tile: getWorldTile(selectedTile) } : getWorldTileEntries()[0];
+    if (!selectedEntry) { ui.notifications.warn("Create or assign at least one world tile first."); return; }
+    const blank = normalizeCharacterDetails({ landMovement: 3, navalMovement: 3, status: "Alive", visibility: "Owner+GM" });
+    const result = await new Promise(resolve => {
+      new Dialog({
+        title: "Create Character",
+        content: buildCharacterForm(blank, getTileId(selectedEntry)),
+        buttons: {
+          create: { label: "Create Character", callback: html => resolve(readCharacterForm(html, blank)) },
+          cancel: { label: "Cancel", callback: () => resolve(null) }
+        },
+        default: "create"
+      }, { width: 900, height: 760, resizable: true }).render(true);
+    });
+    if (!result) return;
+    const entry = getTileEntryByNameOrId(result.currentTileId);
+    if (!entry) { ui.notifications.error("Could not find selected destination tile."); return; }
+    const ownerUser = getUserFromCharacterDetails(result);
+    if (ownerUser) {
+      result.playerUserId = ownerUser.id;
+      result.playerName = ownerUser.name;
+      result.ownerType = "Player";
+      if (!result.visibility || result.visibility === "GM Only") result.visibility = "Owner+GM";
+    }
+    await spawnCharacterToken(result, entry, ownerUser);
+    ui.notifications.info(`Created character: ${result.characterName}.`);
+    await ChatMessage.create({ speaker: ChatMessage.getSpeaker({ alias: "Crown Characters" }), content: `<h2>Character Created</h2><p><strong>Name:</strong> ${escapeHtml(result.characterName)}</p><p><strong>House:</strong> ${escapeHtml(result.house || "None")}</p><p><strong>Location:</strong> ${escapeHtml(getTileName(entry))}</p><p><strong>Player:</strong> ${escapeHtml(ownerUser?.name || result.ownerType || "NPC")}</p>` });
+    revealForCurrentPlayerPieces();
+  }
+
+  async function editSelectedCharacter() {
+    if (!requireOverviewScene()) return;
+    if (!game.user.isGM) { ui.notifications.warn("Only the GM can edit characters."); return; }
+    const selected = canvas.tokens.controlled.filter(token => isCharacterToken(token));
+    if (selected.length !== 1) { ui.notifications.warn("Select exactly one character token to edit or assign."); return; }
+    const token = selected[0];
+    const existing = getCharacterDataFromToken(token);
+    const result = await new Promise(resolve => {
+      new Dialog({
+        title: "Edit / Assign Character",
+        content: buildCharacterForm(existing, existing.currentTileId),
+        buttons: {
+          save: { label: "Save Character", callback: html => resolve(readCharacterForm(html, existing)) },
+          cancel: { label: "Cancel", callback: () => resolve(null) }
+        },
+        default: "save"
+      }, { width: 900, height: 760, resizable: true }).render(true);
+    });
+    if (!result) return;
+    const entry = getTileEntryByNameOrId(result.currentTileId) || getCurrentTileEntryForToken(token, getWorldPiece(token));
+    if (!entry) { ui.notifications.error("Could not find selected destination tile."); return; }
+    const ownerUser = getUserFromCharacterDetails(result);
+    if (ownerUser) {
+      result.playerUserId = ownerUser.id;
+      result.playerName = ownerUser.name;
+      result.ownerType = "Player";
+    } else if (result.ownerType === "Player") {
+      result.ownerType = "NPC";
+    }
+    const saved = await saveCharacterFlags(token, result, entry, ownerUser);
+    const position = getTokenTopLeftForTileSlot(token, entry);
+    await token.document.update({ x: position.x, y: position.y }, { animate: false, worldMovementBypass: true, bypassWorldMovementWatcher: true, clickMoveBypass: true });
+    ui.notifications.info(`Updated character: ${saved.characterData.characterName}.`);
+    revealForCurrentPlayerPieces();
+  }
+
+  function characterRowFromToken(token) {
+    const data = getCharacterDataFromToken(token);
+    return {
+      ...data,
+      tokenName: token.document.name,
+      tokenImage: token.document.texture?.src || token.actor?.img || data.tokenImage || ""
+    };
+  }
+
+  async function exportCharacterCsv() {
+    if (!requireOverviewScene()) return;
+    if (!game.user.isGM) { ui.notifications.warn("Only the GM can export character CSVs."); return; }
+    const rows = getCharacterTokens().map(characterRowFromToken).sort((a, b) => String(a.playerName || a.ownerType || "").localeCompare(String(b.playerName || b.ownerType || "")) || String(a.characterSlot || "").localeCompare(String(b.characterSlot || "")) || String(a.characterName || "").localeCompare(String(b.characterName || "")));
+    if (!rows.length) { ui.notifications.warn("No character tokens were found on this scene."); return; }
+    let csv = "\uFEFF" + CHARACTER_CSV_COLUMNS.map(column => csvEscape(column[0])).join(",") + "\r\n";
+    for (const row of rows) csv += CHARACTER_CSV_COLUMNS.map(column => csvEscape(row[column[1]] ?? "")).join(",") + "\r\n";
+    const filename = `Crown_of_Ashes_${safeFilename(canvas.scene?.name || "World_Map")}_Characters.csv`;
+    saveDataToFile(csv, "text/csv;charset=utf-8", filename);
+    ui.notifications.info(`Exported ${rows.length} character(s).`);
+  }
+
+  async function importCharacterCsv() {
+    if (!requireOverviewScene()) return;
+    if (!game.user.isGM) { ui.notifications.warn("Only the GM can import character CSVs."); return; }
+    const file = await new Promise(resolve => {
+      const input = document.createElement("input");
+      input.type = "file";
+      input.accept = ".csv,text/csv";
+      input.addEventListener("change", () => resolve(input.files?.length ? input.files[0] : null));
+      input.click();
+    });
+    if (!file) { ui.notifications.warn("No CSV file selected."); return; }
+    let text = await file.text();
+    if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+    const csvRows = parseCSV(text);
+    if (csvRows.length < 2) { ui.notifications.error("This CSV contains no character rows."); return; }
+    const headers = csvRows[0].map(header => String(header).trim());
+    let created = 0, updated = 0, skipped = 0, failed = 0;
+    const existing = () => getCharacterTokens();
+
+    for (let i = 1; i < csvRows.length; i++) {
+      const row = csvRows[i];
+      const raw = {
+        characterId: characterCsvValue(row, headers, "Character ID", "character_id", "characterId"),
+        playerName: characterCsvValue(row, headers, "Player Name", "player_name", "playerName"),
+        playerUserId: characterCsvValue(row, headers, "Player User ID", "player_user_id", "playerUserId"),
+        ownerType: characterCsvValue(row, headers, "Owner Type", "owner_type", "ownerType"),
+        characterSlot: characterCsvValue(row, headers, "Character Slot", "character_slot", "characterSlot"),
+        characterRole: characterCsvValue(row, headers, "Character Role", "character_role", "characterRole"),
+        characterName: characterCsvValue(row, headers, "Character Name", "character_name", "characterName", "Name"),
+        house: characterCsvValue(row, headers, "House", "house"),
+        age: characterCsvValue(row, headers, "Age", "age"),
+        heightWeight: characterCsvValue(row, headers, "Height / Weight", "height_weight", "heightWeight"),
+        preferredWeapons: characterCsvValue(row, headers, "Preferred Weapons", "preferred_weapons", "preferredWeapons"),
+        marriage: characterCsvValue(row, headers, "Marriage", "marriage"),
+        issueChildren: characterCsvValue(row, headers, "Issue / Children", "issue_children", "issueChildren"),
+        currentTileName: characterCsvValue(row, headers, "Current Tile Name", "current_tile_name", "currentTileName"),
+        currentTileId: characterCsvValue(row, headers, "Current Tile ID", "current_tile_id", "currentTileId"),
+        currentRegion: characterCsvValue(row, headers, "Current Region", "current_region", "currentRegion"),
+        tokenName: characterCsvValue(row, headers, "Token Name", "token_name", "tokenName"),
+        tokenImage: characterCsvValue(row, headers, "Token Image", "token_image", "tokenImage"),
+        status: characterCsvValue(row, headers, "Status", "status"),
+        visibility: characterCsvValue(row, headers, "Visibility", "visibility"),
+        traits: characterCsvValue(row, headers, "Traits", "traits"),
+        quirks: characterCsvValue(row, headers, "Quirks", "quirks"),
+        publicNotes: characterCsvValue(row, headers, "Public Notes", "public_notes", "publicNotes"),
+        gmNotes: characterCsvValue(row, headers, "GM Notes", "gm_notes", "gmNotes")
+      };
+      for (const key of CHARACTER_STAT_KEYS) raw[key] = characterCsvValue(row, headers, titleCase(key), key);
+      raw.marriageDiplomacy = characterCsvValue(row, headers, "Marriage Diplomacy", "marriage_diplomacy", "marriageDiplomacy");
+      raw.navalMovement = characterCsvValue(row, headers, "Naval Movement", "naval_movement", "navalMovement");
+      raw.landMovement = characterCsvValue(row, headers, "Land Movement", "land_movement", "landMovement");
+      raw.wounds = characterCsvValue(row, headers, "Wounds", "wounds");
+      raw.fertility = characterCsvValue(row, headers, "Fertility", "fertility");
+      raw.commandPoints = characterCsvValue(row, headers, "Command Points", "command_points", "commandPoints");
+      raw.favouredWeaponBonus = characterCsvValue(row, headers, "Favoured Weapon Bonus", "favoured_weapon_bonus", "favouredWeaponBonus");
+
+      const details = normalizeCharacterDetails(raw);
+      if (!details.characterName) { skipped++; continue; }
+      const entry = getTileEntryByNameOrId(details.currentTileId) || getTileEntryByNameOrId(details.currentTileName);
+      if (!entry) { failed++; console.warn("Character import row has no matching tile:", i + 1, details); continue; }
+      const ownerUser = getUserFromCharacterDetails(details);
+      if (ownerUser) { details.playerUserId = ownerUser.id; details.playerName = ownerUser.name; details.ownerType = "Player"; }
+      const match = existing().find(token => {
+        const data = getCharacterDataFromToken(token);
+        return (details.characterId && String(data.characterId) === String(details.characterId)) || normalize(data.characterName) === normalize(details.characterName);
+      });
+      try {
+        if (match) {
+          await saveCharacterFlags(match, details, entry, ownerUser);
+          const position = getTokenTopLeftForTileSlot(match, entry);
+          await match.document.update({ x: position.x, y: position.y }, { animate: false, worldMovementBypass: true, bypassWorldMovementWatcher: true, clickMoveBypass: true });
+          updated++;
+        } else {
+          await spawnCharacterToken(details, entry, ownerUser);
+          created++;
+        }
+      } catch (err) {
+        failed++;
+        console.error("Character import failed on row", i + 1, err);
+      }
+    }
+    ui.notifications.info(`Character import complete — ${created} created, ${updated} updated, ${skipped} skipped, ${failed} failed.`);
+    await ChatMessage.create({ speaker: ChatMessage.getSpeaker({ alias: "Crown Characters" }), content: `<h2>Character CSV Import</h2><p><strong>Created:</strong> ${escapeHtml(created)}</p><p><strong>Updated:</strong> ${escapeHtml(updated)}</p><p><strong>Skipped:</strong> ${escapeHtml(skipped)}</p><p><strong>Failed:</strong> ${escapeHtml(failed)}</p>` });
+    revealForCurrentPlayerPieces();
+  }
+
+  function getDiplomacyValue(piece = {}, character = {}) {
+    const value = numberOrBlank(character.diplomacy ?? character.stats?.diplomacy ?? piece.diplomacy ?? piece.stats?.diplomacy);
+    return value === "" ? 0 : Number(value);
+  }
+
+  function findDefenderCharacterForTile(entry, attackerToken, actingUserId) {
+    const tileId = getTileId(entry);
+    const candidates = getCharacterTokens().filter(token => {
+      if (token.document.id === attackerToken.document.id) return false;
+      const piece = getWorldPiece(token) || {};
+      const character = getCharacterDataFromToken(token);
+      const sameTile = String(character.currentTileId || piece.currentTileId || "") === String(tileId || "") || getCurrentTileEntryForToken(token, piece)?.tile?.id === tileId;
+      if (!sameTile) return false;
+      if (actingUserId && String(character.playerUserId || piece.playerOwnerUserId || piece.ownerUserId || "") === String(actingUserId)) return false;
+      return true;
+    });
+    candidates.sort((a, b) => getDiplomacyValue(getWorldPiece(b), getCharacterDataFromToken(b)) - getDiplomacyValue(getWorldPiece(a), getCharacterDataFromToken(a)));
+    return candidates[0] || null;
+  }
+
+  async function applyDiplomaticTakeover({ token, piece, entry, actingUserId, actingUserName }) {
+    if (!token || !piece || !entry) throw new Error("Diplomatic takeover needs one character token on a world tile.");
+    const actingUser = game.users.get(actingUserId) || { id: actingUserId, name: actingUserName, isGM: false };
+    if (!canUserControlWorldPieceForUser(token, piece, actingUser)) throw new Error(`${actingUserName} does not control ${piece.name || token.document.name}.`);
+    if (normalize(piece.pieceType) !== "character") throw new Error("Diplomatic Takeover must be attempted with a character token.");
+
+    const character = getCharacterDataFromToken(token);
+    const worldTile = foundry.utils.deepClone(entry.tile);
+    const house = foundry.utils.deepClone(entry.drawing.document.getFlag(FLAG_SCOPE, HOUSE_KEY) || {});
+    const currentOwnerId = getTileOwnerUserId(worldTile, house);
+    if (currentOwnerId && String(currentOwnerId) === String(actingUserId)) throw new Error(`${getTileName(entry)} is already owned by ${actingUserName}.`);
+
+    const defenderToken = findDefenderCharacterForTile(entry, token, actingUserId);
+    const defenderPiece = defenderToken ? getWorldPiece(defenderToken) : null;
+    const defenderCharacter = defenderToken ? getCharacterDataFromToken(defenderToken) : null;
+    const defenderName = defenderCharacter?.characterName || house.npcDefenderName || house.lord || `${getTileName(entry)} NPC Defender`;
+    const attackerDiplomacy = getDiplomacyValue(piece, character);
+    const defenderDiplomacy = defenderToken ? getDiplomacyValue(defenderPiece, defenderCharacter) : Number(house.npcDiplomacy ?? worldTile.npcDiplomacy ?? 5);
+    const success = attackerDiplomacy > defenderDiplomacy;
+    const ownerUser = game.users.get(actingUserId) || null;
+    const now = new Date().toISOString();
+
+    if (success) {
+      worldTile.owner = character.house || piece.faction || ownerUser?.name || actingUserName || "Player";
+      worldTile.ownerUserId = ownerUser?.id || actingUserId || "";
+      worldTile.ownerUserName = ownerUser?.name || actingUserName || "";
+      worldTile.playerOwnerUserId = ownerUser?.id || actingUserId || "";
+      worldTile.playerOwnerUserName = ownerUser?.name || actingUserName || "";
+      house.house = character.house || piece.faction || house.house || worldTile.owner;
+      house.lord = character.characterName || piece.name || token.document.name;
+      house.ownerUserId = worldTile.ownerUserId;
+      house.ownerUserName = worldTile.ownerUserName;
+      house.playerOwnerUserId = worldTile.playerOwnerUserId;
+      house.playerOwnerUserName = worldTile.playerOwnerUserName;
+      house.lastDiplomaticTakeover = { success: true, attackerCharacterId: character.characterId, attackerName: character.characterName, attackerDiplomacy, defenderName, defenderDiplomacy, userId: actingUserId, userName: actingUserName, at: now };
+    } else {
+      if (!worldTile.owner) worldTile.owner = "NPC";
+      if (!house.house) house.house = "NPC";
+      house.npcDefenderName = defenderName;
+      house.lord = house.lord || defenderName;
+      house.lastDiplomaticTakeover = { success: false, attackerCharacterId: character.characterId, attackerName: character.characterName, attackerDiplomacy, defenderName, defenderDiplomacy, userId: actingUserId, userName: actingUserName, at: now };
+    }
+    worldTile.updatedAt = now;
+    worldTile.updatedBy = game.user.name;
+    house.updatedAt = now;
+    house.updatedBy = game.user.name;
+    await entry.drawing.document.setFlag(FLAG_SCOPE, WORLD_TILE_KEY, worldTile);
+    await entry.drawing.document.setFlag(FLAG_SCOPE, HOUSE_KEY, house);
+
+    const publicContent = success
+      ? `<h2>Diplomatic Takeover</h2><p><strong>${escapeHtml(character.characterName || piece.name)}</strong> has diplomatically taken control of <strong>${escapeHtml(getTileName(entry))}</strong>.</p><p><strong>New owner:</strong> ${escapeHtml(ownerUser?.name || actingUserName || "Player")}</p>`
+      : `<h2>Diplomatic Takeover Failed</h2><p><strong>${escapeHtml(character.characterName || piece.name)}</strong> failed to diplomatically take control of <strong>${escapeHtml(getTileName(entry))}</strong>.</p><p>The tile remains under <strong>${escapeHtml(house.house || worldTile.owner || "NPC")}</strong> control.</p>`;
+    await ChatMessage.create({ speaker: ChatMessage.getSpeaker({ alias: "Crown Diplomacy" }), content: publicContent });
+    const gmUsers = game.users.contents.filter(user => user.isGM).map(user => user.id);
+    if (gmUsers.length) {
+      await ChatMessage.create({ speaker: ChatMessage.getSpeaker({ alias: "Crown Diplomacy GM" }), whisper: gmUsers, content: `<h2>Diplomacy Check — GM Details</h2><p><strong>Attacker:</strong> ${escapeHtml(character.characterName || piece.name)} — Diplomacy ${escapeHtml(attackerDiplomacy)}</p><p><strong>Defender:</strong> ${escapeHtml(defenderName)} — Diplomacy ${escapeHtml(defenderDiplomacy)}</p><p><strong>Result:</strong> ${success ? "Success" : "Failure"}</p>` });
+    }
+    revealForCurrentPlayerPieces();
+    return success;
+  }
+
+  async function requestGmDiplomacy({ token, piece, entry }) {
+    const gm = findActiveGmForScene(canvas.scene?.id);
+    if (!gm) { ui.notifications.warn("No active GM online to resolve the diplomatic takeover."); return false; }
+    game.socket.emit(SOCKET_NAME, {
+      type: "diplomacyRequest",
+      targetGmId: gm.id,
+      sceneId: canvas.scene?.id,
+      requesterUserId: game.user.id,
+      requesterUserName: game.user.name,
+      tokenId: token.document.id,
+      tokenName: token.document.name,
+      drawingId: entry.drawing.document.id,
+      tileId: getTileId(entry),
+      tileName: getTileName(entry)
+    });
+    ui.notifications.info(`Diplomatic takeover request sent to GM ${gm.name}.`);
+    return true;
+  }
+
+  async function diplomaticTakeover() {
+    if (!requireOverviewScene()) return;
+    const selected = canvas.tokens.controlled.filter(token => isCharacterToken(token));
+    if (selected.length !== 1) { ui.notifications.warn("Select exactly one character token on the target tile."); return; }
+    const token = selected[0];
+    const piece = getWorldPiece(token);
+    if (!piece) { ui.notifications.warn("Selected character is missing world-piece data."); return; }
+    if (!canUserControlWorldPiece(token, piece)) { ui.notifications.warn("You can only attempt diplomacy with a character you control."); return; }
+    const entry = getCurrentTileEntryForToken(token, piece);
+    if (!entry) { ui.notifications.warn("The selected character is not currently inside a world tile."); return; }
+    const confirmed = await Dialog.confirm({ title: "Diplomatic Takeover", content: `<p>Attempt to diplomatically take over <strong>${escapeHtml(getTileName(entry))}</strong> using <strong>${escapeHtml(piece.name || token.document.name)}</strong>?</p><p class="notes">Players will not see hidden NPC stats. The GM receives the exact comparison.</p>`, yes: () => true, no: () => false, defaultYes: true });
+    if (!confirmed) return;
+    if (!game.user.isGM) { await requestGmDiplomacy({ token, piece, entry }); return; }
+    try {
+      await applyDiplomaticTakeover({ token, piece, entry, actingUserId: game.user.id, actingUserName: game.user.name });
+    } catch (err) {
+      ui.notifications.error(err.message || "Diplomatic takeover failed.");
+      console.error(err);
+    }
+  }
+
+  async function handleDiplomacyRequest(message) {
+    if (!game.user.isGM) return;
+    if (message.targetGmId && String(message.targetGmId) !== String(game.user.id)) return;
+    if (message.sceneId && String(message.sceneId) !== String(canvas.scene?.id)) return;
+    const token = canvas.tokens.placeables.find(token => token.document.id === message.tokenId);
+    if (!token) { ui.notifications.warn(`Diplomacy request failed: token ${message.tokenName || message.tokenId} not found.`); return; }
+    const piece = getWorldPiece(token);
+    const entry = getCurrentTileEntryForToken(token, piece);
+    try {
+      await applyDiplomaticTakeover({ token, piece, entry, actingUserId: message.requesterUserId, actingUserName: message.requesterUserName });
+      ui.notifications.info(`Resolved diplomacy request from ${message.requesterUserName}.`);
+    } catch (err) {
+      ui.notifications.error(err.message || "Diplomacy request failed.");
+      console.error("Diplomacy request failed", err);
+    }
   }
 
   async function assignPieceOwner() {
@@ -4720,8 +5546,15 @@
   function registerSocketHandlers() {
     if (!game.socket) return;
     game.socket.on(SOCKET_NAME, async message => {
-      if (!message || message.type !== "buildRequest") return;
-      await handleBuildRequest(message);
+      if (!message) return;
+      if (message.type === "buildRequest") {
+        await handleBuildRequest(message);
+        return;
+      }
+      if (message.type === "diplomacyRequest") {
+        await handleDiplomacyRequest(message);
+        return;
+      }
     });
   }
 
@@ -6319,12 +7152,17 @@
     portCrossing,
     buildOnCurrentTile,
     showHoldings,
+    diplomaticTakeover,
     resetMovement,
     resetBuildCapacity,
     repairBuildLocks,
     processPendingBuilds,
     roundClock,
     createPiece: createWorldPiece,
+    createCharacter,
+    editSelectedCharacter,
+    importCharacterCsv,
+    exportCharacterCsv,
     linkTiles,
     unlinkTiles,
     viewLinks,
