@@ -1,8 +1,8 @@
 {
   "id": "crown-overview-tools",
   "title": "Crown Overview Tools",
-  "description": "Scene-gated strategic overview map tools for Crown of Ashes. v0.4.3 adds character creation/editing, character CSV import/export, diplomatic takeover, and a reordered player/GM panel while keeping v0.4.2 building/economy systems.",
-  "version": "0.4.3",
+  "description": "Scene-gated strategic overview map tools for Crown of Ashes. v0.4.4 adds tile ownership CSV import/export, d20 diplomacy with culture/religion/allegiance modifiers, marriage-protection blocks, summonable character-linked armies, and quick siege/storm resolution.",
+  "version": "0.4.4",
   "authors": [
     {
       "name": "Beyond Fandome"
@@ -20,6 +20,6 @@
   ],
   "url": "https://github.com/beyondfandome/crown-overview-tools",
   "manifest": "https://raw.githubusercontent.com/beyondfandome/crown-overview-tools/main/module.json",
-  "download": "https://github.com/beyondfandome/crown-overview-tools/releases/download/v0.4.3/crown-overview-tools-v0.4.3.zip",
+  "download": "https://github.com/beyondfandome/crown-overview-tools/releases/download/v0.4.4/crown-overview-tools-v0.4.4.zip",
   "socket": true
 }

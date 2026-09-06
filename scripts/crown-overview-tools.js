@@ -1,6 +1,6 @@
 (() => {
   const MODULE_ID = "crown-overview-tools";
-  const MODULE_VERSION = "0.4.3";
+  const MODULE_VERSION = "0.4.4";
   const FLAG_SCOPE = "world";
   const WORLD_TILE_KEY = "worldTile";
   const WORLD_PIECE_KEY = "worldPiece";
@@ -50,6 +50,8 @@
     ["Character Role", "characterRole"],
     ["Character Name", "characterName"],
     ["House", "house"],
+    ["Culture", "culture"],
+    ["Religion", "religion"],
     ["Age", "age"],
     ["Height / Weight", "heightWeight"],
     ["Preferred Weapons", "preferredWeapons"],
@@ -80,6 +82,54 @@
     ["Public Notes", "publicNotes"],
     ["GM Notes", "gmNotes"]
   ];
+
+  const TILE_OWNERSHIP_CSV_COLUMNS = [
+    ["Tile Name", "tileName"],
+    ["Tile ID", "tileId"],
+    ["Drawing ID", "drawingId"],
+    ["Region", "region"],
+    ["Tile Type", "tileType"],
+    ["Ownership Type", "ownershipType"],
+    ["Controller Player Name", "controllerPlayerName"],
+    ["Controller Player User ID", "controllerPlayerUserId"],
+    ["House", "house"],
+    ["Ruler", "ruler"],
+    ["Ruling Character ID", "rulingCharacterId"],
+    ["Culture", "culture"],
+    ["Religion", "religion"],
+    ["Sworn To Type", "swornToType"],
+    ["Sworn To Player Name", "swornToPlayerName"],
+    ["Sworn To Player User ID", "swornToPlayerUserId"],
+    ["Marriage Protected", "marriageProtected"],
+    ["Marriage Protected Player Name", "marriageProtectedPlayerName"],
+    ["Marriage Protected Player User ID", "marriageProtectedPlayerUserId"],
+    ["Ruler Diplomacy", "rulerDiplomacy"],
+    ["NPC Defender Diplomacy", "npcDefenderDiplomacy"],
+    ["Diplomatic Takeover Allowed", "diplomaticTakeoverAllowed"],
+    ["Public Owner Label", "publicOwnerLabel"],
+    ["Ownership Notes", "ownershipNotes"]
+  ];
+
+  const ARMY_TROOP_TYPES = [
+    { key: "Mob", label: "Mob", gold: 1, food: 1 },
+    { key: "Light Infantry", label: "Light Infantry", gold: 1, food: 2 },
+    { key: "Spearmen", label: "Spearmen", gold: 1, food: 2 },
+    { key: "Archers", label: "Archers", gold: 2, food: 2 },
+    { key: "Heavy Infantry", label: "Heavy Infantry", gold: 3, food: 2 },
+    { key: "Pikemen", label: "Pikemen", gold: 3, food: 2 },
+    { key: "Crossbowmen", label: "Crossbowmen", gold: 3, food: 2 },
+    { key: "Light Cavalry", label: "Light Cavalry", gold: 3, food: 3 },
+    { key: "Lancers", label: "Lancers", gold: 4, food: 3 },
+    { key: "Heavy Cavalry", label: "Heavy Cavalry", gold: 5, food: 4 }
+  ];
+
+  const SIEGE_DC_TABLE = {
+    ruin: [15, 20, 25, 30],
+    hamlet: [25, 30, 35, 40],
+    village: [35, 40, 45, 50],
+    town: [45, 50, 55, 60],
+    city: [55, 60, 65, 70]
+  };
 
   const ROUND_ORDER = [
     { season: "Spring", round: 1 },
@@ -1755,6 +1805,17 @@
         <button data-coa-action="exportCharacterCsv">Export Character CSV</button>
       </div>
       <div class="coa-panel-section coa-panel-gm-section">
+        <div class="coa-panel-section-title">GM: Armies</div>
+        <button data-coa-action="processArmyMusters">Process Army Musters</button>
+        <button data-coa-action="editSelectedArmy">Edit Selected Army</button>
+        <button data-coa-action="dismissSelectedArmy">Dismiss Selected Army</button>
+      </div>
+      <div class="coa-panel-section coa-panel-gm-section">
+        <div class="coa-panel-section-title">GM: Tile Ownership</div>
+        <button data-coa-action="importTileOwnershipCsv">Import Tile Ownership CSV</button>
+        <button data-coa-action="exportTileOwnershipCsv">Export Tile Ownership CSV</button>
+      </div>
+      <div class="coa-panel-section coa-panel-gm-section">
         <div class="coa-panel-section-title">GM: World Pieces</div>
         <button data-coa-action="createPiece">Create World Piece</button>
         <button data-coa-action="editWorldPiece">Edit World Piece</button>
@@ -1796,7 +1857,9 @@
       <div class="coa-panel-section coa-panel-player-section">
         <div class="coa-panel-section-title">Player Actions</div>
         <button data-coa-action="pathMove">Move Piece</button>
+        <button data-coa-action="summonArmy">Summon Army</button>
         <button data-coa-action="diplomaticTakeover">Diplomatic Takeover</button>
+        <button data-coa-action="siegeStorm">Siege / Storm</button>
         <button data-coa-action="buildOnCurrentTile">Build / Upgrade</button>
         <button data-coa-action="showHoldings">My Holdings</button>
         <button data-coa-action="portCrossing">Port Crossing</button>
@@ -2834,6 +2897,7 @@
 
       await saveWorldPiece(token, currentPiece);
       await token.document.update({ x: position.x, y: position.y }, { animate: true, worldMovementBypass: true, bypassWorldMovementWatcher: true, clickMoveBypass: true });
+      await moveLinkedArmyToCharacter(token, currentPiece, entry);
 
       if (pauseMs > 0) await new Promise(resolve => setTimeout(resolve, pauseMs));
     }
@@ -3221,6 +3285,8 @@
       characterRole: String(details.characterRole || "").trim(),
       characterName,
       house: String(details.house || "").trim(),
+      culture: String(details.culture || "").trim(),
+      religion: String(details.religion || "").trim(),
       age: String(details.age || "").trim(),
       heightWeight: String(details.heightWeight || "").trim(),
       preferredWeapons: String(details.preferredWeapons || "").trim(),
@@ -3270,6 +3336,10 @@
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
         <div class="form-group"><label>Character Name</label><input type="text" name="characterName" value="${escapeHtml(details.characterName || "")}" style="width:100%;" /></div>
         <div class="form-group"><label>House</label><input type="text" name="house" value="${escapeHtml(details.house || "")}" style="width:100%;" /></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div class="form-group"><label>Culture</label><input type="text" name="culture" value="${escapeHtml(details.culture || "")}" placeholder="Andal, First Men, Ironborn..." style="width:100%;" /></div>
+        <div class="form-group"><label>Religion</label><input type="text" name="religion" value="${escapeHtml(details.religion || "")}" placeholder="Faith of the Seven, Old Gods..." style="width:100%;" /></div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
         <div class="form-group"><label>Player Owner / Controller</label><select name="playerUserId" style="width:100%;">${ownerOptions}</select></div>
@@ -3324,6 +3394,8 @@
       characterRole: get("characterRole"),
       characterName: get("characterName"),
       house: get("house"),
+      culture: get("culture"),
+      religion: get("religion"),
       age: get("age"),
       heightWeight: get("heightWeight"),
       preferredWeapons: get("preferredWeapons"),
@@ -3369,6 +3441,8 @@
       pieceType: "character",
       faction: characterData.house,
       house: characterData.house,
+      culture: characterData.culture,
+      religion: characterData.religion,
       ownerType: characterData.ownerType,
       characterSlot: characterData.characterSlot,
       characterRole: characterData.characterRole,
@@ -3439,6 +3513,8 @@
       pieceType: "character",
       faction: characterData.house,
       house: characterData.house,
+      culture: characterData.culture,
+      religion: characterData.religion,
       ownerType: characterData.ownerType,
       characterSlot: characterData.characterSlot,
       characterRole: characterData.characterRole,
@@ -3591,8 +3667,16 @@
 
   function characterRowFromToken(token) {
     const data = getCharacterDataFromToken(token);
+    const piece = getWorldPiece(token) || {};
+    const entry = getCurrentTileEntryForToken(token, piece);
+    const currentTileId = entry ? getTileId(entry) : (data.currentTileId || piece.currentTileId || "");
+    const currentTileName = entry ? getTileName(entry) : (data.currentTileName || piece.currentTileName || "");
+    const currentRegion = entry ? (entry.tile?.region || "") : (data.currentRegion || piece.currentRegion || "");
     return {
       ...data,
+      currentTileId,
+      currentTileName,
+      currentRegion,
       tokenName: token.document.name,
       tokenImage: token.document.texture?.src || token.actor?.img || data.tokenImage || ""
     };
@@ -3640,6 +3724,8 @@
         characterRole: characterCsvValue(row, headers, "Character Role", "character_role", "characterRole"),
         characterName: characterCsvValue(row, headers, "Character Name", "character_name", "characterName", "Name"),
         house: characterCsvValue(row, headers, "House", "house"),
+        culture: characterCsvValue(row, headers, "Culture", "culture"),
+        religion: characterCsvValue(row, headers, "Religion", "religion"),
         age: characterCsvValue(row, headers, "Age", "age"),
         heightWeight: characterCsvValue(row, headers, "Height / Weight", "height_weight", "heightWeight"),
         preferredWeapons: characterCsvValue(row, headers, "Preferred Weapons", "preferred_weapons", "preferredWeapons"),
@@ -3668,21 +3754,27 @@
 
       const details = normalizeCharacterDetails(raw);
       if (!details.characterName) { skipped++; continue; }
-      const entry = getTileEntryByNameOrId(details.currentTileId) || getTileEntryByNameOrId(details.currentTileName);
-      if (!entry) { failed++; console.warn("Character import row has no matching tile:", i + 1, details); continue; }
+      const requestedEntry = getTileEntryByNameOrId(details.currentTileId) || getTileEntryByNameOrId(details.currentTileName);
+      const hasRequestedLocation = Boolean(String(details.currentTileId || details.currentTileName || "").trim());
       const ownerUser = getUserFromCharacterDetails(details);
       if (ownerUser) { details.playerUserId = ownerUser.id; details.playerName = ownerUser.name; details.ownerType = "Player"; }
       const match = existing().find(token => {
         const data = getCharacterDataFromToken(token);
-        return (details.characterId && String(data.characterId) === String(details.characterId)) || normalize(data.characterName) === normalize(details.characterName);
+        return (details.characterId && String(data.characterId) === String(details.characterId)) || (details.playerName && data.playerName && normalize(data.playerName) === normalize(details.playerName) && normalize(data.characterName) === normalize(details.characterName)) || normalize(data.characterName) === normalize(details.characterName);
       });
       try {
         if (match) {
-          await saveCharacterFlags(match, details, entry, ownerUser);
-          const position = getTokenTopLeftForTileSlot(match, entry);
-          await match.document.update({ x: position.x, y: position.y }, { animate: false, worldMovementBypass: true, bypassWorldMovementWatcher: true, clickMoveBypass: true });
+          const entry = requestedEntry || getCurrentTileEntryForToken(match, getWorldPiece(match));
+          if (!entry && hasRequestedLocation) { failed++; console.warn("Character import row has no matching requested tile:", i + 1, details); continue; }
+          await saveCharacterFlags(match, details, requestedEntry ? requestedEntry : null, ownerUser);
+          if (requestedEntry) {
+            const position = getTokenTopLeftForTileSlot(match, requestedEntry);
+            await match.document.update({ x: position.x, y: position.y }, { animate: false, worldMovementBypass: true, bypassWorldMovementWatcher: true, clickMoveBypass: true });
+          }
           updated++;
         } else {
+          const entry = requestedEntry;
+          if (!entry) { failed++; console.warn("New character import row has no matching tile:", i + 1, details); continue; }
           await spawnCharacterToken(details, entry, ownerUser);
           created++;
         }
@@ -3693,6 +3785,802 @@
     }
     ui.notifications.info(`Character import complete — ${created} created, ${updated} updated, ${skipped} skipped, ${failed} failed.`);
     await ChatMessage.create({ speaker: ChatMessage.getSpeaker({ alias: "Crown Characters" }), content: `<h2>Character CSV Import</h2><p><strong>Created:</strong> ${escapeHtml(created)}</p><p><strong>Updated:</strong> ${escapeHtml(updated)}</p><p><strong>Skipped:</strong> ${escapeHtml(skipped)}</p><p><strong>Failed:</strong> ${escapeHtml(failed)}</p>` });
+    revealForCurrentPlayerPieces();
+  }
+
+  function csvBoolean(value, defaultValue = false) {
+    const text = normalize(value);
+    if (!text) return Boolean(defaultValue);
+    if (["yes", "true", "1", "y", "on", "protected", "blocked"].includes(text)) return true;
+    if (["no", "false", "0", "n", "off", "none", "unprotected", "allowed"].includes(text)) return false;
+    return Boolean(defaultValue);
+  }
+
+  function getCsvValue(row, headers, ...names) {
+    return characterCsvValue(row, headers, ...names);
+  }
+
+  function getUserByIdOrName(id, name) {
+    const userId = String(id || "").trim();
+    if (userId && game.users.get(userId)) return game.users.get(userId);
+    const userName = normalize(name || "");
+    if (!userName) return null;
+    return game.users.contents.find(user => normalize(user.name) === userName) || null;
+  }
+
+  function inferOwnershipType(worldTile = {}, house = {}) {
+    const explicit = String(house.ownershipType || worldTile.ownershipType || "").trim();
+    if (explicit) return explicit;
+    if (getTileType(worldTile) === "sea" || isSeaByTile(worldTile)) return "None";
+    if (getTileOwnerUserId(worldTile, house) || getTileOwnerUserName(worldTile, house)) return "Player";
+    const houseName = normalize(house.house || worldTile.owner || "");
+    if (!houseName || houseName === "none") return "None";
+    if (houseName === "neutral" || houseName === "npc") return "NPC";
+    return "NPC";
+  }
+
+  function tileOwnershipRowFromEntry(entry) {
+    const worldTile = entry.tile || {};
+    const house = getHouseData(entry.drawing) || {};
+    const tileType = getTileType(worldTile);
+    const ownershipType = inferOwnershipType(worldTile, house);
+    const controllerName = getTileOwnerUserName(worldTile, house);
+    const controllerId = getTileOwnerUserId(worldTile, house);
+    const ruler = house.lord || house.ruler || worldTile.ruler || "";
+    const npcDiplomacy = house.npcDefenderDiplomacy ?? house.npcDiplomacy ?? worldTile.npcDefenderDiplomacy ?? worldTile.npcDiplomacy ?? "";
+    return {
+      tileName: getTileName(entry),
+      tileId: getTileId(entry),
+      drawingId: entry.drawing.document.id,
+      region: house.region || worldTile.region || "",
+      tileType,
+      ownershipType,
+      controllerPlayerName: controllerName,
+      controllerPlayerUserId: controllerId,
+      house: house.house || worldTile.owner || "",
+      ruler,
+      rulingCharacterId: house.rulingCharacterId || worldTile.rulingCharacterId || "",
+      culture: house.culture || worldTile.culture || "",
+      religion: house.religion || worldTile.religion || "",
+      swornToType: house.swornToType || worldTile.swornToType || (controllerId ? "Player" : ownershipType === "NPC" ? "NPC" : ""),
+      swornToPlayerName: house.swornToPlayerName || worldTile.swornToPlayerName || controllerName,
+      swornToPlayerUserId: house.swornToPlayerUserId || worldTile.swornToPlayerUserId || controllerId,
+      marriageProtected: csvBoolean(house.marriageProtected ?? worldTile.marriageProtected, false) ? "Yes" : "No",
+      marriageProtectedPlayerName: house.marriageProtectedPlayerName || worldTile.marriageProtectedPlayerName || "",
+      marriageProtectedPlayerUserId: house.marriageProtectedPlayerUserId || worldTile.marriageProtectedPlayerUserId || "",
+      rulerDiplomacy: house.rulerDiplomacy ?? worldTile.rulerDiplomacy ?? "",
+      npcDefenderDiplomacy: npcDiplomacy,
+      diplomaticTakeoverAllowed: csvBoolean(house.diplomaticTakeoverAllowed ?? worldTile.diplomaticTakeoverAllowed, tileType !== "sea") ? "Yes" : "No",
+      publicOwnerLabel: house.publicOwnerLabel || worldTile.publicOwnerLabel || controllerName || house.house || "",
+      ownershipNotes: house.ownershipNotes || worldTile.ownershipNotes || ""
+    };
+  }
+
+  async function exportTileOwnershipCsv() {
+    if (!requireOverviewScene()) return;
+    if (!game.user.isGM) { ui.notifications.warn("Only the GM can export tile ownership CSVs."); return; }
+    const rows = getWorldTileEntries()
+      .map(tileOwnershipRowFromEntry)
+      .sort((a, b) => String(a.region || "").localeCompare(String(b.region || "")) || String(a.tileName || "").localeCompare(String(b.tileName || "")));
+    let csv = "\uFEFF" + TILE_OWNERSHIP_CSV_COLUMNS.map(column => csvEscape(column[0])).join(",") + "\r\n";
+    for (const row of rows) csv += TILE_OWNERSHIP_CSV_COLUMNS.map(column => csvEscape(row[column[1]] ?? "")).join(",") + "\r\n";
+    const filename = `Crown_of_Ashes_${safeFilename(canvas.scene?.name || "World_Map")}_Tile_Ownership.csv`;
+    saveDataToFile(csv, "text/csv;charset=utf-8", filename);
+    ui.notifications.info(`Exported ${rows.length} tile ownership row(s).`);
+  }
+
+  function tileOwnershipDetailsFromCsvRow(row, headers) {
+    const detail = {};
+    for (const [label, key] of TILE_OWNERSHIP_CSV_COLUMNS) detail[key] = getCsvValue(row, headers, label, key);
+    detail.controllerPlayerName ||= getCsvValue(row, headers, "Player Owner", "Owner User Name", "World Tile Owner");
+    detail.controllerPlayerUserId ||= getCsvValue(row, headers, "Player Owner User ID", "Owner User ID", "playerOwnerUserId");
+    detail.ruler ||= getCsvValue(row, headers, "Lord / Ruler", "Ruler", "lord");
+    detail.tileName ||= getCsvValue(row, headers, "Province / Tile", "Tile", "Name");
+    return detail;
+  }
+
+  async function importTileOwnershipCsv() {
+    if (!requireOverviewScene()) return;
+    if (!game.user.isGM) { ui.notifications.warn("Only the GM can import tile ownership CSVs."); return; }
+    const file = await new Promise(resolve => {
+      const input = document.createElement("input");
+      input.type = "file";
+      input.accept = ".csv,text/csv";
+      input.addEventListener("change", () => resolve(input.files?.length ? input.files[0] : null));
+      input.click();
+    });
+    if (!file) { ui.notifications.warn("No CSV file selected."); return; }
+    let text = await file.text();
+    if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+    const csvRows = parseCSV(text);
+    if (csvRows.length < 2) { ui.notifications.error("This CSV contains no tile ownership rows."); return; }
+    const headers = csvRows[0].map(header => String(header).trim());
+    let updated = 0, skipped = 0, failed = 0;
+
+    for (let i = 1; i < csvRows.length; i++) {
+      const row = csvRows[i];
+      if (!row.some(cell => String(cell || "").trim())) { skipped++; continue; }
+      const details = tileOwnershipDetailsFromCsvRow(row, headers);
+      const entry = getTileEntryByNameOrId(details.tileId) || getTileEntryByNameOrId(details.drawingId) || getTileEntryByNameOrId(details.tileName);
+      if (!entry) { failed++; console.warn("Tile ownership import row has no matching tile:", i + 1, details); continue; }
+      try {
+        const worldTile = foundry.utils.deepClone(entry.tile || {});
+        const house = foundry.utils.deepClone(getHouseData(entry.drawing) || {});
+        const ownershipType = String(details.ownershipType || inferOwnershipType(worldTile, house)).trim() || "NPC";
+        const controllerUser = getUserByIdOrName(details.controllerPlayerUserId, details.controllerPlayerName);
+        const controllerId = controllerUser?.id || String(details.controllerPlayerUserId || "").trim();
+        const controllerName = controllerUser?.name || String(details.controllerPlayerName || "").trim();
+        const isPlayer = normalize(ownershipType) === "player";
+
+        worldTile.name = worldTile.name || details.tileName || entry.drawing.document.name;
+        worldTile.region = String(details.region || worldTile.region || "").trim();
+        worldTile.tileType = String(details.tileType || worldTile.tileType || getTileType(worldTile)).trim();
+        worldTile.ownershipType = ownershipType;
+        worldTile.culture = String(details.culture || "").trim();
+        worldTile.religion = String(details.religion || "").trim();
+        worldTile.rulingCharacterId = String(details.rulingCharacterId || "").trim();
+        worldTile.swornToType = String(details.swornToType || (isPlayer ? "Player" : ownershipType)).trim();
+        worldTile.swornToPlayerName = String(details.swornToPlayerName || (isPlayer ? controllerName : "")).trim();
+        worldTile.swornToPlayerUserId = String(details.swornToPlayerUserId || (isPlayer ? controllerId : "")).trim();
+        worldTile.marriageProtected = csvBoolean(details.marriageProtected, false);
+        worldTile.marriageProtectedPlayerName = String(details.marriageProtectedPlayerName || "").trim();
+        worldTile.marriageProtectedPlayerUserId = String(details.marriageProtectedPlayerUserId || "").trim();
+        worldTile.rulerDiplomacy = numberOrBlank(details.rulerDiplomacy);
+        worldTile.npcDefenderDiplomacy = numberOrBlank(details.npcDefenderDiplomacy);
+        worldTile.npcDiplomacy = numberOrBlank(details.npcDefenderDiplomacy || details.rulerDiplomacy);
+        worldTile.diplomaticTakeoverAllowed = csvBoolean(details.diplomaticTakeoverAllowed, getTileType(worldTile) !== "sea");
+        worldTile.publicOwnerLabel = String(details.publicOwnerLabel || "").trim();
+        worldTile.ownershipNotes = String(details.ownershipNotes || "").trim();
+
+        house.region = worldTile.region;
+        house.house = String(details.house || house.house || worldTile.owner || "").trim();
+        house.lord = String(details.ruler || house.lord || "").trim();
+        house.ownershipType = ownershipType;
+        house.culture = worldTile.culture;
+        house.religion = worldTile.religion;
+        house.rulingCharacterId = worldTile.rulingCharacterId;
+        house.swornToType = worldTile.swornToType;
+        house.swornToPlayerName = worldTile.swornToPlayerName;
+        house.swornToPlayerUserId = worldTile.swornToPlayerUserId;
+        house.marriageProtected = worldTile.marriageProtected;
+        house.marriageProtectedPlayerName = worldTile.marriageProtectedPlayerName;
+        house.marriageProtectedPlayerUserId = worldTile.marriageProtectedPlayerUserId;
+        house.rulerDiplomacy = worldTile.rulerDiplomacy;
+        house.npcDefenderName = house.lord || details.tileName || "NPC Defender";
+        house.npcDefenderDiplomacy = worldTile.npcDefenderDiplomacy;
+        house.npcDiplomacy = worldTile.npcDiplomacy;
+        house.diplomaticTakeoverAllowed = worldTile.diplomaticTakeoverAllowed;
+        house.publicOwnerLabel = worldTile.publicOwnerLabel;
+        house.ownershipNotes = worldTile.ownershipNotes;
+        house.version = `Crown Overview Tools ${MODULE_VERSION}`;
+        house.updatedAt = new Date().toISOString();
+        house.updatedBy = game.user.name;
+
+        if (isPlayer && (controllerId || controllerName)) {
+          worldTile.ownerUserId = controllerId;
+          worldTile.ownerUserName = controllerName;
+          worldTile.playerOwnerUserId = controllerId;
+          worldTile.playerOwnerUserName = controllerName;
+          house.ownerUserId = controllerId;
+          house.ownerUserName = controllerName;
+          house.playerOwnerUserId = controllerId;
+          house.playerOwnerUserName = controllerName;
+        } else {
+          delete worldTile.ownerUserId;
+          delete worldTile.ownerUserName;
+          delete worldTile.playerOwnerUserId;
+          delete worldTile.playerOwnerUserName;
+          house.ownerUserId = "";
+          house.ownerUserName = "";
+          house.playerOwnerUserId = "";
+          house.playerOwnerUserName = "";
+        }
+
+        await entry.drawing.document.setFlag(FLAG_SCOPE, WORLD_TILE_KEY, worldTile);
+        await entry.drawing.document.setFlag(FLAG_SCOPE, HOUSE_KEY, house);
+        updated++;
+      } catch (err) {
+        failed++;
+        console.error("Tile ownership import failed on row", i + 1, err);
+      }
+    }
+    ui.notifications.info(`Tile ownership import complete — ${updated} updated, ${skipped} skipped, ${failed} failed.`);
+    await ChatMessage.create({ speaker: ChatMessage.getSpeaker({ alias: "Crown Tile Ownership" }), content: `<h2>Tile Ownership CSV Import</h2><p><strong>Updated:</strong> ${escapeHtml(updated)}</p><p><strong>Skipped:</strong> ${escapeHtml(skipped)}</p><p><strong>Failed:</strong> ${escapeHtml(failed)}</p>` });
+    revealForCurrentPlayerPieces();
+  }
+
+  function getCharacterTokenById(characterId) {
+    const id = String(characterId || "").trim();
+    if (!id) return null;
+    return getCharacterTokens().find(token => String(getCharacterDataFromToken(token).characterId || "") === id || String(getWorldPiece(token)?.characterId || "") === id) || null;
+  }
+
+  function getArmyTokens() {
+    return canvas.tokens.placeables.filter(token => normalize(getWorldPiece(token)?.pieceType) === "army");
+  }
+
+  function getArmyComposition(piece = {}) {
+    const raw = piece.composition || piece.armyComposition || {};
+    const result = {};
+    for (const troop of ARMY_TROOP_TYPES) {
+      const value = numberOrBlank(raw[troop.key] ?? raw[troop.label] ?? piece[troop.key] ?? 0);
+      result[troop.key] = value === "" ? 0 : Math.max(0, Number(value));
+    }
+    return result;
+  }
+
+  function getArmyTotalStrength(composition = {}) {
+    return Object.values(composition || {}).reduce((total, value) => total + Math.max(0, Number(value || 0)), 0);
+  }
+
+  function calculateArmyUpkeep(composition = {}) {
+    const totals = { Gold: 0, Food: 0 };
+    for (const troop of ARMY_TROOP_TYPES) {
+      const count = Math.max(0, Number(composition[troop.key] || 0));
+      const blocks = count / 500;
+      totals.Gold += blocks * troop.gold;
+      totals.Food += blocks * troop.food;
+    }
+    return normalizeResourceMap(totals);
+  }
+
+  function armyCompositionText(composition = {}) {
+    const parts = [];
+    for (const troop of ARMY_TROOP_TYPES) {
+      const count = Number(composition[troop.key] || 0);
+      if (count > 0) parts.push(`${troop.label}: ${count.toLocaleString()}`);
+    }
+    return parts.length ? parts.join("; ") : "None";
+  }
+
+  function getExistingArmyForCharacter(characterId) {
+    const id = String(characterId || "").trim();
+    if (!id) return null;
+    return getArmyTokens().find(token => String(getWorldPiece(token)?.linkedCharacterId || "") === id) || null;
+  }
+
+  function getPendingArmyMuster(characterToken) {
+    const character = getCharacterDataFromToken(characterToken) || {};
+    const piece = getWorldPiece(characterToken) || {};
+    return character.pendingArmyMuster || piece.pendingArmyMuster || null;
+  }
+
+  function getCharacterMartialValue(characterToken) {
+    const character = getCharacterDataFromToken(characterToken) || {};
+    const piece = getWorldPiece(characterToken) || {};
+    const value = numberOrBlank(character.martial ?? character.stats?.martial ?? piece.martial ?? piece.stats?.martial);
+    return value === "" ? 0 : Number(value);
+  }
+
+  async function savePendingArmyMuster(characterToken, muster) {
+    const character = foundry.utils.deepClone(getCharacterDataFromToken(characterToken) || {});
+    const piece = foundry.utils.deepClone(getWorldPiece(characterToken) || {});
+    character.pendingArmyMuster = muster;
+    piece.pendingArmyMuster = muster;
+    await characterToken.document.setFlag(FLAG_SCOPE, WORLD_CHARACTER_KEY, character);
+    if (characterToken.actor) await characterToken.actor.setFlag(FLAG_SCOPE, WORLD_CHARACTER_KEY, foundry.utils.deepClone(character));
+    await saveWorldPiece(characterToken, piece);
+  }
+
+  function buildArmyCompositionInputs(maxMen) {
+    return ARMY_TROOP_TYPES.map(troop => `<div class="form-group"><label>${escapeHtml(troop.label)}</label><input type="number" name="troop_${escapeHtml(troop.key)}" value="0" min="0" step="50" style="width:100%;" /><p class="notes">${escapeHtml(troop.gold)} Gold / 500, ${escapeHtml(troop.food)} Food / 500</p></div>`).join("");
+  }
+
+  function readArmyCompositionForm(form) {
+    const composition = {};
+    for (const troop of ARMY_TROOP_TYPES) {
+      const input = form.elements[`troop_${troop.key}`];
+      composition[troop.key] = Math.max(0, Number(input?.value || 0));
+    }
+    return composition;
+  }
+
+  async function createArmyMusterRequestForCharacter(characterToken) {
+    const character = getCharacterDataFromToken(characterToken);
+    const piece = getWorldPiece(characterToken);
+    const martial = getCharacterMartialValue(characterToken);
+    const maxMen = Math.max(0, Math.floor(martial * 250));
+    if (!character?.characterId) { ui.notifications.warn("This character is missing a Character ID. Edit/import the character first."); return null; }
+    if (getExistingArmyForCharacter(character.characterId)) { ui.notifications.warn(`${character.characterName || piece.name} already has an army token.`); return null; }
+    const existingPending = getPendingArmyMuster(characterToken);
+    if (existingPending?.status === "pending") { ui.notifications.warn(`${character.characterName || piece.name} already has a pending army muster.`); return null; }
+    const entry = getCurrentTileEntryForToken(characterToken, piece);
+    if (!entry) { ui.notifications.warn("The selected character is not currently in a world tile."); return null; }
+
+    const result = await new Promise(resolve => {
+      new Dialog({
+        title: `Summon Army — ${character.characterName || piece.name}`,
+        content: `<form>
+          <div style="padding:8px;margin-bottom:10px;border:1px solid #777;border-radius:6px;">
+            <strong>Commander:</strong> ${escapeHtml(character.characterName || piece.name)}<br>
+            <strong>Martial:</strong> ${escapeHtml(martial)}<br>
+            <strong>Maximum Army Size:</strong> ${escapeHtml(maxMen.toLocaleString())} men<br>
+            <strong>Location:</strong> ${escapeHtml(getTileName(entry))}<br>
+            <span class="notes">Summoning takes 1 turn. The GM must process army musters to spawn the token.</span>
+          </div>
+          <div class="form-group"><label>Army Name</label><input type="text" name="armyName" value="${escapeHtml(character.characterName || piece.name)}'s Host" style="width:100%;" /></div>
+          <div style="display:grid;grid-template-columns:repeat(2, 1fr);gap:8px;">${buildArmyCompositionInputs(maxMen)}</div>
+          <div class="form-group"><label>Siege Engines</label><input type="number" name="siegeEngines" value="0" min="0" step="1" style="width:100%;" /></div>
+          <div class="form-group"><label><input type="checkbox" name="followCharacter" checked /> Army follows this character when not detached or besieging</label></div>
+        </form>`,
+        buttons: {
+          save: { label: "Request Muster", callback: html => {
+            const form = html[0].querySelector("form");
+            resolve({
+              armyName: String(form.armyName.value || "").trim(),
+              composition: readArmyCompositionForm(form),
+              siegeEngines: Math.max(0, Number(form.siegeEngines.value || 0)),
+              followCharacter: form.followCharacter.checked
+            });
+          }},
+          cancel: { label: "Cancel", callback: () => resolve(null) }
+        },
+        default: "save"
+      }, { width: 780, height: 820, resizable: true }).render(true);
+    });
+    if (!result) return null;
+    const totalStrength = getArmyTotalStrength(result.composition);
+    if (totalStrength <= 0) { ui.notifications.warn("Add at least one troop type to summon an army."); return null; }
+    if (totalStrength > maxMen) { ui.notifications.error(`Army is too large: ${totalStrength.toLocaleString()} men selected, but ${character.characterName || piece.name} can command ${maxMen.toLocaleString()}.`); return null; }
+    const upkeep = calculateArmyUpkeep(result.composition);
+    return {
+      id: foundry.utils.randomID(16),
+      status: "pending",
+      armyName: result.armyName || `${character.characterName || piece.name}'s Host`,
+      linkedCharacterId: character.characterId,
+      linkedCharacterName: character.characterName || piece.name || characterToken.document.name,
+      requesterUserId: game.user.id,
+      requesterUserName: game.user.name,
+      ownerUserId: piece.ownerUserId || piece.playerOwnerUserId || character.playerUserId || game.user.id,
+      ownerUserName: piece.ownerUserName || piece.playerOwnerUserName || character.playerName || game.user.name,
+      house: character.house || piece.house || piece.faction || "",
+      composition: result.composition,
+      totalStrength,
+      strengthMax: totalStrength,
+      strengthCurrent: totalStrength,
+      upkeep,
+      siegeEngines: result.siegeEngines,
+      followCharacter: result.followCharacter,
+      currentTileId: getTileId(entry),
+      currentTileName: getTileName(entry),
+      currentRegion: entry.tile?.region || "",
+      requestedRoundKey: getRoundKey(getClock()),
+      requestedDateLabel: getDateLabel(getClock()),
+      readyRoundKey: getRoundKey(getNextClockData(getClock())),
+      readyDateLabel: getDateLabel(getNextClockData(getClock())),
+      requestedAt: new Date().toISOString()
+    };
+  }
+
+  async function summonArmy() {
+    if (!requireOverviewScene()) return;
+    const selected = canvas.tokens.controlled.filter(token => isCharacterToken(token));
+    if (selected.length !== 1) { ui.notifications.warn("Select exactly one character token to summon an army."); return; }
+    const token = selected[0];
+    const piece = getWorldPiece(token);
+    if (!canUserControlWorldPiece(token, piece)) { ui.notifications.warn("You can only summon armies from characters you control."); return; }
+    const muster = await createArmyMusterRequestForCharacter(token);
+    if (!muster) return;
+    if (!game.user.isGM) {
+      const gm = findActiveGmForScene(canvas.scene?.id);
+      if (!gm) { ui.notifications.warn("No active GM online to receive this army muster request."); return; }
+      game.socket.emit(SOCKET_NAME, { type: "armyMusterRequest", targetGmId: gm.id, sceneId: canvas.scene?.id, requesterUserId: game.user.id, requesterUserName: game.user.name, tokenId: token.document.id, tokenName: token.document.name, muster });
+      ui.notifications.info(`Army muster request sent to GM ${gm.name}.`);
+      return;
+    }
+    await savePendingArmyMuster(token, muster);
+    await ChatMessage.create({ speaker: ChatMessage.getSpeaker({ alias: "Crown Armies" }), content: `<h2>Army Muster Requested</h2><p><strong>Commander:</strong> ${escapeHtml(muster.linkedCharacterName)}</p><p><strong>Army:</strong> ${escapeHtml(muster.armyName)}</p><p><strong>Strength:</strong> ${escapeHtml(muster.totalStrength.toLocaleString())}</p><p><strong>Composition:</strong> ${escapeHtml(armyCompositionText(muster.composition))}</p><p><strong>Upkeep:</strong> ${escapeHtml(resourceMapToText(muster.upkeep))}</p><p><strong>Ready:</strong> ${escapeHtml(muster.readyDateLabel || "next round")}</p>` });
+  }
+
+  async function handleArmyMusterRequest(message) {
+    if (!game.user.isGM) return;
+    if (message.targetGmId && String(message.targetGmId) !== String(game.user.id)) return;
+    if (message.sceneId && String(message.sceneId) !== String(canvas.scene?.id)) return;
+    const token = canvas.tokens.placeables.find(token => token.document.id === message.tokenId);
+    if (!token) { ui.notifications.warn(`Army muster request failed: ${message.tokenName || message.tokenId} not found.`); return; }
+    await savePendingArmyMuster(token, message.muster);
+    ui.notifications.info(`Received army muster request from ${message.requesterUserName}.`);
+    await ChatMessage.create({ speaker: ChatMessage.getSpeaker({ alias: "Crown Armies" }), content: `<h2>Army Muster Requested</h2><p><strong>Player:</strong> ${escapeHtml(message.requesterUserName || "Unknown")}</p><p><strong>Commander:</strong> ${escapeHtml(message.muster?.linkedCharacterName || token.document.name)}</p><p><strong>Army:</strong> ${escapeHtml(message.muster?.armyName || "Host")}</p><p><strong>Strength:</strong> ${escapeHtml(Number(message.muster?.totalStrength || 0).toLocaleString())}</p><p>Use <strong>Process Army Musters</strong> after one turn to spawn the army token.</p>` });
+  }
+
+  async function spawnArmyTokenFromMuster(characterToken, muster) {
+    const character = getCharacterDataFromToken(characterToken) || {};
+    const characterPiece = getWorldPiece(characterToken) || {};
+    const entry = getCurrentTileEntryForToken(characterToken, characterPiece) || getTileEntryByNameOrId(muster.currentTileId) || getTileEntryByNameOrId(muster.currentTileName);
+    if (!entry) throw new Error(`Could not find muster tile for ${muster.armyName}.`);
+    const ownerUser = getUserByIdOrName(muster.ownerUserId, muster.ownerUserName) || getUserByIdOrName(character.playerUserId, character.playerName);
+    const image = DEFAULT_IMAGES.army;
+    const folder = await getOrCreateWorldMapFolder();
+    const actorType = getSafeActorType();
+    const now = new Date().toISOString();
+    const armyPiece = {
+      name: muster.armyName,
+      pieceType: "army",
+      faction: muster.house || character.house || characterPiece.faction || "",
+      house: muster.house || character.house || "",
+      linkedCharacterId: muster.linkedCharacterId || character.characterId,
+      linkedCharacterName: muster.linkedCharacterName || character.characterName || characterPiece.name,
+      commanderCharacterId: muster.linkedCharacterId || character.characterId,
+      commanderName: muster.linkedCharacterName || character.characterName || characterPiece.name,
+      commanderMartial: getCharacterMartialValue(characterToken),
+      composition: muster.composition || {},
+      strengthMax: Number(muster.strengthMax || muster.totalStrength || 0),
+      strengthCurrent: Number(muster.strengthCurrent || muster.totalStrength || 0),
+      totalStrength: Number(muster.totalStrength || 0),
+      upkeep: muster.upkeep || calculateArmyUpkeep(muster.composition || {}),
+      siegeEngines: Number(muster.siegeEngines || 0),
+      followCharacter: muster.followCharacter !== false,
+      detached: false,
+      siegeTurns: 1,
+      movementMax: Number(characterPiece.movementMax || character.landMovement || 3),
+      movementUsed: 0,
+      allowedTileTypes: getAllowedTileTypes("army"),
+      currentTileId: getTileId(entry),
+      currentTileName: getTileName(entry),
+      currentRegion: entry.tile?.region || "",
+      ownerUserId: ownerUser?.id || muster.ownerUserId || "",
+      ownerUserName: ownerUser?.name || muster.ownerUserName || "",
+      playerOwnerUserId: ownerUser?.id || muster.ownerUserId || "",
+      playerOwnerUserName: ownerUser?.name || muster.ownerUserName || "",
+      status: "Active",
+      version: `Crown Overview Tools ${MODULE_VERSION}`,
+      musteredAt: now,
+      musteredBy: game.user.name
+    };
+    const actor = await Actor.create({
+      name: muster.armyName,
+      type: actorType,
+      folder: folder.id,
+      img: image,
+      flags: { [FLAG_SCOPE]: { [WORLD_PIECE_KEY]: foundry.utils.deepClone(armyPiece) } },
+      prototypeToken: {
+        name: muster.armyName,
+        actorLink: true,
+        width: 1,
+        height: 1,
+        disposition: CONST.TOKEN_DISPOSITIONS.FRIENDLY,
+        sight: { enabled: true },
+        texture: { src: image },
+        flags: { [FLAG_SCOPE]: { [WORLD_PIECE_KEY]: foundry.utils.deepClone(armyPiece) } }
+      }
+    });
+    if (ownerUser) {
+      const ownership = foundry.utils.deepClone(actor.ownership || {});
+      for (const user of getPlayerUsers()) ownership[user.id] = CONST.DOCUMENT_OWNERSHIP_LEVELS.NONE;
+      ownership[ownerUser.id] = CONST.DOCUMENT_OWNERSHIP_LEVELS.OWNER;
+      await actor.update({ ownership });
+    }
+    const center = getDrawingCenter(entry);
+    const gridSize = getGridSize();
+    const occupants = getOccupantsForTile(entry.tile, null);
+    const offset = getSlotOffset(occupants.length + 1, gridSize);
+    const tokenData = actor.prototypeToken.toObject();
+    tokenData.actorId = actor.id;
+    tokenData.actorLink = true;
+    tokenData.name = muster.armyName;
+    tokenData.x = Math.round(center.x + offset.x - gridSize / 2);
+    tokenData.y = Math.round(center.y + offset.y - gridSize / 2);
+    tokenData.width = 1;
+    tokenData.height = 1;
+    tokenData.hidden = false;
+    tokenData.texture = tokenData.texture || {};
+    tokenData.texture.src = image;
+    tokenData.flags = tokenData.flags || {};
+    tokenData.flags[FLAG_SCOPE] = tokenData.flags[FLAG_SCOPE] || {};
+    tokenData.flags[FLAG_SCOPE][WORLD_PIECE_KEY] = foundry.utils.deepClone(armyPiece);
+    const created = await canvas.scene.createEmbeddedDocuments("Token", [tokenData]);
+    return { actor, tokenDocument: created?.[0], piece: armyPiece, entry };
+  }
+
+  async function processArmyMusters() {
+    if (!requireOverviewScene()) return;
+    if (!game.user.isGM) { ui.notifications.warn("Only the GM can process army musters."); return; }
+    let processed = 0, skipped = 0, failed = 0;
+    const rows = [];
+    for (const characterToken of getCharacterTokens()) {
+      const muster = getPendingArmyMuster(characterToken);
+      if (!muster || muster.status !== "pending") continue;
+      const character = getCharacterDataFromToken(characterToken) || {};
+      if (getExistingArmyForCharacter(muster.linkedCharacterId || character.characterId)) { skipped++; continue; }
+      try {
+        const spawned = await spawnArmyTokenFromMuster(characterToken, muster);
+        const done = { ...muster, status: "spawned", spawnedAt: new Date().toISOString(), spawnedBy: game.user.name, armyTokenId: spawned.tokenDocument?.id || "" };
+        await savePendingArmyMuster(characterToken, done);
+        processed++;
+        rows.push(`<li><strong>${escapeHtml(done.armyName)}</strong> — ${escapeHtml(done.totalStrength.toLocaleString())} men at ${escapeHtml(spawned.entry ? getTileName(spawned.entry) : done.currentTileName)}</li>`);
+      } catch (err) {
+        failed++;
+        console.error("Army muster failed", characterToken, muster, err);
+      }
+    }
+    ui.notifications.info(`Processed ${processed} army muster(s). ${skipped ? `${skipped} skipped. ` : ""}${failed ? `${failed} failed.` : ""}`);
+    await ChatMessage.create({ speaker: ChatMessage.getSpeaker({ alias: "Crown Armies" }), content: `<h2>Army Musters Processed</h2><p><strong>Spawned:</strong> ${escapeHtml(processed)}</p><p><strong>Skipped:</strong> ${escapeHtml(skipped)}</p><p><strong>Failed:</strong> ${escapeHtml(failed)}</p>${rows.length ? `<ul>${rows.join("")}</ul>` : ""}` });
+    revealForCurrentPlayerPieces();
+  }
+
+  async function moveLinkedArmyToCharacter(characterToken, characterPiece, destinationEntry) {
+    if (!characterToken || normalize(characterPiece?.pieceType) !== "character" || !destinationEntry?.tile) return;
+    const character = getCharacterDataFromToken(characterToken) || {};
+    const characterId = character.characterId || characterPiece.characterId;
+    if (!characterId) return;
+    const linkedArmies = getArmyTokens().filter(token => {
+      const army = getWorldPiece(token) || {};
+      return String(army.linkedCharacterId || army.commanderCharacterId || "") === String(characterId) && army.followCharacter !== false && !army.detached && !army.siegeStatus;
+    });
+    for (const armyToken of linkedArmies) {
+      const army = foundry.utils.deepClone(getWorldPiece(armyToken) || {});
+      army.previousTileId = army.currentTileId;
+      army.previousTileName = army.currentTileName;
+      army.currentTileId = getTileId(destinationEntry);
+      army.currentTileName = getTileName(destinationEntry);
+      army.currentRegion = destinationEntry.tile?.region || "";
+      army.lastMovedAt = new Date().toISOString();
+      army.lastMovedBy = game.user.name;
+      army.lastMovedSource = `Following ${character.characterName || characterPiece.name}`;
+      await saveWorldPiece(armyToken, army);
+      const pos = getTokenTopLeftForTileSlot(armyToken, destinationEntry);
+      await armyToken.document.update({ x: pos.x, y: pos.y }, { animate: true, worldMovementBypass: true, bypassWorldMovementWatcher: true, followCharacterBypass: true });
+    }
+  }
+
+  async function editSelectedArmy() {
+    if (!requireOverviewScene()) return;
+    if (!game.user.isGM) { ui.notifications.warn("Only the GM can edit armies."); return; }
+    const selected = canvas.tokens.controlled.filter(token => normalize(getWorldPiece(token)?.pieceType) === "army");
+    if (selected.length !== 1) { ui.notifications.warn("Select exactly one army token to edit."); return; }
+    const token = selected[0];
+    const piece = foundry.utils.deepClone(getWorldPiece(token));
+    const composition = getArmyComposition(piece);
+    const result = await new Promise(resolve => {
+      new Dialog({
+        title: `Edit Army — ${piece.name || token.document.name}`,
+        content: `<form>
+          <div class="form-group"><label>Army Name</label><input type="text" name="armyName" value="${escapeHtml(piece.name || token.document.name)}" style="width:100%;" /></div>
+          <div style="display:grid;grid-template-columns:repeat(2, 1fr);gap:8px;">${ARMY_TROOP_TYPES.map(troop => `<div class="form-group"><label>${escapeHtml(troop.label)}</label><input type="number" name="troop_${escapeHtml(troop.key)}" value="${escapeHtml(composition[troop.key] || 0)}" min="0" step="50" style="width:100%;" /></div>`).join("")}</div>
+          <div class="form-group"><label>Siege Engines</label><input type="number" name="siegeEngines" value="${escapeHtml(piece.siegeEngines || 0)}" min="0" step="1" style="width:100%;" /></div>
+          <div class="form-group"><label>Siege Turns</label><input type="number" name="siegeTurns" value="${escapeHtml(piece.siegeTurns || 1)}" min="1" step="1" style="width:100%;" /></div>
+          <div class="form-group"><label><input type="checkbox" name="followCharacter" ${piece.followCharacter !== false ? "checked" : ""} /> Follow linked character</label></div>
+          <div class="form-group"><label><input type="checkbox" name="detached" ${piece.detached ? "checked" : ""} /> Detached / holds position</label></div>
+        </form>`,
+        buttons: { save: { label: "Save Army", callback: html => {
+          const form = html[0].querySelector("form");
+          resolve({ armyName: String(form.armyName.value || "").trim(), composition: readArmyCompositionForm(form), siegeEngines: Math.max(0, Number(form.siegeEngines.value || 0)), siegeTurns: Math.max(1, Number(form.siegeTurns.value || 1)), followCharacter: form.followCharacter.checked, detached: form.detached.checked });
+        }}, cancel: { label: "Cancel", callback: () => resolve(null) } },
+        default: "save"
+      }, { width: 760, height: 760, resizable: true }).render(true);
+    });
+    if (!result) return;
+    piece.name = result.armyName || token.document.name;
+    piece.composition = result.composition;
+    piece.totalStrength = getArmyTotalStrength(result.composition);
+    piece.strengthMax = piece.totalStrength;
+    piece.strengthCurrent = Math.min(Number(piece.strengthCurrent || piece.totalStrength), piece.totalStrength);
+    piece.upkeep = calculateArmyUpkeep(result.composition);
+    piece.siegeEngines = result.siegeEngines;
+    piece.siegeTurns = result.siegeTurns;
+    piece.followCharacter = result.followCharacter;
+    piece.detached = result.detached;
+    piece.updatedAt = new Date().toISOString();
+    piece.updatedBy = game.user.name;
+    await saveWorldPiece(token, piece);
+    await token.document.update({ name: piece.name }, { worldMovementBypass: true, bypassWorldMovementWatcher: true });
+    if (token.actor) await token.actor.update({ name: piece.name });
+    ui.notifications.info(`Updated army: ${piece.name}.`);
+  }
+
+  async function dismissSelectedArmy() {
+    if (!requireOverviewScene()) return;
+    if (!game.user.isGM) { ui.notifications.warn("Only the GM can dismiss armies."); return; }
+    const selected = canvas.tokens.controlled.filter(token => normalize(getWorldPiece(token)?.pieceType) === "army");
+    if (selected.length !== 1) { ui.notifications.warn("Select exactly one army token to dismiss."); return; }
+    const token = selected[0];
+    const confirmed = await Dialog.confirm({ title: "Dismiss Army?", content: `<p>Dismiss <strong>${escapeHtml(token.document.name)}</strong> from the map?</p>`, yes: () => true, no: () => false, defaultYes: false });
+    if (!confirmed) return;
+    const piece = getWorldPiece(token) || {};
+    const characterToken = getCharacterTokenById(piece.linkedCharacterId || piece.commanderCharacterId);
+    if (characterToken) {
+      const character = foundry.utils.deepClone(getCharacterDataFromToken(characterToken) || {});
+      const charPiece = foundry.utils.deepClone(getWorldPiece(characterToken) || {});
+      if (character.pendingArmyMuster) delete character.pendingArmyMuster;
+      if (charPiece.pendingArmyMuster) delete charPiece.pendingArmyMuster;
+      await characterToken.document.setFlag(FLAG_SCOPE, WORLD_CHARACTER_KEY, character);
+      if (characterToken.actor) await characterToken.actor.setFlag(FLAG_SCOPE, WORLD_CHARACTER_KEY, foundry.utils.deepClone(character));
+      await saveWorldPiece(characterToken, charPiece);
+    }
+    await token.document.delete();
+    ui.notifications.info(`Dismissed army: ${piece.name || token.document.name}.`);
+  }
+
+  function getFortificationLevelForHouse(house = {}) {
+    const explicit = numberOrBlank(house.fortificationLevel ?? house.fortification ?? "");
+    if (explicit !== "") return Math.max(0, Math.min(3, Number(explicit)));
+    const data = Array.isArray(house.buildingData) ? house.buildingData : [];
+    const watch = data.find(item => item.lineKey === "watchtower" || ["Watchtowers", "Holdfasts", "Castles"].includes(String(item.name || item.building || "")));
+    if (watch?.level) return Math.max(0, Math.min(3, Number(watch.level || 0)));
+    const built = Array.isArray(house.builtBuildings) ? house.builtBuildings.map(String) : [];
+    if (built.includes("Castles")) return 3;
+    if (built.includes("Holdfasts")) return 2;
+    if (built.includes("Watchtowers")) return 1;
+    return 0;
+  }
+
+  function getSiegeSettlementKey(house = {}) {
+    const fallbackLevel = Array.isArray(house.builtBuildings) ? house.builtBuildings.length : 0;
+    const rawLevel = house.developmentLevel ?? fallbackLevel;
+    const level = Math.max(0, Math.min(4, Number(rawLevel || 0)));
+    return ["ruin", "hamlet", "village", "town", "city"][level] || "ruin";
+  }
+
+  function siegeSettlementLabel(key) {
+    const labels = { ruin: "Ruin", hamlet: "Hamlet", village: "Village", town: "Town", city: "City" };
+    return labels[key] || titleCase(key);
+  }
+
+  function getSiegeEngineBonus(count) {
+    const engines = Math.max(0, Number(count || 0));
+    if (engines <= 0) return 0;
+    if (engines <= 5) return 5;
+    if (engines <= 10) return 10;
+    if (engines <= 15) return 15;
+    if (engines <= 20) return 20;
+    if (engines <= 25) return 25;
+    return 30;
+  }
+
+  function getSiegeDurationBonus(turns) {
+    const t = Math.max(1, Number(turns || 1));
+    return Math.min(21, Math.max(0, (t - 1) * 3));
+  }
+
+  function getSiegeManpowerBonus(strength) {
+    return Math.min(20, Math.floor(Math.max(0, Number(strength || 0)) / 500));
+  }
+
+  function getDefendingArmiesOnTile(entry, attackingOwnerId) {
+    const tileId = String(getTileId(entry) || "");
+    return getArmyTokens().filter(token => {
+      const army = getWorldPiece(token) || {};
+      const sameTile = String(army.currentTileId || "") === tileId || getCurrentTileEntryForToken(token, army)?.tile?.id === tileId;
+      if (!sameTile) return false;
+      const ownerId = String(army.ownerUserId || army.playerOwnerUserId || "");
+      return ownerId && String(ownerId) !== String(attackingOwnerId || "");
+    });
+  }
+
+  function getSiegeOutcome(roll, chance) {
+    if (roll <= 5) return { key: "decisive", label: "Decisive Storm", success: true, text: "The settlement falls with reduced attacker casualties." };
+    if (roll >= 96) return { key: "autoCatastrophe", label: "Catastrophe (Automatic)", success: false, text: "The assault goes disastrously wrong." };
+    if (roll <= chance) return { key: "success", label: "Successful Storm", success: true, text: "The settlement falls with normal assault casualties." };
+    const miss = roll - chance;
+    if (miss <= 10) return { key: "foothold", label: "Foothold", success: false, foothold: true, text: "The city holds, but attackers gain +10% on the next storm attempt if the siege continues." };
+    if (miss <= 25) return { key: "repulsed", label: "Repulsed", success: false, text: "The assault fails. Moderate casualties." };
+    if (miss <= 40) return { key: "bloodyRepulse", label: "Bloody Repulse", success: false, text: "The assault fails. Heavy casualties." };
+    return { key: "catastrophe", label: "Catastrophe", success: false, text: "Severe casualties and possible commander consequences." };
+  }
+
+  async function applyTileControllerFromVictory(entry, attackerPiece, actingUserId, actingUserName, source = "Siege") {
+    const ownerUser = game.users.get(actingUserId) || null;
+    const worldTile = foundry.utils.deepClone(entry.tile || {});
+    const house = foundry.utils.deepClone(getHouseData(entry.drawing) || {});
+    const controllerId = ownerUser?.id || actingUserId || "";
+    const controllerName = ownerUser?.name || actingUserName || "";
+    worldTile.ownershipType = "Player";
+    worldTile.ownerUserId = controllerId;
+    worldTile.ownerUserName = controllerName;
+    worldTile.playerOwnerUserId = controllerId;
+    worldTile.playerOwnerUserName = controllerName;
+    worldTile.swornToType = "Player";
+    worldTile.swornToPlayerName = controllerName;
+    worldTile.swornToPlayerUserId = controllerId;
+    worldTile.publicOwnerLabel = controllerName;
+    house.ownershipType = "Player";
+    house.ownerUserId = controllerId;
+    house.ownerUserName = controllerName;
+    house.playerOwnerUserId = controllerId;
+    house.playerOwnerUserName = controllerName;
+    house.swornToType = "Player";
+    house.swornToPlayerName = controllerName;
+    house.swornToPlayerUserId = controllerId;
+    house.publicOwnerLabel = controllerName;
+    house.lastControllerChange = { source, userId: controllerId, userName: controllerName, armyName: attackerPiece?.name || "", at: new Date().toISOString() };
+    worldTile.updatedAt = new Date().toISOString();
+    worldTile.updatedBy = game.user.name;
+    house.updatedAt = new Date().toISOString();
+    house.updatedBy = game.user.name;
+    await entry.drawing.document.setFlag(FLAG_SCOPE, WORLD_TILE_KEY, worldTile);
+    await entry.drawing.document.setFlag(FLAG_SCOPE, HOUSE_KEY, house);
+  }
+
+  async function siegeStorm() {
+    if (!requireOverviewScene()) return;
+    const selected = canvas.tokens.controlled.filter(token => normalize(getWorldPiece(token)?.pieceType) === "army");
+    if (selected.length !== 1) { ui.notifications.warn("Select exactly one army token on the target tile."); return; }
+    const token = selected[0];
+    const piece = foundry.utils.deepClone(getWorldPiece(token));
+    if (!canUserControlWorldPiece(token, piece)) { ui.notifications.warn("You can only siege with an army you control."); return; }
+    const entry = getCurrentTileEntryForToken(token, piece);
+    if (!entry) { ui.notifications.warn("The selected army is not currently inside a world tile."); return; }
+    const house = getHouseData(entry.drawing) || {};
+    const ownerId = getTileOwnerUserId(entry.tile, house);
+    const ownerName = getTileOwnerUserName(entry.tile, house);
+    const attackerOwnerId = piece.ownerUserId || piece.playerOwnerUserId || game.user.id;
+    if (ownerId && String(ownerId) === String(attackerOwnerId)) { ui.notifications.warn(`${getTileName(entry)} is already controlled by this army's owner.`); return; }
+
+    const defendingArmies = getDefendingArmiesOnTile(entry, attackerOwnerId);
+    if (ownerId && defendingArmies.length) {
+      const gmUsers = game.users.contents.filter(user => user.isGM).map(user => user.id);
+      const content = `<h2>Pitched Battle Declared</h2><p><strong>Location:</strong> ${escapeHtml(getTileName(entry))}</p><p><strong>Attacker:</strong> ${escapeHtml(piece.name || token.document.name)} — ${escapeHtml(Number(piece.strengthCurrent || piece.totalStrength || 0).toLocaleString())} men</p><p><strong>Defender:</strong> ${defendingArmies.map(t => `${escapeHtml(t.document.name)} — ${escapeHtml(Number(getWorldPiece(t)?.strengthCurrent || getWorldPiece(t)?.totalStrength || 0).toLocaleString())} men`).join("<br>")}</p><p>Resolve manually, simulate, or move to the battle minigame. Quick Siege is not rolled while a defending player army is present.</p>`;
+      await ChatMessage.create({ speaker: ChatMessage.getSpeaker({ alias: "Crown Siege" }), whisper: gmUsers.length ? gmUsers : undefined, content });
+      ui.notifications.info("Defending army present: pitched battle card sent to GM.");
+      return;
+    }
+
+    const defaultTurns = Math.max(1, Number(piece.siegeTurns || 1));
+    const defaultEngines = Math.max(0, Number(piece.siegeEngines || 0));
+    const result = await new Promise(resolve => {
+      const settlementKey = getSiegeSettlementKey(house);
+      const fortLevel = getFortificationLevelForHouse(house);
+      const settlementDc = SIEGE_DC_TABLE[settlementKey]?.[fortLevel] ?? 15;
+      new Dialog({
+        title: `Siege / Storm — ${getTileName(entry)}`,
+        content: `<form>
+          <div style="padding:8px;margin-bottom:10px;border:1px solid #777;border-radius:6px;">
+            <strong>Attacking Army:</strong> ${escapeHtml(piece.name || token.document.name)}<br>
+            <strong>Target:</strong> ${escapeHtml(getTileName(entry))}<br>
+            <strong>Current Owner:</strong> ${escapeHtml(ownerName || house.house || entry.tile.owner || "NPC / Neutral")}<br>
+            <strong>Settlement:</strong> ${escapeHtml(siegeSettlementLabel(settlementKey))}<br>
+            <strong>Fortification:</strong> ${escapeHtml(fortLevel)}<br>
+            <strong>Settlement/Fortification DC:</strong> ${escapeHtml(settlementDc)}
+          </div>
+          <div class="form-group"><label>Siege Engines</label><input type="number" name="siegeEngines" value="${escapeHtml(defaultEngines)}" min="0" step="1" style="width:100%;" /></div>
+          <div class="form-group"><label>Turns Under Siege</label><input type="number" name="siegeTurns" value="${escapeHtml(defaultTurns)}" min="1" step="1" style="width:100%;" /></div>
+          <p class="notes">Quick Siege uses the tile's settlement and fortification DC only. NPCs do not need army or garrison tokens.</p>
+        </form>`,
+        buttons: { roll: { label: "Roll Storm", callback: html => { const form = html[0].querySelector("form"); resolve({ siegeEngines: Math.max(0, Number(form.siegeEngines.value || 0)), siegeTurns: Math.max(1, Number(form.siegeTurns.value || 1)) }); }}, cancel: { label: "Cancel", callback: () => resolve(null) } },
+        default: "roll"
+      }, { width: 620, height: 520, resizable: true }).render(true);
+    });
+    if (!result) return;
+
+    const linkedCommander = getCharacterTokenById(piece.linkedCharacterId || piece.commanderCharacterId);
+    const martial = Number(piece.commanderMartial || (linkedCommander ? getCharacterMartialValue(linkedCommander) : 0) || 0);
+    const strength = Number(piece.strengthCurrent || piece.totalStrength || 0);
+    const settlementKey = getSiegeSettlementKey(house);
+    const fortLevel = getFortificationLevelForHouse(house);
+    const settlementDc = SIEGE_DC_TABLE[settlementKey]?.[fortLevel] ?? 15;
+    const martialBonus = martial * 2;
+    const manpowerBonus = getSiegeManpowerBonus(strength);
+    const engineBonus = getSiegeEngineBonus(result.siegeEngines);
+    const durationBonus = getSiegeDurationBonus(result.siegeTurns);
+    const footholdBonus = Number(piece.footholdBonus || 0);
+    const rawChance = 50 + martialBonus + manpowerBonus + engineBonus + durationBonus + footholdBonus - settlementDc;
+    const chance = Math.max(5, Math.min(95, Math.round(rawChance * 100) / 100));
+    const roll = await new Roll("1d100").evaluate({ async: true });
+    const d100 = Number(roll.total || 0);
+    const outcome = getSiegeOutcome(d100, chance);
+
+    piece.siegeEngines = result.siegeEngines;
+    piece.siegeTurns = outcome.success ? 1 : result.siegeTurns + 1;
+    piece.siegeStatus = outcome.success ? "resolved" : "under siege";
+    piece.footholdBonus = outcome.foothold ? 10 : 0;
+    piece.detached = !outcome.success;
+    piece.followCharacter = outcome.success ? piece.followCharacter : false;
+    await saveWorldPiece(token, piece);
+
+    if (outcome.success) await applyTileControllerFromVictory(entry, piece, attackerOwnerId || game.user.id, piece.ownerUserName || piece.playerOwnerUserName || game.user.name, "Siege");
+
+    await ChatMessage.create({
+      speaker: ChatMessage.getSpeaker({ alias: "Crown Siege" }),
+      content: `<h2>Quick Siege — ${escapeHtml(outcome.label)}</h2>
+        <p><strong>Army:</strong> ${escapeHtml(piece.name || token.document.name)}</p>
+        <p><strong>Target:</strong> ${escapeHtml(getTileName(entry))}</p>
+        <p><strong>Roll:</strong> ${escapeHtml(d100)} on d100</p>
+        <p><strong>Storm Chance:</strong> ${escapeHtml(chance)}%</p>
+        <p><strong>Formula:</strong> 50 + Martial ${escapeHtml(martial)}×2 (${escapeHtml(martialBonus)}) + Manpower ${escapeHtml(manpowerBonus)} + Engines ${escapeHtml(engineBonus)} + Duration ${escapeHtml(durationBonus)}${footholdBonus ? ` + Foothold ${escapeHtml(footholdBonus)}` : ""} - DC ${escapeHtml(settlementDc)}</p>
+        <p><strong>Settlement:</strong> ${escapeHtml(siegeSettlementLabel(settlementKey))}; <strong>Fortification:</strong> ${escapeHtml(fortLevel)}</p>
+        <p>${escapeHtml(outcome.text)}</p>
+        ${outcome.success ? `<p><strong>Control:</strong> ${escapeHtml(getTileName(entry))} now changes allegiance to ${escapeHtml(piece.ownerUserName || piece.playerOwnerUserName || game.user.name)}. The local ruler is not automatically replaced.</p>` : `<p><strong>Next Attempt:</strong> Siege turns will count as ${escapeHtml(piece.siegeTurns)}.${outcome.foothold ? " Foothold +10% has been stored." : ""}</p>`}`
+    });
     revealForCurrentPlayerPieces();
   }
 
@@ -3716,6 +4604,25 @@
     return candidates[0] || null;
   }
 
+  function getTextComparisonModifier(attackerValue, defenderValue, sameLabel, differentLabel) {
+    const a = normalize(attackerValue);
+    const d = normalize(defenderValue);
+    if (!a || !d) return { modifier: 0, label: "", kind: "unknown" };
+    if (a === d) return { modifier: -2, label: sameLabel, kind: "same" };
+    return { modifier: 2, label: differentLabel, kind: "different" };
+  }
+
+  function getDefenderDiplomacyValue(house = {}, worldTile = {}, defenderToken = null) {
+    if (defenderToken) return getDiplomacyValue(getWorldPiece(defenderToken), getCharacterDataFromToken(defenderToken));
+    const value = numberOrBlank(house.npcDefenderDiplomacy ?? house.npcDiplomacy ?? house.rulerDiplomacy ?? worldTile.npcDefenderDiplomacy ?? worldTile.npcDiplomacy ?? worldTile.rulerDiplomacy ?? 3);
+    return value === "" ? 3 : Number(value);
+  }
+
+  async function rollDieTotal(formula) {
+    const roll = await new Roll(formula).evaluate({ async: true });
+    return Number(roll.total || 0);
+  }
+
   async function applyDiplomaticTakeover({ token, piece, entry, actingUserId, actingUserName }) {
     if (!token || !piece || !entry) throw new Error("Diplomatic takeover needs one character token on a world tile.");
     const actingUser = game.users.get(actingUserId) || { id: actingUserId, name: actingUserName, isGM: false };
@@ -3726,37 +4633,66 @@
     const worldTile = foundry.utils.deepClone(entry.tile);
     const house = foundry.utils.deepClone(entry.drawing.document.getFlag(FLAG_SCOPE, HOUSE_KEY) || {});
     const currentOwnerId = getTileOwnerUserId(worldTile, house);
-    if (currentOwnerId && String(currentOwnerId) === String(actingUserId)) throw new Error(`${getTileName(entry)} is already owned by ${actingUserName}.`);
+    const tileName = getTileName(entry);
+    if (currentOwnerId && String(currentOwnerId) === String(actingUserId)) throw new Error(`${tileName} is already controlled by ${actingUserName}.`);
+    if (csvBoolean(house.diplomaticTakeoverAllowed ?? worldTile.diplomaticTakeoverAllowed, getTileType(worldTile) !== "sea") === false) throw new Error(`${tileName} cannot be taken by diplomacy.`);
+    if (csvBoolean(house.marriageProtected ?? worldTile.marriageProtected, false)) {
+      const protectedBy = house.marriageProtectedPlayerName || worldTile.marriageProtectedPlayerName || "another player family";
+      throw new Error(`${tileName} is marriage-protected by ${protectedBy}; diplomacy is blocked.`);
+    }
 
     const defenderToken = findDefenderCharacterForTile(entry, token, actingUserId);
     const defenderPiece = defenderToken ? getWorldPiece(defenderToken) : null;
     const defenderCharacter = defenderToken ? getCharacterDataFromToken(defenderToken) : null;
-    const defenderName = defenderCharacter?.characterName || house.npcDefenderName || house.lord || `${getTileName(entry)} NPC Defender`;
+    const defenderName = defenderCharacter?.characterName || house.npcDefenderName || house.lord || `${tileName} NPC Defender`;
     const attackerDiplomacy = getDiplomacyValue(piece, character);
-    const defenderDiplomacy = defenderToken ? getDiplomacyValue(defenderPiece, defenderCharacter) : Number(house.npcDiplomacy ?? worldTile.npcDiplomacy ?? 5);
-    const success = attackerDiplomacy > defenderDiplomacy;
+    const defenderDiplomacy = getDefenderDiplomacyValue(house, worldTile, defenderToken);
+    const attackerCulture = character.culture || piece.culture || "";
+    const defenderCulture = defenderCharacter?.culture || defenderPiece?.culture || house.culture || worldTile.culture || "";
+    const attackerReligion = character.religion || piece.religion || "";
+    const defenderReligion = defenderCharacter?.religion || defenderPiece?.religion || house.religion || worldTile.religion || "";
+    const cultureMod = getTextComparisonModifier(attackerCulture, defenderCulture, "Same Culture", "Different Culture");
+    const religionMod = getTextComparisonModifier(attackerReligion, defenderReligion, "Same Religion", "Different Religion");
+    const swornToPlayerId = String(house.swornToPlayerUserId || worldTile.swornToPlayerUserId || currentOwnerId || "").trim();
+    const swornToType = normalize(house.swornToType || worldTile.swornToType || (currentOwnerId ? "Player" : ""));
+    const swornModifier = swornToType === "player" && swornToPlayerId && String(swornToPlayerId) !== String(actingUserId) ? 4 : 0;
+    const baseDc = 10;
+    const finalDc = baseDc + defenderDiplomacy + cultureMod.modifier + religionMod.modifier + swornModifier;
+    const d20 = await rollDieTotal("1d20");
+    const finalRoll = d20 + attackerDiplomacy;
+    const success = finalRoll >= finalDc;
     const ownerUser = game.users.get(actingUserId) || null;
     const now = new Date().toISOString();
+    const math = { d20, attackerDiplomacy, finalRoll, baseDc, defenderDiplomacy, cultureModifier: cultureMod.modifier, religionModifier: religionMod.modifier, swornModifier, finalDc, attackerCulture, defenderCulture, attackerReligion, defenderReligion };
 
     if (success) {
-      worldTile.owner = character.house || piece.faction || ownerUser?.name || actingUserName || "Player";
+      worldTile.ownershipType = "Player";
       worldTile.ownerUserId = ownerUser?.id || actingUserId || "";
       worldTile.ownerUserName = ownerUser?.name || actingUserName || "";
       worldTile.playerOwnerUserId = ownerUser?.id || actingUserId || "";
       worldTile.playerOwnerUserName = ownerUser?.name || actingUserName || "";
-      house.house = character.house || piece.faction || house.house || worldTile.owner;
-      house.lord = character.characterName || piece.name || token.document.name;
+      worldTile.swornToType = "Player";
+      worldTile.swornToPlayerName = ownerUser?.name || actingUserName || "";
+      worldTile.swornToPlayerUserId = ownerUser?.id || actingUserId || "";
+      worldTile.publicOwnerLabel = ownerUser?.name || actingUserName || "Player";
+      house.ownershipType = "Player";
       house.ownerUserId = worldTile.ownerUserId;
       house.ownerUserName = worldTile.ownerUserName;
       house.playerOwnerUserId = worldTile.playerOwnerUserId;
       house.playerOwnerUserName = worldTile.playerOwnerUserName;
-      house.lastDiplomaticTakeover = { success: true, attackerCharacterId: character.characterId, attackerName: character.characterName, attackerDiplomacy, defenderName, defenderDiplomacy, userId: actingUserId, userName: actingUserName, at: now };
+      house.swornToType = "Player";
+      house.swornToPlayerName = worldTile.swornToPlayerName;
+      house.swornToPlayerUserId = worldTile.swornToPlayerUserId;
+      house.publicOwnerLabel = worldTile.publicOwnerLabel;
+      house.house = house.house || worldTile.owner || "NPC";
+      house.lord = house.lord || defenderName;
+      house.npcDefenderName = defenderName;
+      house.lastDiplomaticTakeover = { success: true, attackerCharacterId: character.characterId, attackerName: character.characterName, defenderName, userId: actingUserId, userName: actingUserName, at: now, math };
     } else {
-      if (!worldTile.owner) worldTile.owner = "NPC";
-      if (!house.house) house.house = "NPC";
       house.npcDefenderName = defenderName;
       house.lord = house.lord || defenderName;
-      house.lastDiplomaticTakeover = { success: false, attackerCharacterId: character.characterId, attackerName: character.characterName, attackerDiplomacy, defenderName, defenderDiplomacy, userId: actingUserId, userName: actingUserName, at: now };
+      house.lastDiplomaticTakeover = { success: false, attackerCharacterId: character.characterId, attackerName: character.characterName, defenderName, userId: actingUserId, userName: actingUserName, at: now, math };
+      worldTile.ownershipType = worldTile.ownershipType || house.ownershipType || inferOwnershipType(worldTile, house);
     }
     worldTile.updatedAt = now;
     worldTile.updatedBy = game.user.name;
@@ -3766,12 +4702,17 @@
     await entry.drawing.document.setFlag(FLAG_SCOPE, HOUSE_KEY, house);
 
     const publicContent = success
-      ? `<h2>Diplomatic Takeover</h2><p><strong>${escapeHtml(character.characterName || piece.name)}</strong> has diplomatically taken control of <strong>${escapeHtml(getTileName(entry))}</strong>.</p><p><strong>New owner:</strong> ${escapeHtml(ownerUser?.name || actingUserName || "Player")}</p>`
-      : `<h2>Diplomatic Takeover Failed</h2><p><strong>${escapeHtml(character.characterName || piece.name)}</strong> failed to diplomatically take control of <strong>${escapeHtml(getTileName(entry))}</strong>.</p><p>The tile remains under <strong>${escapeHtml(house.house || worldTile.owner || "NPC")}</strong> control.</p>`;
+      ? `<h2>Diplomatic Takeover</h2><p><strong>${escapeHtml(character.characterName || piece.name)}</strong> has won over <strong>${escapeHtml(tileName)}</strong>.</p><p><strong>New allegiance:</strong> ${escapeHtml(ownerUser?.name || actingUserName || "Player")}</p><p>The local ruler remains in place unless the GM changes it.</p>`
+      : `<h2>Diplomatic Takeover Failed</h2><p><strong>${escapeHtml(character.characterName || piece.name)}</strong> failed to win over <strong>${escapeHtml(tileName)}</strong>.</p><p>The tile remains under <strong>${escapeHtml(getTileOwnerUserName(worldTile, house) || house.house || worldTile.owner || "NPC")}</strong> control.</p>`;
     await ChatMessage.create({ speaker: ChatMessage.getSpeaker({ alias: "Crown Diplomacy" }), content: publicContent });
     const gmUsers = game.users.contents.filter(user => user.isGM).map(user => user.id);
     if (gmUsers.length) {
-      await ChatMessage.create({ speaker: ChatMessage.getSpeaker({ alias: "Crown Diplomacy GM" }), whisper: gmUsers, content: `<h2>Diplomacy Check — GM Details</h2><p><strong>Attacker:</strong> ${escapeHtml(character.characterName || piece.name)} — Diplomacy ${escapeHtml(attackerDiplomacy)}</p><p><strong>Defender:</strong> ${escapeHtml(defenderName)} — Diplomacy ${escapeHtml(defenderDiplomacy)}</p><p><strong>Result:</strong> ${success ? "Success" : "Failure"}</p>` });
+      const modifierLines = [
+        cultureMod.label ? `${cultureMod.label}: ${cultureMod.modifier >= 0 ? "+" : ""}${cultureMod.modifier}` : "Culture: no modifier",
+        religionMod.label ? `${religionMod.label}: ${religionMod.modifier >= 0 ? "+" : ""}${religionMod.modifier}` : "Religion: no modifier",
+        swornModifier ? `Sworn to another player: +${swornModifier}` : "Sworn to another player: 0"
+      ].join("<br>");
+      await ChatMessage.create({ speaker: ChatMessage.getSpeaker({ alias: "Crown Diplomacy GM" }), whisper: gmUsers, content: `<h2>Diplomacy Check — GM Details</h2><p><strong>Attacker:</strong> ${escapeHtml(character.characterName || piece.name)} — Diplomacy ${escapeHtml(attackerDiplomacy)}</p><p><strong>Defender:</strong> ${escapeHtml(defenderName)} — Diplomacy ${escapeHtml(defenderDiplomacy)}</p><p><strong>Roll:</strong> d20 ${escapeHtml(d20)} + Diplomacy ${escapeHtml(attackerDiplomacy)} = <strong>${escapeHtml(finalRoll)}</strong></p><p><strong>DC:</strong> 10 + Defender ${escapeHtml(defenderDiplomacy)} + modifiers = <strong>${escapeHtml(finalDc)}</strong></p><p>${modifierLines}</p><p><strong>Result:</strong> ${success ? "Success" : "Failure"}</p>` });
     }
     revealForCurrentPlayerPieces();
     return success;
@@ -5555,6 +6496,10 @@
         await handleDiplomacyRequest(message);
         return;
       }
+      if (message.type === "armyMusterRequest") {
+        await handleArmyMusterRequest(message);
+        return;
+      }
     });
   }
 
@@ -7152,7 +8097,9 @@
     portCrossing,
     buildOnCurrentTile,
     showHoldings,
+    summonArmy,
     diplomaticTakeover,
+    siegeStorm,
     resetMovement,
     resetBuildCapacity,
     repairBuildLocks,
@@ -7163,6 +8110,11 @@
     editSelectedCharacter,
     importCharacterCsv,
     exportCharacterCsv,
+    processArmyMusters,
+    editSelectedArmy,
+    dismissSelectedArmy,
+    importTileOwnershipCsv,
+    exportTileOwnershipCsv,
     linkTiles,
     unlinkTiles,
     viewLinks,
