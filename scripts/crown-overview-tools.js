@@ -1,6 +1,6 @@
 (() => {
   const MODULE_ID = "crown-overview-tools";
-  const MODULE_VERSION = "0.4.8";
+  const MODULE_VERSION = "0.5.1";
   const FLAG_SCOPE = "world";
   const WORLD_TILE_KEY = "worldTile";
   const WORLD_PIECE_KEY = "worldPiece";
@@ -130,6 +130,64 @@
     { key: "War Galley", label: "War Galley", quality: 4, gold: 4, food: 2, troopEquivalent: "Heavy Infantry / Crossbowmen / Light Cavalry", note: "Dedicated, powerful military ship" },
     { key: "Greatship", label: "Greatship", quality: 5, gold: 5, food: 3, troopEquivalent: "Lancers", note: "Expensive elite naval asset" },
     { key: "Dromond", label: "Dromond", quality: 6, gold: 6, food: 3, troopEquivalent: "Heavy Cavalry", note: "Premier, extremely expensive military ship" }
+  ];
+
+
+  const DUEL_WEAPONS = ["Spear", "Bow", "Sword", "Polearm", "Mace", "Axe"];
+
+  const DUEL_ARMORS = [
+    { key: "Unarmored", label: "Unarmored", bonus: 3, note: "+3 combat, no injury protection" },
+    { key: "Lightly Armored", label: "Lightly Armored", bonus: 2, note: "+2 combat, reroll Amputation once" },
+    { key: "Medium Armored", label: "Medium Armored", bonus: 1, note: "+1 combat, reroll lethal or Amputation once" },
+    { key: "Heavy Armored", label: "Heavy Armored", bonus: 0, note: "+0 combat, roll second injury on lethal/Amputation and keep the less severe" }
+  ];
+
+  const DUEL_WEAPON_ADVANTAGE = {
+    Sword: ["Axe", "Mace"],
+    Axe: ["Mace", "Polearm"],
+    Mace: ["Polearm", "Spear"],
+    Polearm: ["Spear", "Sword"],
+    Spear: ["Sword", "Axe"],
+    Bow: []
+  };
+
+  const DUEL_HIT_LOCATIONS = [
+    { location: "Forehead", effect: "Dazed; lose a round." },
+    { location: "Ear", effect: "Temporarily deafened." },
+    { location: "Left Eye", effect: "Partially blinded." },
+    { location: "Right Eye", effect: "Partially blinded." },
+    { location: "Nose/Cheek", effect: "Reduced appearance." },
+    { location: "Mouth/Jaw", effect: "Muddled speech." },
+    { location: "Right Shoulder", effect: "Reduced attack." },
+    { location: "Right Bicep", effect: "Reduced attack." },
+    { location: "Right Forearm", effect: "Possible disarm." },
+    { location: "Right Palm", effect: "Disarmed." },
+    { location: "Right Thumb", effect: "Can't grasp." },
+    { location: "Right Finger", effect: "Disarmed." },
+    { location: "Left Shoulder", effect: "Reduced attack." },
+    { location: "Left Bicep", effect: "Reduced attack." },
+    { location: "Left Forearm", effect: "Possible disarm." },
+    { location: "Left Palm", effect: "Disarmed." },
+    { location: "Left Thumb", effect: "Can't grasp." },
+    { location: "Left Fingers", effect: "Disarmed." },
+    { location: "Solar Plexus", effect: "Temporarily winded." },
+    { location: "Upper Belly", effect: "Possibly winded." },
+    { location: "Lower Belly", effect: "Possibly winded." },
+    { location: "Left Hip", effect: "No extra effect." },
+    { location: "Right Hip", effect: "No extra effect." },
+    { location: "Genitals", effect: "Crippling pain; possible end of fight." },
+    { location: "Neck", effect: "Possible end of fight." },
+    { location: "Left Clavicle", effect: "Disarmed." },
+    { location: "Right Clavicle", effect: "Disarmed." },
+    { location: "Left Chest", effect: "Possible death." },
+    { location: "Right Chest", effect: "Winded." },
+    { location: "Ribs", effect: "Possibly winded." },
+    { location: "Right Foot", effect: "Trip." },
+    { location: "Left Foot", effect: "Trip." },
+    { location: "Right Knee", effect: "Half move." },
+    { location: "Left Knee", effect: "Half move." },
+    { location: "Right Thigh", effect: "Reduced move." },
+    { location: "Left Thigh", effect: "Reduced move." }
   ];
 
   const SIEGE_DC_TABLE = {
@@ -1908,6 +1966,7 @@
         <button data-coa-action="summonNavy">Summon Navy</button>
         <button data-coa-action="diplomaticTakeover">Diplomatic Takeover</button>
         <button data-coa-action="siegeStorm">Siege / Storm</button>
+        <button data-coa-action="duel">Duel</button>
         <button data-coa-action="dismissSelectedArmy">Dismiss Army / Navy</button>
         <button data-coa-action="buildOnCurrentTile">Build / Upgrade</button>
         <button data-coa-action="showHoldings">My Holdings</button>
@@ -5725,6 +5784,348 @@
     }
   }
 
+
+  function getDuelArmorMeta(armor) {
+    const key = String(armor || "Unarmored").trim();
+    return DUEL_ARMORS.find(item => item.key === key || normalize(item.key) === normalize(key)) || DUEL_ARMORS[0];
+  }
+
+  function getDuelArmorBonus(armor) {
+    return Number(getDuelArmorMeta(armor).bonus || 0);
+  }
+
+  function getDuelWeaponAdvantage(attacker, defender) {
+    const a = DUEL_WEAPONS.find(w => normalize(w) === normalize(attacker)) || inferDuelWeapon(attacker) || "";
+    const d = DUEL_WEAPONS.find(w => normalize(w) === normalize(defender)) || inferDuelWeapon(defender) || "";
+    return DUEL_WEAPON_ADVANTAGE[a]?.includes(d) ? 5 : 0;
+  }
+
+  function inferDuelWeapon(value) {
+    const text = normalize(value);
+    if (!text) return "Sword";
+    if (text.includes("spear") || text.includes("pike")) return "Spear";
+    if (text.includes("bow") || text.includes("crossbow")) return "Bow";
+    if (text.includes("polearm") || text.includes("halberd") || text.includes("glaive")) return "Polearm";
+    if (text.includes("mace") || text.includes("hammer")) return "Mace";
+    if (text.includes("axe")) return "Axe";
+    if (text.includes("sword") || text.includes("blade")) return "Sword";
+    return "Sword";
+  }
+
+  function characterHasPreferredDuelWeapon(character = {}, weapon = "") {
+    const preferred = String(character.preferredWeapons || "");
+    if (!preferred.trim()) return false;
+    const inferred = inferDuelWeapon(preferred);
+    return normalize(inferred) === normalize(weapon);
+  }
+
+  function getDuelNumber(value, fallback = 0) {
+    const number = Number(String(value ?? "").replaceAll(",", "").trim());
+    return Number.isFinite(number) ? number : fallback;
+  }
+
+  async function rollDuelDie(sides) {
+    const roll = await new Roll(`1d${Number(sides)}`).evaluate({ async: true });
+    return Number(roll.total || 0);
+  }
+
+  function duelSeverityName(roll) {
+    const value = Number(roll || 0);
+    if (value <= 2) return "Scratch";
+    if (value <= 4) return "Wound";
+    if (value <= 6) return "Sprain";
+    if (value <= 8) return "Break";
+    if (value === 9) return "Near Amputation";
+    return "Amputation";
+  }
+
+  function duelEffectIsLethal(effect) {
+    const text = normalize(effect);
+    return text.includes("possible death") || text.includes("possible end of fight");
+  }
+
+  function duelInjuryScore(injury) {
+    let score = Number(injury?.severityRoll || 0) * 10;
+    if (duelEffectIsLethal(injury?.effect)) score += 25;
+    return score;
+  }
+
+  async function makeDuelInjury() {
+    const locationRoll = await rollDuelDie(36);
+    const severityRoll = await rollDuelDie(10);
+    const location = DUEL_HIT_LOCATIONS[Math.max(0, Math.min(DUEL_HIT_LOCATIONS.length - 1, locationRoll - 1))] || DUEL_HIT_LOCATIONS[0];
+    return {
+      locationRoll,
+      location: location.location,
+      effect: location.effect,
+      severityRoll,
+      severity: duelSeverityName(severityRoll)
+    };
+  }
+
+  async function resolveDuelInjuryForArmor(armor) {
+    const first = await makeDuelInjury();
+    const firstIsAmputation = first.severity === "Amputation";
+    const firstIsLethal = duelEffectIsLethal(first.effect);
+    const armorKey = getDuelArmorMeta(armor).key;
+
+    if (armorKey === "Unarmored") return { injury: first, rerolled: false, armorRule: "Unarmored: no injury protection." };
+
+    if (armorKey === "Lightly Armored") {
+      if (firstIsAmputation) return { injury: await makeDuelInjury(), rerolled: true, armorRule: "Light armor rerolled Amputation once; second result stands." };
+      return { injury: first, rerolled: false, armorRule: "Light armor did not trigger a reroll." };
+    }
+
+    if (armorKey === "Medium Armored") {
+      if (firstIsAmputation || firstIsLethal) return { injury: await makeDuelInjury(), rerolled: true, armorRule: "Medium armor rerolled lethal/Amputation once; second result stands." };
+      return { injury: first, rerolled: false, armorRule: "Medium armor did not trigger a reroll." };
+    }
+
+    if (armorKey === "Heavy Armored") {
+      if (firstIsAmputation || firstIsLethal) {
+        const second = await makeDuelInjury();
+        const kept = duelInjuryScore(second) < duelInjuryScore(first) ? second : first;
+        return { injury: kept, rerolled: true, armorRule: "Heavy armor rolled a second injury and kept the less severe result.", first, second };
+      }
+      return { injury: first, rerolled: false, armorRule: "Heavy armor did not trigger a second injury." };
+    }
+
+    return { injury: first, rerolled: false, armorRule: "No armor rule applied." };
+  }
+
+  function buildDuelWeaponOptions(selected = "") {
+    const current = inferDuelWeapon(selected);
+    return DUEL_WEAPONS.map(weapon => `<option value="${escapeHtml(weapon)}" ${normalize(weapon) === normalize(current) ? "selected" : ""}>${escapeHtml(weapon)}</option>`).join("");
+  }
+
+  function buildDuelArmorOptions(selected = "Unarmored") {
+    const current = getDuelArmorMeta(selected).key;
+    return DUEL_ARMORS.map(armor => `<option value="${escapeHtml(armor.key)}" ${armor.key === current ? "selected" : ""}>${escapeHtml(armor.label)} — ${escapeHtml(armor.note)}</option>`).join("");
+  }
+
+  function buildDuelSideForm(prefix, token) {
+    const character = getCharacterDataFromToken(token) || {};
+    const weapon = inferDuelWeapon(character.preferredWeapons || "Sword");
+    const showStats = game.user.isGM || canUserControlWorldPiece(token, getWorldPiece(token));
+    const statLine = showStats
+      ? `<p class="notes">Prowess ${escapeHtml(character.prowess || 0)}; Martial ${escapeHtml(character.martial || 0)}.</p>`
+      : `<p class="notes">Stats hidden from non-owners. The GM-side resolver uses the stored character stats.</p>`;
+    return `<div style="padding:8px;border:1px solid #777;border-radius:6px;">
+      <h3 style="margin-top:0;">${prefix === "a" ? "Combatant A" : "Combatant B"}: ${escapeHtml(character.characterName || token.document.name)}</h3>
+      ${statLine}
+      <div class="form-group"><label>Weapon</label><select name="${prefix}_weapon" style="width:100%;">${buildDuelWeaponOptions(weapon)}</select></div>
+      <div class="form-group"><label>Armor</label><select name="${prefix}_armor" style="width:100%;">${buildDuelArmorOptions("Unarmored")}</select></div>
+      <div class="form-group"><label><input type="checkbox" name="${prefix}_valyrian" /> Valyrian Steel?</label></div>
+      <div class="form-group"><label>Secondary Bonus</label><input type="number" name="${prefix}_secondary" value="0" step="1" style="width:100%;" /></div>
+    </div>`;
+  }
+
+  async function getDuelDialogOptions(tokenA, tokenB) {
+    return await new Promise(resolve => {
+      new Dialog({
+        title: "Duel",
+        content: `<form>
+          <div style="padding:8px;margin-bottom:10px;border:1px solid #777;border-radius:6px;">
+            Select two character tokens, then choose weapon, armor, Valyrian steel, and any temporary secondary bonus. The combat formula follows the corrected Google Sheet roller: d30 + Prowess + Martial/2 + armor + weapon advantage + Valyrian bonus + secondary bonus.
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+            ${buildDuelSideForm("a", tokenA)}
+            ${buildDuelSideForm("b", tokenB)}
+          </div>
+        </form>`,
+        buttons: {
+          roll: { label: "Roll Duel", callback: html => {
+            const form = html[0].querySelector("form");
+            resolve({
+              a: {
+                weapon: form.elements.a_weapon.value,
+                armor: form.elements.a_armor.value,
+                valyrian: Boolean(form.elements.a_valyrian.checked),
+                secondary: getDuelNumber(form.elements.a_secondary.value, 0)
+              },
+              b: {
+                weapon: form.elements.b_weapon.value,
+                armor: form.elements.b_armor.value,
+                valyrian: Boolean(form.elements.b_valyrian.checked),
+                secondary: getDuelNumber(form.elements.b_secondary.value, 0)
+              }
+            });
+          }},
+          cancel: { label: "Cancel", callback: () => resolve(null) }
+        },
+        default: "roll"
+      }, { width: 820, height: 680, resizable: true }).render(true);
+    });
+  }
+
+  function buildDuelCombatant(token, options = {}) {
+    const character = getCharacterDataFromToken(token) || {};
+    const weapon = options.weapon || inferDuelWeapon(character.preferredWeapons || "Sword");
+    const armor = getDuelArmorMeta(options.armor || "Unarmored").key;
+    const prowess = getDuelNumber(character.prowess, 0);
+    const martial = getDuelNumber(character.martial, 0);
+    const secondary = getDuelNumber(options.secondary, 0);
+    return {
+      tokenId: token.document.id,
+      tokenName: token.document.name,
+      characterId: character.characterId || token.document.id,
+      name: character.characterName || token.document.name,
+      house: character.house || "",
+      preferredWeapons: character.preferredWeapons || "",
+      weapon,
+      armor,
+      armorBonus: getDuelArmorBonus(armor),
+      valyrian: Boolean(options.valyrian),
+      prowess,
+      martial,
+      martialBonus: martial / 2,
+      secondary
+    };
+  }
+
+  function formatDuelBreakdown(combatant) {
+    return `d30 ${combatant.d30} + Prowess ${combatant.prowess} + Martial/2 ${combatant.martialBonus} + Armor ${combatant.armorBonus} + Weapon ${combatant.weaponBonus} + Valyrian ${combatant.vsBonus} + Secondary ${combatant.secondary} = ${combatant.final}`;
+  }
+
+  function formatDuelInjury(injuryResult, defenderName) {
+    if (!injuryResult?.injury) return "No injury.";
+    const injury = injuryResult.injury;
+    return `${defenderName} suffers a ${injury.severity} to the ${injury.location}${injury.effect ? ` — ${injury.effect}` : ""}`;
+  }
+
+  async function resolveDuel({ tokenA, tokenB, options = {}, requesterUserName = game.user.name }) {
+    if (!tokenA || !tokenB) throw new Error("Duel requires two character tokens.");
+    if (!isCharacterToken(tokenA) || !isCharacterToken(tokenB)) throw new Error("Duel can only be rolled between character tokens.");
+
+    const a = buildDuelCombatant(tokenA, options.a || {});
+    const b = buildDuelCombatant(tokenB, options.b || {});
+
+    a.d30 = await rollDuelDie(30);
+    b.d30 = await rollDuelDie(30);
+
+    a.vsBonus = a.valyrian && !b.valyrian ? 5 : 0;
+    b.vsBonus = b.valyrian && !a.valyrian ? 5 : 0;
+
+    a.weaponBonus = getDuelWeaponAdvantage(a.weapon, b.weapon);
+    b.weaponBonus = getDuelWeaponAdvantage(b.weapon, a.weapon);
+    if (a.valyrian && !b.valyrian) b.weaponBonus = 0;
+    if (b.valyrian && !a.valyrian) a.weaponBonus = 0;
+
+    a.final = a.prowess + a.martialBonus + a.secondary + a.d30 + a.armorBonus + a.weaponBonus + a.vsBonus;
+    b.final = b.prowess + b.martialBonus + b.secondary + b.d30 + b.armorBonus + b.weaponBonus + b.vsBonus;
+
+    const margin = Math.abs(a.final - b.final);
+    const winner = a.final > b.final ? a.name : b.final > a.final ? b.name : "Tie";
+
+    a.d100 = await rollDuelDie(100);
+    b.d100 = await rollDuelDie(100);
+
+    let injuryResult = null;
+    let injuryAttacker = null;
+    let injuryDefender = null;
+    if (a.final > b.final) {
+      injuryAttacker = a;
+      injuryDefender = b;
+      if (a.d100 <= a.final) injuryResult = await resolveDuelInjuryForArmor(b.armor);
+    } else if (b.final > a.final) {
+      injuryAttacker = b;
+      injuryDefender = a;
+      if (b.d100 <= b.final) injuryResult = await resolveDuelInjuryForArmor(a.armor);
+    }
+
+    const injuryCheckText = !injuryAttacker
+      ? "Tie — no injury check."
+      : `${injuryAttacker.name} injury check: d100 ${injuryAttacker.d100} vs final combat ${injuryAttacker.final} — ${injuryResult ? "INJURY" : "No injury"}`;
+    const injuryText = injuryResult ? formatDuelInjury(injuryResult, injuryDefender.name) : "No injury inflicted.";
+
+    await ChatMessage.create({
+      speaker: ChatMessage.getSpeaker({ alias: "Crown Duel" }),
+      content: `<h2>Duel — ${escapeHtml(winner === "Tie" ? "Tie" : `${winner} Wins`)}</h2>
+        <p><strong>Combatant A:</strong> ${escapeHtml(a.name)} — ${escapeHtml(a.weapon)}, ${escapeHtml(a.armor)}${a.valyrian ? ", Valyrian Steel" : ""}</p>
+        <p><strong>Combatant B:</strong> ${escapeHtml(b.name)} — ${escapeHtml(b.weapon)}, ${escapeHtml(b.armor)}${b.valyrian ? ", Valyrian Steel" : ""}</p>
+        <p><strong>Winner:</strong> ${escapeHtml(winner)}</p>
+        <p><strong>Margin:</strong> ${escapeHtml(margin)}</p>
+        <p><strong>Injury Check:</strong> ${escapeHtml(injuryCheckText)}</p>
+        <p><strong>Injury:</strong> ${escapeHtml(injuryText)}</p>`
+    });
+
+    const gmUsers = game.users.contents.filter(user => user.isGM).map(user => user.id);
+    if (gmUsers.length) {
+      const armorLine = injuryResult?.armorRule ? `<p><strong>Armor Rule:</strong> ${escapeHtml(injuryResult.armorRule)}</p>` : "";
+      const rerollLine = injuryResult?.first && injuryResult?.second
+        ? `<p><strong>First Injury:</strong> ${escapeHtml(formatDuelInjury({ injury: injuryResult.first }, injuryDefender.name))}<br><strong>Second Injury:</strong> ${escapeHtml(formatDuelInjury({ injury: injuryResult.second }, injuryDefender.name))}</p>`
+        : "";
+      await ChatMessage.create({
+        speaker: ChatMessage.getSpeaker({ alias: "Crown Duel GM" }),
+        whisper: gmUsers,
+        content: `<h2>Duel Details — GM</h2>
+          <p><strong>Requested by:</strong> ${escapeHtml(requesterUserName || game.user.name)}</p>
+          <p><strong>${escapeHtml(a.name)}:</strong> ${escapeHtml(formatDuelBreakdown(a))}</p>
+          <p><strong>${escapeHtml(b.name)}:</strong> ${escapeHtml(formatDuelBreakdown(b))}</p>
+          <p><strong>A d100:</strong> ${escapeHtml(a.d100)}; <strong>B d100:</strong> ${escapeHtml(b.d100)}</p>
+          ${armorLine}${rerollLine}
+          <p class="notes">The module reports injuries from the sheet logic. Wounds/status are not auto-applied; GM should edit the character if the injury changes the campaign state.</p>`
+      });
+    }
+
+    return { a, b, winner, margin, injuryResult };
+  }
+
+  async function requestGmDuel({ tokenA, tokenB, options }) {
+    const gm = findActiveGmForScene(canvas.scene?.id);
+    if (!gm) { ui.notifications.warn("No active GM online to resolve this duel."); return false; }
+    game.socket.emit(SOCKET_NAME, {
+      type: "duelRequest",
+      targetGmId: gm.id,
+      sceneId: canvas.scene?.id,
+      requesterUserId: game.user.id,
+      requesterUserName: game.user.name,
+      tokenAId: tokenA.document.id,
+      tokenAName: tokenA.document.name,
+      tokenBId: tokenB.document.id,
+      tokenBName: tokenB.document.name,
+      options
+    });
+    ui.notifications.info(`Duel request sent to GM ${gm.name}.`);
+    return true;
+  }
+
+  async function duel() {
+    if (!requireOverviewScene()) return;
+    const selected = canvas.tokens.controlled.filter(token => isCharacterToken(token));
+    if (selected.length !== 2) { ui.notifications.warn("Select exactly two character tokens, then click Duel."); return; }
+    const [tokenA, tokenB] = selected;
+    if (!game.user.isGM && !selected.some(token => canUserControlWorldPiece(token, getWorldPiece(token)))) {
+      ui.notifications.warn("You must control at least one selected character to request a duel.");
+      return;
+    }
+    const options = await getDuelDialogOptions(tokenA, tokenB);
+    if (!options) return;
+    if (!game.user.isGM) { await requestGmDuel({ tokenA, tokenB, options }); return; }
+    try {
+      await resolveDuel({ tokenA, tokenB, options, requesterUserName: game.user.name });
+    } catch (err) {
+      ui.notifications.error(err.message || "Duel failed.");
+      console.error("Duel failed", err);
+    }
+  }
+
+  async function handleDuelRequest(message) {
+    if (!game.user.isGM) return;
+    if (message.targetGmId && String(message.targetGmId) !== String(game.user.id)) return;
+    if (message.sceneId && String(message.sceneId) !== String(canvas.scene?.id)) return;
+    const tokenA = canvas.tokens.placeables.find(token => token.document.id === message.tokenAId);
+    const tokenB = canvas.tokens.placeables.find(token => token.document.id === message.tokenBId);
+    if (!tokenA || !tokenB) { ui.notifications.warn(`Duel request failed: missing token ${message.tokenAName || message.tokenAId} or ${message.tokenBName || message.tokenBId}.`); return; }
+    try {
+      await resolveDuel({ tokenA, tokenB, options: message.options || {}, requesterUserName: message.requesterUserName || "Player" });
+      ui.notifications.info(`Resolved duel request from ${message.requesterUserName || "player"}.`);
+    } catch (err) {
+      ui.notifications.error(err.message || "Duel request failed.");
+      console.error("Duel request failed", err, message);
+    }
+  }
+
   async function assignPieceOwner() {
     if (!requireOverviewScene()) return;
     if (!game.user.isGM) { ui.notifications.warn("Only the GM can assign world piece owners."); return; }
@@ -7508,6 +7909,10 @@
         await handleSiegeStormRequest(message);
         return;
       }
+      if (message.type === "duelRequest") {
+        await handleDuelRequest(message);
+        return;
+      }
       if (message.type === "dismissForceRequest") {
         await handleDismissForceRequest(message);
         return;
@@ -9232,6 +9637,7 @@
     summonNavy,
     diplomaticTakeover,
     siegeStorm,
+    duel,
     resetMovement,
     resetBuildCapacity,
     repairBuildLocks,

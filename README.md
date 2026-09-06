@@ -1,3 +1,34 @@
+# Crown Overview Tools v0.5.0
+
+## v0.5.1 — Duel output-fix script alignment
+
+Uses the corrected `Roll_Everything_Output_Fix.gs` file as the Duel reference.
+
+- Duel formula now follows the corrected sheet exactly: d30 + Prowess + Martial/2 + Secondary Bonus + Armor Modifier + Weapon Advantage + Valyrian Steel Bonus.
+- Favoured Weapon Bonus remains stored/exported on characters, but is not applied to Duel rolls unless re-added later as a separate rule.
+- Keeps corrected d100 injury check: only the higher Final Combat combatant can inflict injury, and injury triggers when d100 is equal to or below Final Combat.
+- Keeps armor injury protection: Light rerolls Amputation, Medium rerolls lethal/Amputation, Heavy rolls a second injury on lethal/Amputation and keeps the less severe result.
+- Keeps v0.5.0 Duel button, GM whisper math, d36 hit location, and d10 severity.
+
+
+## v0.5.0 — Crown Duel System
+
+- Uses the uploaded v0.4.9 naval construction/capacity version as the base.
+- Fixes the internal script version constant to `0.5.0`.
+- Adds a player-facing/GMsupported `Duel` action to the Crown Overview panel.
+- Duel workflow: select exactly two character tokens, click `Duel`, choose weapon, armor, Valyrian steel, and any secondary bonus, then roll.
+- Non-GM duel requests route through the active GM client so hidden character stats are resolved GM-side.
+- Combat formula follows the supplied Google Apps Script: d30 + Prowess + Martial/2 + Secondary Bonus + Armor Modifier + Weapon Advantage + Valyrian Steel Bonus.
+- The module also adds the character Favoured Weapon Bonus when the selected weapon matches the character's preferred weapon category.
+- Weapon advantage is +5 using the supplied matrix: Sword beats Axe/Mace; Axe beats Mace/Polearm; Mace beats Polearm/Spear; Polearm beats Spear/Sword; Spear beats Sword/Axe; Bow has no melee advantage.
+- Valyrian Steel gives +5 when only one combatant has it and negates the opponent's normal weapon advantage.
+- Injury logic follows the supplied Apps Script: only the higher Final Combat combatant can inflict injury; injury occurs when that side's d100 is equal to or below their Final Combat.
+- Injury rolls use d36 location and d10 severity.
+- Armor injury protection follows the sheet: Light rerolls Amputation once; Medium rerolls lethal/Amputation once; Heavy rolls a second injury on lethal/Amputation and keeps the less severe result.
+- Public chat shows the duel winner, margin, injury check, and injury result.
+- GM whispered chat shows the full combat math and armor reroll details.
+- Injuries are reported but not automatically applied to wounds/status yet; GM should edit character state after reviewing the result.
+
 # Crown Overview Tools v0.4.9
 
 ## v0.4.9 — Naval construction tiers
