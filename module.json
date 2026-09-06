@@ -1,8 +1,8 @@
 {
   "id": "crown-overview-tools",
   "title": "Crown Overview Tools",
-  "description": "Scene-gated strategic overview map tools for Crown of Ashes. v0.4.6 polishes navies, siege GM resolution, player dismissal, military upkeep, and round clock/economy ledger controls.",
-  "version": "0.4.6",
+  "description": "Scene-gated strategic overview map tools for Crown of Ashes. v0.4.9 adds Drydock-tier ship-class unlocks: Shipwright for small vessels, Sail Makers for galleys, and Dry Dock for capital ships.",
+  "version": "0.4.9",
   "authors": [
     {
       "name": "Beyond Fandome"
@@ -20,6 +20,6 @@
   ],
   "url": "https://github.com/beyondfandome/crown-overview-tools",
   "manifest": "https://raw.githubusercontent.com/beyondfandome/crown-overview-tools/main/module.json",
-  "download": "https://github.com/beyondfandome/crown-overview-tools/releases/download/v0.4.6/crown-overview-tools-v0.4.6.zip",
+  "download": "https://github.com/beyondfandome/crown-overview-tools/releases/download/v0.4.9/crown-overview-tools-v0.4.9.zip",
   "socket": true
 }

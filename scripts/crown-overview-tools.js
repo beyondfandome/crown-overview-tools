@@ -1,6 +1,6 @@
 (() => {
   const MODULE_ID = "crown-overview-tools";
-  const MODULE_VERSION = "0.4.6";
+  const MODULE_VERSION = "0.4.8";
   const FLAG_SCOPE = "world";
   const WORLD_TILE_KEY = "worldTile";
   const WORLD_PIECE_KEY = "worldPiece";
@@ -250,9 +250,9 @@
       { level: 3, name: "Knight's Holdfast", aliases: ["Knights Holdfasts"], income: { "Light Cavalry": 500, Lancers: 500, "Heavy Cavalry": 200 }, effect: "Convert 500 Mob to Light Cavalry/Lancers; 200 Heavy Cavalry" }
     ]},
     { key: "mustering", group: "Military", label: "Mustering Grounds", levels: [
-      { level: 1, name: "Mustering Hall", income: { Mob: 500, Food: -3 }, effect: "+500 Mob, -3 Food upkeep" },
-      { level: 2, name: "Mustering Grounds", income: { Mob: 1000, Food: -6 }, effect: "+1000 Mob, -6 Food upkeep" },
-      { level: 3, name: "Levee En Masse", aliases: ["Levee En Mass"], income: { Mob: 1500, Food: -6, Gold: -3 }, effect: "+1500 Mob, -6 Food, -3 Gold upkeep" }
+      { level: 1, name: "Mustering Hall", income: { Food: -3 }, manpowerBonus: 500, effect: "+500 province manpower / +5 ship fielding capacity; -3 Food upkeep" },
+      { level: 2, name: "Mustering Grounds", income: { Food: -6 }, manpowerBonus: 1000, effect: "+1000 province manpower / +10 ship fielding capacity; -6 Food upkeep" },
+      { level: 3, name: "Levee En Masse", aliases: ["Levee En Mass"], income: { Food: -6, Gold: -3 }, manpowerBonus: 1500, effect: "+1500 province manpower / +15 ship fielding capacity; -6 Food, -3 Gold upkeep" }
     ]},
     { key: "watchtower", group: "Military", label: "Watchtowers", levels: [
       { level: 1, name: "Watchtowers", income: {}, movementCostModifier: 0.5, siegeModifier: 1, effect: "+1 siege DC, +0.5 enemy movement cost" },
@@ -265,9 +265,9 @@
       { level: 3, name: "Siege Workshop", income: { Siege: 15 }, effect: "Unlock Trebuchet" }
     ]},
     { key: "drydock", group: "Military", label: "Drydock", levels: [
-      { level: 1, name: "Shipwright", income: { Ships: 1 }, effect: "Unlock small boats" },
-      { level: 2, name: "Sail Makers", income: { Ships: 2 }, effect: "Unlock more boats" },
-      { level: 3, name: "Dry Dock", income: { Ships: 3 }, effect: "Unlock heavy boats" }
+      { level: 1, name: "Shipwright", income: {}, effect: "Unlock Fishing / Conscripted Vessels and Longships" },
+      { level: 2, name: "Sail Makers", income: {}, effect: "Unlock Galleys and War Galleys" },
+      { level: 3, name: "Dry Dock", income: {}, effect: "Unlock Greatships and Dromonds" }
     ]},
     { key: "sept", group: "Social", label: "Sept", levels: [
       { level: 1, name: "Village Sept", income: { Influence: 1 }, effect: "+1 Influence; holy order flavour" },
@@ -974,7 +974,7 @@
     },
     road: { maxLevel: 1, movementModifierPerLevel: -0.5, notes: "Roads reduce movement cost by 0.5 and do not upgrade twice." },
     military: { maxLevel: 3, lines: ["Barracks", "Archery Range", "Stable", "Siege Workshop"], notes: "Future hook: converts base mob into trained soldiers." },
-    musteringGrounds: { maxLevel: 3, baseManpower: 1000, manpowerPerLevel: 500, upkeep: { Gold: 1, Food: 1 } },
+    musteringGrounds: { maxLevel: 3, baseManpower: 1000, manpowerByLevel: { 1: 500, 2: 1000, 3: 1500 }, notes: "Each land province contributes 1,000 base manpower and 10 ship fielding capacity; Mustering buildings increase both caps proportionally and charge their listed upkeep." },
     influence: { maxLevel: 3, lines: ["Sept", "Godswood", "Festival Square", "School"], notes: "Influence buildings provide +1 additional Influence per upgrade tier, shown as total Influence 1/2/3." },
     fortification: { maxLevel: 3, movementCostIncreasePerLevel: 0.5, quickSiegeDcIncreasePerLevel: 2 }
   };
@@ -4061,6 +4061,254 @@
     return getCharacterTokens().find(token => String(getCharacterDataFromToken(token).characterId || "") === id || String(getWorldPiece(token)?.characterId || "") === id) || null;
   }
 
+  const BASE_PROVINCE_MANPOWER = 1000;
+  const MANPOWER_RECOVERY_RATE = 0.05;
+
+  function getProvinceManpowerMax(house = {}) {
+    let bonus = 0;
+    const state = getBuildingLineState(house).get("mustering");
+    if (state?.level) bonus = Math.max(0, Number(state.level.manpowerBonus || 0));
+    return BASE_PROVINCE_MANPOWER + bonus;
+  }
+
+  const BASE_PROVINCE_SHIP_CAPACITY = 10;
+  const MOB_EQUIVALENT_PER_SHIP = 100;
+
+  function getProvinceShipCapacity(house = {}) {
+    const manpowerBonus = Math.max(0, getProvinceManpowerMax(house) - BASE_PROVINCE_MANPOWER);
+    return BASE_PROVINCE_SHIP_CAPACITY + Math.floor(manpowerBonus / MOB_EQUIVALENT_PER_SHIP);
+  }
+
+  function getProvinceManpowerCurrent(house = {}) {
+    const max = getProvinceManpowerMax(house);
+    const raw = numberOrBlank(house.manpowerCurrent);
+    if (raw === "") return max;
+    const cachedMax = numberOrBlank(house.manpowerMaxCached);
+    const capacityIncrease = cachedMax === "" ? 0 : Math.max(0, max - Number(cachedMax || 0));
+    return Math.max(0, Math.min(max, Math.floor(Number(raw || 0) + capacityIncrease)));
+  }
+
+  function getCharacterHouseKey(characterToken) {
+    const character = getCharacterDataFromToken(characterToken) || {};
+    const piece = getWorldPiece(characterToken) || {};
+    return normalize(character.house || piece.house || piece.faction || "");
+  }
+
+  function getManpowerEntriesForCharacter(characterToken) {
+    const character = getCharacterDataFromToken(characterToken) || {};
+    const piece = getWorldPiece(characterToken) || {};
+    const houseKey = getCharacterHouseKey(characterToken);
+    const ownerId = String(piece.ownerUserId || piece.playerOwnerUserId || character.playerUserId || "");
+    return getWorldTileEntries().filter(entry => {
+      if (isSeaByTile(entry.tile)) return false;
+      const house = getHouseData(entry.drawing) || {};
+      if (houseKey) return normalize(house.house || entry.tile?.owner || "") === houseKey;
+      return ownerId && String(getTileOwnerUserId(entry.tile, house) || "") === ownerId;
+    });
+  }
+
+  function getHouseManpowerSummaryForCharacter(characterToken) {
+    const entries = getManpowerEntriesForCharacter(characterToken);
+    let current = 0;
+    let max = 0;
+    for (const entry of entries) {
+      const house = getHouseData(entry.drawing) || {};
+      current += getProvinceManpowerCurrent(house);
+      max += getProvinceManpowerMax(house);
+    }
+    return { entries, current, max };
+  }
+
+  function getHouseShipCapacitySummaryForCharacter(characterToken, excludeCharacterId = "") {
+    const entries = getManpowerEntriesForCharacter(characterToken);
+    const houseKey = getCharacterHouseKey(characterToken);
+    let max = 0;
+    for (const entry of entries) {
+      const house = getHouseData(entry.drawing) || {};
+      max += getProvinceShipCapacity(house);
+    }
+    let committed = 0;
+    for (const token of getFleetTokens()) {
+      const fleet = getWorldPiece(token) || {};
+      if (normalize(fleet.house || fleet.faction || "") !== houseKey) continue;
+      if (excludeCharacterId && String(fleet.linkedCharacterId || fleet.commanderCharacterId || "") === String(excludeCharacterId)) continue;
+      committed += Math.max(0, Math.floor(Number(fleet.shipsCurrent ?? fleet.totalShips ?? getNavyTotalShips(getNavyComposition(fleet)) ?? 0)));
+    }
+    for (const token of getCharacterTokens()) {
+      const pending = getPendingNavyMuster(token);
+      if (!pending || pending.status !== "pending") continue;
+      if (normalize(pending.house || "") !== houseKey) continue;
+      if (excludeCharacterId && String(pending.linkedCharacterId || "") === String(excludeCharacterId)) continue;
+      committed += Math.max(0, Math.floor(Number(pending.totalShips || 0)));
+    }
+    return { entries, max, committed, available: Math.max(0, max - committed) };
+  }
+
+  function getNavyCommandCapacity(characterToken) {
+    const martial = getCharacterMartialValue(characterToken);
+    const mobEquivalent = Math.max(0, Math.floor(martial * 250));
+    return { martial, mobEquivalent, ships: Math.max(0, Math.floor(mobEquivalent / MOB_EQUIVALENT_PER_SHIP)) };
+  }
+
+  function getHouseDrydockLevelForCharacter(characterToken) {
+    let level = 0;
+    const entries = getManpowerEntriesForCharacter(characterToken);
+    for (const entry of entries) {
+      const house = getHouseData(entry.drawing) || {};
+      const state = getBuildingLineState(house).get("drydock");
+      if (state?.level) level = Math.max(level, Math.max(0, Number(state.level.level || 0)));
+    }
+    return Math.min(3, level);
+  }
+
+  function getShipRequiredDrydockLevel(shipKey) {
+    const key = normalize(shipKey);
+    if ([normalize("Fishing / Conscripted Vessel"), normalize("Longship")].includes(key)) return 1;
+    if ([normalize("Galley"), normalize("War Galley")].includes(key)) return 2;
+    if ([normalize("Greatship"), normalize("Dromond")].includes(key)) return 3;
+    return 99;
+  }
+
+  function getUnlockedNavyShipTypes(characterToken) {
+    const drydockLevel = getHouseDrydockLevelForCharacter(characterToken);
+    return NAVY_SHIP_TYPES.filter(ship => getShipRequiredDrydockLevel(ship.key) <= drydockLevel);
+  }
+
+  function getDrydockUnlockSummary(level) {
+    const n = Math.max(0, Math.min(3, Number(level || 0)));
+    if (n <= 0) return "No Shipwright: no ship classes unlocked";
+    if (n === 1) return "Shipwright: Fishing / Conscripted Vessels and Longships";
+    if (n === 2) return "Sail Makers: adds Galleys and War Galleys";
+    return "Dry Dock: adds Greatships and Dromonds";
+  }
+
+  function validateNavyShipClassUnlocks(characterToken, composition = {}) {
+    const drydockLevel = getHouseDrydockLevelForCharacter(characterToken);
+    const locked = [];
+    for (const ship of NAVY_SHIP_TYPES) {
+      const count = Math.max(0, Math.floor(Number(composition?.[ship.key] || 0)));
+      if (count <= 0) continue;
+      const required = getShipRequiredDrydockLevel(ship.key);
+      if (required > drydockLevel) locked.push(`${ship.label} (requires Drydock level ${required})`);
+    }
+    if (locked.length) {
+      throw new Error(`Ship class unavailable: ${locked.join(", ")}. House naval infrastructure is level ${drydockLevel}: ${getDrydockUnlockSummary(drydockLevel)}.`);
+    }
+    return { drydockLevel, unlocked: getUnlockedNavyShipTypes(characterToken) };
+  }
+
+  function getTrainingCapacityForEntries(entries = []) {
+    const capacity = {};
+    for (const troop of ARMY_TROOP_TYPES) capacity[troop.key] = troop.key === "Mob" ? Infinity : 0;
+    for (const entry of entries) {
+      const house = getHouseData(entry.drawing) || {};
+      const built = Array.isArray(house.builtBuildings) ? house.builtBuildings : [];
+      for (const building of built) {
+        const meta = getBuildingMetaByName(building);
+        if (!meta || !["barracks", "archery", "stable"].includes(meta.line.key)) continue;
+        const support = meta.level.income || {};
+        for (const troop of ARMY_TROOP_TYPES) {
+          if (troop.key === "Mob") continue;
+          capacity[troop.key] += Math.max(0, Number(support[troop.key] || 0));
+        }
+      }
+    }
+    return capacity;
+  }
+
+  function getCommittedTrainedTroopsForHouse(houseKey, excludeMusterId = "") {
+    const used = {};
+    for (const troop of ARMY_TROOP_TYPES) used[troop.key] = 0;
+    for (const token of getArmyTokens()) {
+      const piece = getWorldPiece(token) || {};
+      if (normalize(piece.house || piece.faction || "") !== houseKey) continue;
+      const composition = getArmyComposition(piece);
+      for (const troop of ARMY_TROOP_TYPES) used[troop.key] += Number(composition[troop.key] || 0);
+    }
+    for (const token of getCharacterTokens()) {
+      const pending = getPendingArmyMuster(token);
+      if (!pending || pending.status !== "pending" || String(pending.id || "") === String(excludeMusterId || "")) continue;
+      if (normalize(pending.house || "") !== houseKey) continue;
+      for (const troop of ARMY_TROOP_TYPES) used[troop.key] += Number(pending.composition?.[troop.key] || 0);
+    }
+    return used;
+  }
+
+  function getAvailableTrainingCapacity(characterToken, excludeMusterId = "") {
+    const entries = getManpowerEntriesForCharacter(characterToken);
+    const total = getTrainingCapacityForEntries(entries);
+    const used = getCommittedTrainedTroopsForHouse(getCharacterHouseKey(characterToken), excludeMusterId);
+    const available = {};
+    for (const troop of ARMY_TROOP_TYPES) {
+      available[troop.key] = troop.key === "Mob" ? Infinity : Math.max(0, Number(total[troop.key] || 0) - Number(used[troop.key] || 0));
+    }
+    return { total, used, available };
+  }
+
+  async function changeHouseManpower(characterToken, delta) {
+    let remaining = Math.abs(Math.floor(Number(delta || 0)));
+    if (!remaining) return 0;
+    const entries = getManpowerEntriesForCharacter(characterToken);
+    let changed = 0;
+    const deducting = Number(delta) < 0;
+    for (const entry of entries) {
+      if (remaining <= 0) break;
+      const house = foundry.utils.deepClone(getHouseData(entry.drawing) || {});
+      const max = getProvinceManpowerMax(house);
+      const current = getProvinceManpowerCurrent(house);
+      const amount = deducting ? Math.min(current, remaining) : Math.min(max - current, remaining);
+      if (amount <= 0) continue;
+      house.manpowerCurrent = current + (deducting ? -amount : amount);
+      house.manpowerMaxCached = max;
+      house.manpowerUpdatedAt = new Date().toISOString();
+      house.manpowerUpdatedBy = game.user.name;
+      await entry.drawing.document.setFlag(FLAG_SCOPE, HOUSE_KEY, house);
+      remaining -= amount;
+      changed += amount;
+    }
+    return changed;
+  }
+
+  async function reserveManpowerForMuster(characterToken, muster) {
+    const summary = getHouseManpowerSummaryForCharacter(characterToken);
+    const need = Math.max(0, Math.floor(Number(muster?.totalStrength || 0)));
+    if (need > summary.current) throw new Error(`Not enough manpower. ${summary.current.toLocaleString()} available, ${need.toLocaleString()} requested.`);
+    const reserved = await changeHouseManpower(characterToken, -need);
+    if (reserved !== need) throw new Error(`Could only reserve ${reserved.toLocaleString()} of ${need.toLocaleString()} manpower.`);
+    muster.manpowerReserved = reserved;
+    muster.manpowerReservedAt = new Date().toISOString();
+    return muster;
+  }
+
+  async function recoverManpowerForRound() {
+    let recovered = 0;
+    let provinces = 0;
+    for (const entry of getWorldTileEntries()) {
+      if (isSeaByTile(entry.tile)) continue;
+      const house = foundry.utils.deepClone(getHouseData(entry.drawing) || {});
+      if (!house.house && !getTileOwnerUserId(entry.tile, house)) continue;
+      const max = getProvinceManpowerMax(house);
+      const current = getProvinceManpowerCurrent(house);
+      if (current >= max) {
+        if (house.manpowerCurrent === undefined) {
+          house.manpowerCurrent = max;
+          house.manpowerMaxCached = max;
+          await entry.drawing.document.setFlag(FLAG_SCOPE, HOUSE_KEY, house);
+        }
+        continue;
+      }
+      const gain = Math.min(max - current, Math.max(1, Math.ceil(max * MANPOWER_RECOVERY_RATE)));
+      house.manpowerCurrent = current + gain;
+      house.manpowerMaxCached = max;
+      house.manpowerUpdatedAt = new Date().toISOString();
+      house.manpowerUpdatedBy = game.user.name;
+      await entry.drawing.document.setFlag(FLAG_SCOPE, HOUSE_KEY, house);
+      recovered += gain;
+      provinces++;
+    }
+    return { recovered, provinces };
+  }
+
   function getArmyTokens() {
     return canvas.tokens.placeables.filter(token => normalize(getWorldPiece(token)?.pieceType) === "army");
   }
@@ -4141,8 +4389,14 @@
     return parts.length ? parts.join("; ") : "None";
   }
 
-  function buildNavyCompositionInputs() {
-    return NAVY_SHIP_TYPES.map(ship => `<div class="form-group"><label>${escapeHtml(ship.label)}</label><input type="number" name="ship_${escapeHtml(ship.key)}" value="0" min="0" step="1" style="width:100%;" /><p class="notes">Quality ${escapeHtml(ship.quality)} — ${escapeHtml(ship.gold)} Gold / 5, ${escapeHtml(ship.food)} Food / 5. ${escapeHtml(ship.note)}</p></div>`).join("");
+  function buildNavyCompositionInputs(maxShips = 0, allowedShipTypes = NAVY_SHIP_TYPES) {
+    const maxAttr = Math.max(0, Math.floor(Number(maxShips || 0)));
+    const allowed = new Set((allowedShipTypes || []).map(ship => ship.key));
+    return NAVY_SHIP_TYPES.map(ship => {
+      const unlocked = allowed.has(ship.key);
+      const required = getShipRequiredDrydockLevel(ship.key);
+      return `<div class="form-group" style="${unlocked ? "" : "opacity:0.55;"}"><label>${escapeHtml(ship.label)}${unlocked ? "" : ` — LOCKED (Drydock ${escapeHtml(required)})`}</label><input type="number" name="ship_${escapeHtml(ship.key)}" value="0" min="0" max="${escapeHtml(unlocked ? maxAttr : 0)}" step="1" style="width:100%;" ${unlocked ? "" : "disabled"} /><p class="notes">Quality ${escapeHtml(ship.quality)} — ${escapeHtml(ship.gold)} Gold / 5, ${escapeHtml(ship.food)} Food / 5. ${escapeHtml(ship.note)}</p></div>`;
+    }).join("");
   }
 
   function readNavyCompositionForm(form) {
@@ -4219,8 +4473,12 @@
     await saveWorldPiece(characterToken, piece);
   }
 
-  function buildArmyCompositionInputs(maxMen) {
-    return ARMY_TROOP_TYPES.map(troop => `<div class="form-group"><label>${escapeHtml(troop.label)}</label><input type="number" name="troop_${escapeHtml(troop.key)}" value="0" min="0" step="50" style="width:100%;" /><p class="notes">${escapeHtml(troop.gold)} Gold / 500, ${escapeHtml(troop.food)} Food / 500</p></div>`).join("");
+  function buildArmyCompositionInputs(maxMen, trainingAvailable = {}) {
+    return ARMY_TROOP_TYPES.map(troop => {
+      const cap = troop.key === "Mob" ? maxMen : Math.max(0, Number(trainingAvailable[troop.key] || 0));
+      const capText = troop.key === "Mob" ? "Default troop type; limited only by manpower/command cap" : `Available training capacity: ${cap.toLocaleString()}`;
+      return `<div class="form-group"><label>${escapeHtml(troop.label)}</label><input type="number" name="troop_${escapeHtml(troop.key)}" value="0" min="0" max="${escapeHtml(cap)}" step="50" style="width:100%;" /><p class="notes">${escapeHtml(troop.gold)} Gold / 500, ${escapeHtml(troop.food)} Food / 500. ${escapeHtml(capText)}</p></div>`;
+    }).join("");
   }
 
   function readArmyCompositionForm(form) {
@@ -4236,7 +4494,10 @@
     const character = getCharacterDataFromToken(characterToken);
     const piece = getWorldPiece(characterToken);
     const martial = getCharacterMartialValue(characterToken);
-    const maxMen = Math.max(0, Math.floor(martial * 250));
+    const commandCap = Math.max(0, Math.floor(martial * 250));
+    const manpower = getHouseManpowerSummaryForCharacter(characterToken);
+    const training = getAvailableTrainingCapacity(characterToken);
+    const maxMen = Math.min(commandCap, manpower.current);
     if (!character?.characterId) { ui.notifications.warn("This character is missing a Character ID. Edit/import the character first."); return null; }
     if (getExistingArmyForCharacter(character.characterId)) { ui.notifications.warn(`${character.characterName || piece.name} already has an army token.`); return null; }
     const existingPending = getPendingArmyMuster(characterToken);
@@ -4251,12 +4512,14 @@
           <div style="padding:8px;margin-bottom:10px;border:1px solid #777;border-radius:6px;">
             <strong>Commander:</strong> ${escapeHtml(character.characterName || piece.name)}<br>
             <strong>Martial:</strong> ${escapeHtml(martial)}<br>
+            <strong>Command Capacity:</strong> ${escapeHtml(commandCap.toLocaleString())} men<br>
+            <strong>House Manpower:</strong> ${escapeHtml(manpower.current.toLocaleString())} / ${escapeHtml(manpower.max.toLocaleString())} men across ${escapeHtml(manpower.entries.length)} province(s)<br>
             <strong>Maximum Army Size:</strong> ${escapeHtml(maxMen.toLocaleString())} men<br>
             <strong>Location:</strong> ${escapeHtml(getTileName(entry))}<br>
             <span class="notes">Summoning takes 1 turn. The GM must process army musters to spawn the token.</span>
           </div>
           <div class="form-group"><label>Army Name</label><input type="text" name="armyName" value="${escapeHtml(character.characterName || piece.name)}'s Host" style="width:100%;" /></div>
-          <div style="display:grid;grid-template-columns:repeat(2, 1fr);gap:8px;">${buildArmyCompositionInputs(maxMen)}</div>
+          <div style="display:grid;grid-template-columns:repeat(2, 1fr);gap:8px;">${buildArmyCompositionInputs(maxMen, training.available)}</div>
           <div class="form-group"><label>Siege Engines</label><input type="number" name="siegeEngines" value="0" min="0" step="1" style="width:100%;" /></div>
           <div class="form-group"><label><input type="checkbox" name="followCharacter" checked /> Army follows this character when not detached or besieging</label></div>
         </form>`,
@@ -4278,7 +4541,16 @@
     if (!result) return null;
     const totalStrength = getArmyTotalStrength(result.composition);
     if (totalStrength <= 0) { ui.notifications.warn("Add at least one troop type to summon an army."); return null; }
-    if (totalStrength > maxMen) { ui.notifications.error(`Army is too large: ${totalStrength.toLocaleString()} men selected, but ${character.characterName || piece.name} can command ${maxMen.toLocaleString()}.`); return null; }
+    if (totalStrength > maxMen) { ui.notifications.error(`Army is too large: ${totalStrength.toLocaleString()} men selected, but only ${maxMen.toLocaleString()} are available under the command/manpower cap.`); return null; }
+    for (const troop of ARMY_TROOP_TYPES) {
+      if (troop.key === "Mob") continue;
+      const selected = Number(result.composition[troop.key] || 0);
+      const available = Number(training.available[troop.key] || 0);
+      if (selected > available) {
+        ui.notifications.error(`${troop.label} exceeds available training capacity: ${selected.toLocaleString()} selected, ${available.toLocaleString()} available from your military buildings.`);
+        return null;
+      }
+    }
     const upkeep = calculateArmyUpkeep(result.composition);
     return {
       id: foundry.utils.randomID(16),
@@ -4325,6 +4597,7 @@
       ui.notifications.info(`Army muster request sent to GM ${gm.name}.`);
       return;
     }
+    try { await reserveManpowerForMuster(token, muster); } catch (err) { ui.notifications.error(err.message || "Could not reserve manpower."); return; }
     await savePendingArmyMuster(token, muster);
     await ChatMessage.create({ speaker: ChatMessage.getSpeaker({ alias: "Crown Armies" }), content: `<h2>Army Muster Requested</h2><p><strong>Commander:</strong> ${escapeHtml(muster.linkedCharacterName)}</p><p><strong>Army:</strong> ${escapeHtml(muster.armyName)}</p><p><strong>Strength:</strong> ${escapeHtml(muster.totalStrength.toLocaleString())}</p><p><strong>Composition:</strong> ${escapeHtml(armyCompositionText(muster.composition))}</p><p><strong>Upkeep:</strong> ${escapeHtml(resourceMapToText(muster.upkeep))}</p><p><strong>Ready:</strong> ${escapeHtml(muster.readyDateLabel || "next round")}</p>` });
   }
@@ -4401,6 +4674,11 @@
     const character = getCharacterDataFromToken(characterToken);
     const piece = getWorldPiece(characterToken);
     const navalMovement = getCharacterNavalMovementValue(characterToken);
+    const command = getNavyCommandCapacity(characterToken);
+    const shipCapacity = getHouseShipCapacitySummaryForCharacter(characterToken);
+    const drydockLevel = getHouseDrydockLevelForCharacter(characterToken);
+    const unlockedShipTypes = getUnlockedNavyShipTypes(characterToken);
+    const maxShips = Math.min(command.ships, shipCapacity.available);
     if (!character?.characterId) { ui.notifications.warn("This character is missing a Character ID. Edit/import the character first."); return null; }
     if (getExistingNavyForCharacter(character.characterId)) { ui.notifications.warn(`${character.characterName || piece.name} already has a navy token.`); return null; }
     const existingPending = getPendingNavyMuster(characterToken);
@@ -4418,14 +4696,19 @@
         content: `<form>
           <div style="padding:8px;margin-bottom:10px;border:1px solid #777;border-radius:6px;">
             <strong>Commander:</strong> ${escapeHtml(character.characterName || piece.name)}<br>
+            <strong>Martial:</strong> ${escapeHtml(command.martial)}<br>
             <strong>Naval Movement:</strong> ${escapeHtml(navalMovement)}<br>
+            <strong>Command Capacity:</strong> ${escapeHtml(command.mobEquivalent.toLocaleString())} Mob-equivalent = ${escapeHtml(command.ships.toLocaleString())} ship(s)<br>
+            <strong>House Ship Capacity:</strong> ${escapeHtml(shipCapacity.available.toLocaleString())} available / ${escapeHtml(shipCapacity.max.toLocaleString())} total across ${escapeHtml(shipCapacity.entries.length)} province(s) (${escapeHtml(shipCapacity.committed.toLocaleString())} already fielded)<br>
+            <strong>Maximum Fleet Size:</strong> ${escapeHtml(maxShips.toLocaleString())} ship(s)<br>
+            <strong>Naval Infrastructure:</strong> Level ${escapeHtml(drydockLevel)} — ${escapeHtml(getDrydockUnlockSummary(drydockLevel))}<br>
             <strong>Port:</strong> ${escapeHtml(getTileName(entry))}<br>
             <strong>Available Sea Tiles:</strong> ${escapeHtml(seaEntries.map(getTileName).join(", "))}<br>
             <span class="notes">The navy launches immediately into the selected sea tile. The commander embarks and cannot move again until movement resets.</span>
           </div>
           <div class="form-group"><label>Starting Sea Tile</label><select name="startingSeaTileId" style="width:100%;">${buildConnectedSeaOptionsForPort(entry, defaultSeaId)}</select></div>
           <div class="form-group"><label>Navy Name</label><input type="text" name="navyName" value="${escapeHtml(character.characterName || piece.name)}'s Fleet" style="width:100%;" /></div>
-          <div style="display:grid;grid-template-columns:repeat(2, 1fr);gap:8px;">${buildNavyCompositionInputs()}</div>
+          <div style="display:grid;grid-template-columns:repeat(2, 1fr);gap:8px;">${buildNavyCompositionInputs(maxShips, unlockedShipTypes)}</div>
           <div class="form-group"><label><input type="checkbox" name="carryCharacter" checked /> Fleet carries linked character when moved</label></div>
         </form>`,
         buttons: {
@@ -4440,7 +4723,16 @@
     });
     if (!result) return null;
     const totalShips = getNavyTotalShips(result.composition);
-    if (totalShips <= 0) { ui.notifications.warn("Add at least one ship to summon a navy."); return null; }
+    if (totalShips <= 0) {
+      if (drydockLevel <= 0) ui.notifications.warn("This House has no Shipwright. Build the first Drydock level before fielding ships.");
+      else ui.notifications.warn("Add at least one ship to summon a navy.");
+      return null;
+    }
+    try { validateNavyShipClassUnlocks(characterToken, result.composition); } catch (err) { ui.notifications.error(err.message); return null; }
+    if (totalShips > maxShips) {
+      ui.notifications.error(`Fleet is too large: ${totalShips.toLocaleString()} ships selected, but this commander/House can currently field only ${maxShips.toLocaleString()}.`);
+      return null;
+    }
     const seaEntry = getEntryById(result.startingSeaTileId);
     if (!seaEntry || !isSeaTile(seaEntry.tile)) { ui.notifications.error("Could not find the selected starting sea tile."); return null; }
     const upkeep = calculateNavyUpkeep(result.composition);
@@ -4459,6 +4751,10 @@
       shipComposition: result.composition,
       composition: result.composition,
       totalShips,
+      shipCapacityAtRequest: shipCapacity.max,
+      shipCapacityAvailableAtRequest: shipCapacity.available,
+      commandShipCapacity: command.ships,
+      commandMobEquivalent: command.mobEquivalent,
       strengthMax: totalShips,
       strengthCurrent: totalShips,
       totalStrength: totalShips,
@@ -4499,6 +4795,7 @@
       ui.notifications.info(`Navy launch request sent to GM ${gm.name}.`);
       return;
     }
+    try { validateNavyFieldingCapacity(token, muster); } catch (err) { ui.notifications.error(err.message || "Could not field this navy."); return; }
     await launchNavyFromMuster(token, muster);
     revealForCurrentPlayerPieces();
   }
@@ -4509,9 +4806,22 @@
     if (message.sceneId && String(message.sceneId) !== String(canvas.scene?.id)) return;
     const token = canvas.tokens.placeables.find(token => token.document.id === message.tokenId);
     if (!token) { ui.notifications.warn(`Army muster request failed: ${message.tokenName || message.tokenId} not found.`); return; }
+    try { await reserveManpowerForMuster(token, message.muster); } catch (err) { ui.notifications.error(err.message || "Could not reserve manpower for army muster."); return; }
     await savePendingArmyMuster(token, message.muster);
     ui.notifications.info(`Received army muster request from ${message.requesterUserName}.`);
     await ChatMessage.create({ speaker: ChatMessage.getSpeaker({ alias: "Crown Armies" }), content: `<h2>Army Muster Requested</h2><p><strong>Player:</strong> ${escapeHtml(message.requesterUserName || "Unknown")}</p><p><strong>Commander:</strong> ${escapeHtml(message.muster?.linkedCharacterName || token.document.name)}</p><p><strong>Army:</strong> ${escapeHtml(message.muster?.armyName || "Host")}</p><p><strong>Strength:</strong> ${escapeHtml(Number(message.muster?.totalStrength || 0).toLocaleString())}</p><p>Use <strong>Process Army Musters</strong> after one turn to spawn the army token.</p>` });
+  }
+
+  function validateNavyFieldingCapacity(characterToken, muster) {
+    const command = getNavyCommandCapacity(characterToken);
+    const shipCapacity = getHouseShipCapacitySummaryForCharacter(characterToken, muster?.linkedCharacterId || "");
+    const composition = muster?.shipComposition || muster?.composition || {};
+    const classAccess = validateNavyShipClassUnlocks(characterToken, composition);
+    const totalShips = Math.max(0, Math.floor(Number(muster?.totalShips || getNavyTotalShips(composition))));
+    const maxShips = Math.min(command.ships, shipCapacity.available);
+    if (totalShips > command.ships) throw new Error(`Commander capacity exceeded: ${totalShips.toLocaleString()} ships requested, but Martial ${command.martial} can command ${command.ships.toLocaleString()} ship(s) (${command.mobEquivalent.toLocaleString()} Mob-equivalent).`);
+    if (totalShips > shipCapacity.available) throw new Error(`House ship capacity exceeded: ${totalShips.toLocaleString()} ships requested, but only ${shipCapacity.available.toLocaleString()} of ${shipCapacity.max.toLocaleString()} ship-capacity is available.`);
+    return { command, shipCapacity, classAccess, maxShips, totalShips };
   }
 
   async function handleNavyMusterRequest(message) {
@@ -4521,6 +4831,7 @@
     const token = canvas.tokens.placeables.find(token => token.document.id === message.tokenId);
     if (!token) { ui.notifications.warn(`Navy request failed: ${message.tokenName || message.tokenId} not found.`); return; }
     try {
+      validateNavyFieldingCapacity(token, message.muster);
       if (message.type === "navyLaunchRequest" || message.muster?.status === "launch") {
         await launchNavyFromMuster(token, message.muster);
         ui.notifications.info(`Launched navy request from ${message.requesterUserName}.`);
@@ -4578,7 +4889,8 @@
       status: "Active",
       version: `Crown Overview Tools ${MODULE_VERSION}`,
       musteredAt: now,
-      musteredBy: game.user.name
+      musteredBy: game.user.name,
+      manpowerReserved: Number(muster.manpowerReserved || muster.totalStrength || 0)
     };
     const actor = await Actor.create({
       name: muster.armyName,
@@ -4840,6 +5152,13 @@
       }, { width: 760, height: 760, resizable: true }).render(true);
     });
     if (!result) return;
+    if (isFleet) {
+      const linkedCharacter = getCharacterTokenById(piece.linkedCharacterId || piece.commanderCharacterId);
+      if (linkedCharacter) {
+        try { validateNavyShipClassUnlocks(linkedCharacter, result.composition); }
+        catch (err) { ui.notifications.error(err.message || "This House lacks the naval infrastructure for that ship class."); return; }
+      }
+    }
     piece.name = result.forceName || token.document.name;
     piece.composition = result.composition;
     if (isFleet) {
@@ -4881,6 +5200,13 @@
       await characterToken.document.setFlag(FLAG_SCOPE, WORLD_CHARACTER_KEY, character);
       if (characterToken.actor) await characterToken.actor.setFlag(FLAG_SCOPE, WORLD_CHARACTER_KEY, foundry.utils.deepClone(character));
       await saveWorldPiece(characterToken, charPiece);
+    }
+    if (normalize(piece.pieceType) === "army" && characterToken) {
+      const survivors = Math.max(0, Math.floor(Number(piece.strengthCurrent ?? piece.totalStrength ?? 0)));
+      if (survivors > 0) {
+        const returned = await changeHouseManpower(characterToken, survivors);
+        if (returned > 0) ui.notifications.info(`${returned.toLocaleString()} surviving soldiers returned to the manpower pool.`);
+      }
     }
     await token.document.delete();
     ui.notifications.info(`Dismissed ${normalize(piece.pieceType) === "fleet" ? "navy" : "army"}: ${piece.name || token.document.name}.`);
@@ -5792,8 +6118,9 @@
       const newClock = advanceClockData(clock);
       await saveClock(newClock);
       await resetMovement();
+      const manpowerRecovery = await recoverManpowerForRound();
       const economySummary = await collectEconomyForRound(newClock, { scope: "all", force: false, silent: false });
-      await ChatMessage.create({ speaker: ChatMessage.getSpeaker({ alias: "World Round Clock" }), content: `<h2>Round Advanced</h2><p><strong>Previous:</strong> ${escapeHtml(getDateLabel(oldClock))}</p><p><strong>Current:</strong> ${escapeHtml(getDateLabel(newClock))}</p><p>All World Pieces now have their full movement available.</p><p><strong>Economy:</strong> ${economySummary.skipped ? "Already collected" : `${escapeHtml(economySummary.applied)} tile(s) paid ${escapeHtml(resourceMapToText(economySummary.totals))}`}</p><p><strong>Military Upkeep:</strong> ${escapeHtml(resourceMapToText(economySummary.militaryUpkeep || {}, "None"))}</p>` });
+      await ChatMessage.create({ speaker: ChatMessage.getSpeaker({ alias: "World Round Clock" }), content: `<h2>Round Advanced</h2><p><strong>Previous:</strong> ${escapeHtml(getDateLabel(oldClock))}</p><p><strong>Current:</strong> ${escapeHtml(getDateLabel(newClock))}</p><p>All World Pieces now have their full movement available.</p><p><strong>Economy:</strong> ${economySummary.skipped ? "Already collected" : `${escapeHtml(economySummary.applied)} tile(s) paid ${escapeHtml(resourceMapToText(economySummary.totals))}`}</p><p><strong>Military Upkeep:</strong> ${escapeHtml(resourceMapToText(economySummary.militaryUpkeep || {}, "None"))}</p><p><strong>Manpower Recovery:</strong> ${escapeHtml(Number(manpowerRecovery.recovered || 0).toLocaleString())} men across ${escapeHtml(Number(manpowerRecovery.provinces || 0))} province(s).</p>` });
     }
   }
 
@@ -8177,7 +8504,7 @@
           <td style="padding:5px 7px;border:1px solid #777;"><strong>${escapeHtml(tile.name || "Unnamed Tile")}</strong><br><span style="opacity:0.75;">${escapeHtml(house.region || tile.region || "Unassigned")}</span></td>
           <td style="padding:5px 7px;border:1px solid #777;">${escapeHtml(house.house || tile.owner || "None")}<br><span style="opacity:0.75;">Ruler: ${escapeHtml(house.lord || "None")}</span></td>
           <td style="padding:5px 7px;border:1px solid #777;">${escapeHtml(developmentLabel)} (${escapeHtml(developmentLevel)}/4)<br><span style="opacity:0.75;">${escapeHtml(built.length ? built.join(", ") : "No buildings")}</span></td>
-          <td style="padding:5px 7px;border:1px solid #777;">Pop: ${escapeHtml(numberText(house.population))}<br>Treasury: ${escapeHtml(numberText(house.treasury))}<br>Stockpile: ${escapeHtml(stockpileText)}<br>Income: ${escapeHtml(incomeText)}</td>
+          <td style="padding:5px 7px;border:1px solid #777;">Pop: ${escapeHtml(numberText(house.population))}<br>Manpower: ${escapeHtml(getProvinceManpowerCurrent(house).toLocaleString())} / ${escapeHtml(getProvinceManpowerMax(house).toLocaleString())}<br>Ship Capacity: ${escapeHtml(getProvinceShipCapacity(house).toLocaleString())}<br>Treasury: ${escapeHtml(numberText(house.treasury))}<br>Stockpile: ${escapeHtml(stockpileText)}<br>Income: ${escapeHtml(incomeText)}</td>
           <td style="padding:5px 7px;border:1px solid #777;">${escapeHtml(resources)}</td>
         </tr>
       `;
