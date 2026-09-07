@@ -1,3 +1,25 @@
+# Crown Overview Tools v0.6.0
+
+## Embark composition and visibility
+- Embark Army now lets the player choose which troops embark when the fleet cannot carry the whole army.
+- Surplus troops are dispersed/dismissed from the field and the embarked army upkeep is recalculated from the kept composition.
+- Embarked army tokens now remain visible while at sea instead of becoming hidden.
+
+## Disembark action locks
+- Disembarking an army now locks the army, army commander, and carrying navy for the rest of the turn.
+- A disembarked character cannot immediately use Diplomatic Takeover in the same turn.
+- Moving a fleet only carries armies still explicitly marked as embarked.
+
+## Holdings and Influence
+- My Holdings now labels conquered generic Neutral/NPC holdings by political allegiance/House so it matches the map tooltip.
+- Local House identity is still shown separately when it differs from allegiance.
+- Adds a first-pass House Influence display on My Holdings and My Turn — Characters.
+- House Influence defaults to 10, is capped 0–21, and includes stored Influence from holdings.
+- Low Influence now applies an effective levy cap to army mustering: below 7 starts penalties, reaching 0 caps levies at 70%.
+
+## UI cleanup
+- The GM Make Territory Neutral / Unaligned button is no longer bolded in the Crown Overview panel.
+
 # Crown Overview Tools v0.5.20
 
 ## My Turn dashboard
