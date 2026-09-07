@@ -1,8 +1,8 @@
 {
   "id": "crown-overview-tools",
   "title": "Crown Overview Tools",
-  "description": "Scene-gated strategic overview map tools for Crown of Ashes. v0.5.11 restores the assigned-character move roster, unifies mustering with My Holdings controller ownership, and separates a province’s original House from its political allegiance.",
-  "version": "0.5.11",
+  "description": "Scene-gated strategic overview map tools for Crown of Ashes. v0.5.13 restores a dedicated Select My Assigned Actor button while retaining the v0.5.12 holdings/manpower and allegiance fixes.",
+  "version": "0.5.13",
   "authors": [
     {
       "name": "Beyond Fandome"
