@@ -1,8 +1,8 @@
 {
   "id": "crown-overview-tools",
   "title": "Crown Overview Tools",
-  "description": "Scene-gated strategic overview map tools for Crown of Ashes. v0.5.3 adds army embark/disembark transport with navy capacity limits.",
-  "version": "0.5.3",
+  "description": "Scene-gated strategic overview map tools for Crown of Ashes. v0.5.8 allows armies to finish a move by embarking, while embarkation consumes remaining movement and disembarkation still prevents further movement until the next refresh.",
+  "version": "0.5.8",
   "authors": [
     {
       "name": "Beyond Fandome"

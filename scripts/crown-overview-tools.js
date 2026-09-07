@@ -1,6 +1,6 @@
 (() => {
   const MODULE_ID = "crown-overview-tools";
-  const MODULE_VERSION = "0.5.3";
+  const MODULE_VERSION = "0.5.8";
   const FLAG_SCOPE = "world";
   const WORLD_TILE_KEY = "worldTile";
   const WORLD_PIECE_KEY = "worldPiece";
@@ -1921,6 +1921,7 @@
         <button data-coa-action="importTileOwnershipCsv">Import Tile Ownership CSV</button>
         <button data-coa-action="exportTileOwnershipCsv">Export Tile Ownership CSV</button>
         <button data-coa-action="assignHouse">Edit Tile Ownership / House Data</button>
+        <button data-coa-action="auditProvinceHouseData">Audit Province / House Data</button>
       </div>
       <div class="coa-panel-section coa-panel-gm-section">
         <div class="coa-panel-section-title">GM: World Pieces</div>
@@ -1961,6 +1962,7 @@
       </div>
       <div class="coa-panel-section coa-panel-player-section">
         <div class="coa-panel-section-title">Player Actions</div>
+        <button data-coa-action="characterMoveMenu">My Characters / Move</button>
         <button data-coa-action="pathMove">Move Piece</button>
         <button data-coa-action="spreadSelected">Spread Selected</button>
         <button data-coa-action="summonArmy">Summon Army</button>
@@ -4161,12 +4163,18 @@
     const character = getCharacterDataFromToken(characterToken) || {};
     const piece = getWorldPiece(characterToken) || {};
     const houseKey = getCharacterHouseKey(characterToken);
-    const ownerId = String(piece.ownerUserId || piece.playerOwnerUserId || character.playerUserId || "");
+    const ownerId = String(piece.ownerUserId || piece.playerOwnerUserId || character.playerUserId || "").trim();
     return getWorldTileEntries().filter(entry => {
       if (isSeaByTile(entry.tile)) return false;
       const house = getHouseData(entry.drawing) || {};
-      if (houseKey) return normalize(house.house || entry.tile?.owner || "") === houseKey;
-      return ownerId && String(getTileOwnerUserId(entry.tile, house) || "") === ownerId;
+      const tileHouseKey = normalize(house.house || entry.tile?.owner || "");
+      const tileOwnerId = String(getTileOwnerUserId(entry.tile, house) || "").trim();
+      if (houseKey) {
+        if (tileHouseKey !== houseKey) return false;
+        if (ownerId && tileOwnerId && tileOwnerId !== ownerId) return false;
+        return true;
+      }
+      return Boolean(ownerId) && tileOwnerId === ownerId;
     });
   }
 
@@ -4312,11 +4320,13 @@
     let remaining = Math.abs(Math.floor(Number(delta || 0)));
     if (!remaining) return 0;
     const entries = getManpowerEntriesForCharacter(characterToken);
-    let changed = 0;
     const deducting = Number(delta) < 0;
+    const planned = [];
+
     for (const entry of entries) {
       if (remaining <= 0) break;
-      const house = foundry.utils.deepClone(getHouseData(entry.drawing) || {});
+      const before = foundry.utils.deepClone(getHouseData(entry.drawing) || {});
+      const house = foundry.utils.deepClone(before);
       const max = getProvinceManpowerMax(house);
       const current = getProvinceManpowerCurrent(house);
       const amount = deducting ? Math.min(current, remaining) : Math.min(max - current, remaining);
@@ -4325,11 +4335,29 @@
       house.manpowerMaxCached = max;
       house.manpowerUpdatedAt = new Date().toISOString();
       house.manpowerUpdatedBy = game.user.name;
-      await entry.drawing.document.setFlag(FLAG_SCOPE, HOUSE_KEY, house);
+      planned.push({ entry, before, after: house, amount });
       remaining -= amount;
-      changed += amount;
     }
-    return changed;
+
+    const applied = [];
+    try {
+      for (const change of planned) {
+        await change.entry.drawing.document.setFlag(FLAG_SCOPE, HOUSE_KEY, change.after);
+        applied.push(change);
+      }
+    } catch (err) {
+      console.error("Crown Overview manpower transaction failed; rolling back applied province changes.", err);
+      for (const change of applied.reverse()) {
+        try {
+          await change.entry.drawing.document.setFlag(FLAG_SCOPE, HOUSE_KEY, change.before);
+        } catch (rollbackErr) {
+          console.error("Crown Overview manpower rollback failed for", getTileName(change.entry), rollbackErr);
+        }
+      }
+      throw new Error(`Manpower update failed and was rolled back where possible: ${err?.message || err}`);
+    }
+
+    return planned.reduce((sum, change) => sum + change.amount, 0);
   }
 
   async function reserveManpowerForMuster(characterToken, muster) {
@@ -5461,6 +5489,16 @@
     if (!canUserControlWorldPieceForUser(armyToken, army, actingUser)) throw new Error(`${actingUserName} does not control ${army.name || armyToken.document.name}.`);
     if (!canUserControlWorldPieceForUser(fleetToken, fleet, actingUser)) throw new Error(`${actingUserName} does not control ${fleet.name || fleetToken.document.name}.`);
 
+    const armyMoveLock = strategicMovementLockReason(army);
+    if (armyMoveLock) throw new Error(armyMoveLock);
+
+    const movementCommander = getArmyCommanderToken(army);
+    if (movementCommander) {
+      const commanderPiece = getWorldPiece(movementCommander) || {};
+      const commanderMoveLock = strategicMovementLockReason(commanderPiece);
+      if (commanderMoveLock) throw new Error(commanderMoveLock);
+    }
+
     const armyEntry = getCurrentTileEntryForToken(armyToken, army) || getTileById(army.currentTileId);
     const fleetEntry = getCurrentTileEntryForToken(fleetToken, fleet) || getTileById(fleet.currentTileId);
     if (!armyEntry?.tile || !isLandLike(armyEntry.tile) || isSeaTile(armyEntry.tile)) throw new Error("The army must be on a land/port tile to embark.");
@@ -5560,7 +5598,7 @@
 
     await ChatMessage.create({
       speaker: ChatMessage.getSpeaker({ alias: "Crown Embarkation" }),
-      content: `<h2>Army Embarked</h2><p><strong>Army:</strong> ${escapeHtml(army.name || armyToken.document.name)}</p><p><strong>Navy:</strong> ${escapeHtml(fleet.name || fleetToken.document.name)}</p><p><strong>From:</strong> ${escapeHtml(getTileName(armyEntry))}</p><p><strong>Sea Tile:</strong> ${escapeHtml(getTileName(fleetEntry))}</p><p><strong>Embarked Troops:</strong> ${escapeHtml(embarkedStrength.toLocaleString())}</p>${surplus ? `<p><strong>Surplus Dismissed:</strong> ${escapeHtml(surplus.toLocaleString())}${returnedManpower ? ` (${escapeHtml(returnedManpower.toLocaleString())} returned to manpower pool)` : ""}</p>` : ""}<p><strong>Army Upkeep Now:</strong> ${escapeHtml(resourceMapToText(army.upkeep))}</p><p>The army is now cargo. Move the navy to transport it.</p>`
+      content: `<h2>Army Embarked</h2><p><strong>Army:</strong> ${escapeHtml(army.name || armyToken.document.name)}</p><p><strong>Navy:</strong> ${escapeHtml(fleet.name || fleetToken.document.name)}</p><p><strong>From:</strong> ${escapeHtml(getTileName(armyEntry))}</p><p><strong>Sea Tile:</strong> ${escapeHtml(getTileName(fleetEntry))}</p><p><strong>Embarked Troops:</strong> ${escapeHtml(embarkedStrength.toLocaleString())}</p>${surplus ? `<p><strong>Surplus Dismissed:</strong> ${escapeHtml(surplus.toLocaleString())}${returnedManpower ? ` (${escapeHtml(returnedManpower.toLocaleString())} returned to manpower pool)` : ""}</p>` : ""}<p><strong>Army Upkeep Now:</strong> ${escapeHtml(resourceMapToText(army.upkeep))}</p><p>Embarking ends the army and commander's movement for this turn, consuming any remaining movement. The army is now cargo; move the navy to transport it.</p>`
     });
     revealForCurrentPlayerPieces();
     return { army, fleet };
@@ -5638,6 +5676,19 @@
     const actingUser = game.users.get(actingUserId) || { id: actingUserId, name: actingUserName, isGM: false };
     if (!canUserControlWorldPieceForUser(armyToken, army, actingUser)) throw new Error(`${actingUserName} does not control ${army.name || armyToken.document.name}.`);
     if (!canUserControlWorldPieceForUser(fleetToken, fleet, actingUser)) throw new Error(`${actingUserName} does not control ${fleet.name || fleetToken.document.name}.`);
+
+    const armyMoveLock = strategicMovementLockReason(army);
+    if (armyMoveLock) throw new Error(armyMoveLock);
+    if (Number(army.movementUsed || 0) > 0) throw new Error(`${army.name || armyToken.document.name} has already spent movement this turn. Disembarking requires the army's entire movement allowance.`);
+
+    const movementCommander = getArmyCommanderToken(army);
+    if (movementCommander) {
+      const commanderPiece = getWorldPiece(movementCommander) || {};
+      const commanderMoveLock = strategicMovementLockReason(commanderPiece);
+      if (commanderMoveLock) throw new Error(commanderMoveLock);
+      if (Number(commanderPiece.movementUsed || 0) > 0) throw new Error(`${movementCommander.document.name} has already spent movement this turn. Disembarking requires the commander's entire movement allowance.`);
+    }
+
     if (!destinationEntry?.tile || !isLandLike(destinationEntry.tile) || isSeaTile(destinationEntry.tile)) throw new Error("Choose a land/port tile to disembark onto.");
     const fleetEntry = getCurrentTileEntryForToken(fleetToken, fleet) || getTileById(fleet.currentTileId);
     const legalIds = new Set(getLandEntriesAdjacentToSeaEntry(fleetEntry).map(entry => String(getTileId(entry))));
@@ -5681,7 +5732,7 @@
 
     await ChatMessage.create({
       speaker: ChatMessage.getSpeaker({ alias: "Crown Embarkation" }),
-      content: `<h2>Army Disembarked</h2><p><strong>Army:</strong> ${escapeHtml(army.name || armyToken.document.name)}</p><p><strong>From Navy:</strong> ${escapeHtml(oldFleetName)}</p><p><strong>Landing:</strong> ${escapeHtml(getTileName(destinationEntry))}</p><p><strong>Troops:</strong> ${escapeHtml(getArmyCurrentStrength(army).toLocaleString())}</p><p>The army and its commander have committed their action and cannot move again until movement resets.</p>`
+      content: `<h2>Army Disembarked</h2><p><strong>Army:</strong> ${escapeHtml(army.name || armyToken.document.name)}</p><p><strong>From Navy:</strong> ${escapeHtml(oldFleetName)}</p><p><strong>Landing:</strong> ${escapeHtml(getTileName(destinationEntry))}</p><p><strong>Troops:</strong> ${escapeHtml(getArmyCurrentStrength(army).toLocaleString())}</p><p>Disembarking consumed the army and commander's full movement for this turn. Neither can move again until movement resets.</p>`
     });
     revealForCurrentPlayerPieces();
     return { army, fleet };
@@ -5962,12 +6013,19 @@
     return { before, percent, lost, after: Math.max(0, before - lost) };
   }
 
-  async function applyTileControllerFromVictory(entry, attackerPiece, actingUserId, actingUserName, source = "Siege") {
+  function getConqueringHouseName(attackerPiece = {}) {
+    const linkedCharacter = getCharacterTokenById(attackerPiece.linkedCharacterId || attackerPiece.commanderCharacterId || "");
+    const character = linkedCharacter ? (getCharacterDataFromToken(linkedCharacter) || {}) : {};
+    return String(attackerPiece.house || character.house || attackerPiece.faction || "").trim();
+  }
+
+  function applyProvinceTransferData(worldTile, house, { houseName = "", actingUserId = "", actingUserName = "", source = "Transfer", actorName = "", metadata = {} } = {}) {
     const ownerUser = game.users.get(actingUserId) || null;
-    const worldTile = foundry.utils.deepClone(entry.tile || {});
-    const house = foundry.utils.deepClone(getHouseData(entry.drawing) || {});
     const controllerId = ownerUser?.id || actingUserId || "";
     const controllerName = ownerUser?.name || actingUserName || "";
+    const newHouseName = String(houseName || controllerName || "Player").trim();
+    const now = new Date().toISOString();
+
     worldTile.ownershipType = "Player";
     worldTile.ownerUserId = controllerId;
     worldTile.ownerUserName = controllerName;
@@ -5976,7 +6034,12 @@
     worldTile.swornToType = "Player";
     worldTile.swornToPlayerName = controllerName;
     worldTile.swornToPlayerUserId = controllerId;
-    worldTile.publicOwnerLabel = controllerName;
+    worldTile.owner = newHouseName;
+    worldTile.house = newHouseName;
+    worldTile.publicOwnerLabel = newHouseName;
+    worldTile.updatedAt = now;
+    worldTile.updatedBy = game.user.name;
+
     house.ownershipType = "Player";
     house.ownerUserId = controllerId;
     house.ownerUserName = controllerName;
@@ -5985,14 +6048,45 @@
     house.swornToType = "Player";
     house.swornToPlayerName = controllerName;
     house.swornToPlayerUserId = controllerId;
-    house.publicOwnerLabel = controllerName;
-    house.lastControllerChange = { source, userId: controllerId, userName: controllerName, armyName: attackerPiece?.name || "", at: new Date().toISOString() };
-    worldTile.updatedAt = new Date().toISOString();
-    worldTile.updatedBy = game.user.name;
-    house.updatedAt = new Date().toISOString();
+    house.house = newHouseName;
+    house.publicOwnerLabel = newHouseName;
+    house.lastControllerChange = { source, userId: controllerId, userName: controllerName, house: newHouseName, actorName, at: now, ...metadata };
+    house.updatedAt = now;
     house.updatedBy = game.user.name;
-    await entry.drawing.document.setFlag(FLAG_SCOPE, WORLD_TILE_KEY, worldTile);
-    await entry.drawing.document.setFlag(FLAG_SCOPE, HOUSE_KEY, house);
+
+    return { worldTile, house, houseName: newHouseName, controllerId, controllerName, at: now };
+  }
+
+  async function transferProvinceToHouse(entry, attackerPiece, actingUserId, actingUserName, source = "Transfer", metadata = {}) {
+    const originalWorldTile = foundry.utils.deepClone(entry.tile || {});
+    const originalHouse = foundry.utils.deepClone(getHouseData(entry.drawing) || {});
+    const result = applyProvinceTransferData(
+      foundry.utils.deepClone(originalWorldTile),
+      foundry.utils.deepClone(originalHouse),
+      {
+        houseName: getConqueringHouseName(attackerPiece),
+        actingUserId,
+        actingUserName,
+        source,
+        actorName: attackerPiece?.name || "",
+        metadata
+      }
+    );
+
+    try {
+      await entry.drawing.document.setFlag(FLAG_SCOPE, WORLD_TILE_KEY, result.worldTile);
+      await entry.drawing.document.setFlag(FLAG_SCOPE, HOUSE_KEY, result.house);
+      return result;
+    } catch (err) {
+      console.error("Province transfer failed; attempting rollback.", err);
+      try {
+        await entry.drawing.document.setFlag(FLAG_SCOPE, WORLD_TILE_KEY, originalWorldTile);
+        await entry.drawing.document.setFlag(FLAG_SCOPE, HOUSE_KEY, originalHouse);
+      } catch (rollbackErr) {
+        console.error("Province transfer rollback also failed.", rollbackErr);
+      }
+      throw new Error(`Province transfer failed and was rolled back where possible: ${err?.message || err}`);
+    }
   }
 
   async function resolveSiegeStorm({ token, piece, entry, options, actingUserId = game.user.id, actingUserName = game.user.name } = {}) {
@@ -6001,8 +6095,11 @@
     const ownerId = getTileOwnerUserId(entry.tile, house);
     const ownerName = getTileOwnerUserName(entry.tile, house);
     const attackerOwnerId = piece.ownerUserId || piece.playerOwnerUserId || actingUserId || game.user.id;
+    const attackerHouseKey = normalize(getConqueringHouseName(piece));
+    const defenderHouseKey = normalize(house.house || entry.tile?.house || entry.tile?.owner || "");
     const siegeRoundKey = getCurrentActionRoundKey();
     if (piece.lastSiegeRoundKey && String(piece.lastSiegeRoundKey) === String(siegeRoundKey)) throw new Error("This army has already attempted a siege this turn.");
+    if (attackerHouseKey && defenderHouseKey && attackerHouseKey === defenderHouseKey) throw new Error(`${getTileName(entry)} already belongs to this army's House.`);
     if (ownerId && String(ownerId) === String(attackerOwnerId)) throw new Error(`${getTileName(entry)} is already controlled by this army's owner.`);
 
     const defendingArmies = getDefendingArmiesOnTile(entry, attackerOwnerId);
@@ -6049,7 +6146,15 @@
     updatedPiece.movementLockedReason = "This army committed a siege this turn.";
     await saveWorldPiece(token, updatedPiece);
 
-    if (outcome.success) await applyTileControllerFromVictory(entry, updatedPiece, actingUserId || attackerOwnerId || game.user.id, actingUserName || updatedPiece.ownerUserName || updatedPiece.playerOwnerUserName || game.user.name, "Siege");
+    let siegeTransfer = null;
+    if (outcome.success) siegeTransfer = await transferProvinceToHouse(
+      entry,
+      updatedPiece,
+      actingUserId || attackerOwnerId || game.user.id,
+      actingUserName || updatedPiece.ownerUserName || updatedPiece.playerOwnerUserName || game.user.name,
+      "Siege",
+      { outcome: outcome.key, armyId: token.document.id }
+    );
 
     await ChatMessage.create({
       speaker: ChatMessage.getSpeaker({ alias: "Crown Siege" }),
@@ -6063,7 +6168,7 @@
         <p>${escapeHtml(outcome.text)}</p>
         <p><strong>Attacker Casualties:</strong> ${escapeHtml(casualties.percent)}% — ${escapeHtml(casualties.lost.toLocaleString())} lost. <strong>Strength Remaining:</strong> ${escapeHtml(casualties.after.toLocaleString())} / ${escapeHtml(Number(updatedPiece.strengthMax || updatedPiece.totalStrength || casualties.before).toLocaleString())}</p>
         <p><strong>Movement:</strong> Siege committed; this army cannot move again until movement resets.</p>
-        ${outcome.success ? `<p><strong>Control:</strong> ${escapeHtml(getTileName(entry))} now changes allegiance to ${escapeHtml(actingUserName || updatedPiece.ownerUserName || updatedPiece.playerOwnerUserName || game.user.name)}. The local ruler is not automatically replaced.</p>` : `<p><strong>Next Attempt:</strong> Siege turns will count as ${escapeHtml(updatedPiece.siegeTurns)}.${outcome.foothold ? " Foothold +10% has been stored." : ""}</p>`}`
+        ${outcome.success ? `<p><strong>Control:</strong> ${escapeHtml(getTileName(entry))} now changes allegiance to ${escapeHtml(siegeTransfer?.houseName || actingUserName || updatedPiece.ownerUserName || updatedPiece.playerOwnerUserName || game.user.name)}. The local ruler is not automatically replaced.</p>` : `<p><strong>Next Attempt:</strong> Siege turns will count as ${escapeHtml(updatedPiece.siegeTurns)}.${outcome.foothold ? " Foothold +10% has been stored." : ""}</p>`}`
     });
     revealForCurrentPlayerPieces();
     return outcome;
@@ -6324,31 +6429,21 @@
     const success = finalRoll >= finalDc;
     const ownerUser = game.users.get(actingUserId) || null;
     const now = new Date().toISOString();
+    const conqueringHouse = String(character.house || piece.house || piece.faction || "").trim();
     const math = { d20, attackerDiplomacy, finalRoll, baseDc, defenderDiplomacy, cultureModifier: cultureMod.modifier, religionModifier: religionMod.modifier, swornModifier, finalDc, attackerCulture, defenderCulture, attackerReligion, defenderReligion };
 
     if (success) {
-      worldTile.ownershipType = "Player";
-      worldTile.ownerUserId = ownerUser?.id || actingUserId || "";
-      worldTile.ownerUserName = ownerUser?.name || actingUserName || "";
-      worldTile.playerOwnerUserId = ownerUser?.id || actingUserId || "";
-      worldTile.playerOwnerUserName = ownerUser?.name || actingUserName || "";
-      worldTile.swornToType = "Player";
-      worldTile.swornToPlayerName = ownerUser?.name || actingUserName || "";
-      worldTile.swornToPlayerUserId = ownerUser?.id || actingUserId || "";
-      worldTile.publicOwnerLabel = ownerUser?.name || actingUserName || "Player";
-      house.ownershipType = "Player";
-      house.ownerUserId = worldTile.ownerUserId;
-      house.ownerUserName = worldTile.ownerUserName;
-      house.playerOwnerUserId = worldTile.playerOwnerUserId;
-      house.playerOwnerUserName = worldTile.playerOwnerUserName;
-      house.swornToType = "Player";
-      house.swornToPlayerName = worldTile.swornToPlayerName;
-      house.swornToPlayerUserId = worldTile.swornToPlayerUserId;
-      house.publicOwnerLabel = worldTile.publicOwnerLabel;
-      house.house = house.house || worldTile.owner || "NPC";
+      const transfer = applyProvinceTransferData(worldTile, house, {
+        houseName: conqueringHouse,
+        actingUserId,
+        actingUserName,
+        source: "Diplomacy",
+        actorName: character.characterName || piece.name || "",
+        metadata: { attackerCharacterId: character.characterId || "" }
+      });
       house.lord = house.lord || defenderName;
       house.npcDefenderName = defenderName;
-      house.lastDiplomaticTakeover = { success: true, attackerCharacterId: character.characterId, attackerName: character.characterName, defenderName, userId: actingUserId, userName: actingUserName, at: now, math };
+      house.lastDiplomaticTakeover = { success: true, attackerCharacterId: character.characterId, attackerName: character.characterName, defenderName, userId: actingUserId, userName: actingUserName, house: transfer.houseName, at: now, math };
     } else {
       house.npcDefenderName = defenderName;
       house.lord = house.lord || defenderName;
@@ -6380,7 +6475,7 @@
     await entry.drawing.document.setFlag(FLAG_SCOPE, HOUSE_KEY, house);
 
     const publicContent = success
-      ? `<h2>Diplomatic Takeover</h2><p><strong>${escapeHtml(character.characterName || piece.name)}</strong> has won over <strong>${escapeHtml(tileName)}</strong>.</p><p><strong>New allegiance:</strong> ${escapeHtml(ownerUser?.name || actingUserName || "Player")}</p><p>The local ruler remains in place unless the GM changes it.</p>`
+      ? `<h2>Diplomatic Takeover</h2><p><strong>${escapeHtml(character.characterName || piece.name)}</strong> has won over <strong>${escapeHtml(tileName)}</strong>.</p><p><strong>New allegiance:</strong> ${escapeHtml(house.house || worldTile.owner || ownerUser?.name || actingUserName || "Player")}</p><p>The local ruler remains in place unless the GM changes it.</p>`
       : `<h2>Diplomatic Takeover Failed</h2><p><strong>${escapeHtml(character.characterName || piece.name)}</strong> failed to win over <strong>${escapeHtml(tileName)}</strong>.</p><p>The tile remains under <strong>${escapeHtml(getTileOwnerUserName(worldTile, house) || house.house || worldTile.owner || "NPC")}</strong> control.</p>`;
     await ChatMessage.create({ speaker: ChatMessage.getSpeaker({ alias: "Crown Diplomacy" }), content: publicContent });
     const gmUsers = game.users.contents.filter(user => user.isGM).map(user => user.id);
@@ -7248,6 +7343,149 @@
         }
       }, { width: 660, height: 520, resizable: true }).render(true);
     });
+  }
+
+  function getCharacterTurnStatusForMenu(token) {
+    const piece = getWorldPiece(token) || {};
+    const character = getCharacterDataFromToken(token) || {};
+    const roundKey = getCurrentActionRoundKey();
+    const movementUsed = Math.max(0, Number(piece.movementUsed || 0));
+    const movementMax = Math.max(0, Number(piece.movementMax || 0));
+    const movementRemaining = Math.max(0, movementMax - movementUsed);
+    const diplomacyUsed = hasDiplomacyAttemptThisRound(character, piece);
+    const linkedArmy = character.characterId ? getExistingArmyForCharacter(character.characterId) : null;
+    const linkedArmyPiece = linkedArmy ? (getWorldPiece(linkedArmy) || {}) : {};
+    const linkedNavy = character.characterId ? getExistingNavyForCharacter(character.characterId) : null;
+    const linkedNavyPiece = linkedNavy ? (getWorldPiece(linkedNavy) || {}) : {};
+    const siegeUsed = Boolean(linkedArmy && linkedArmyPiece.lastSiegeRoundKey && String(linkedArmyPiece.lastSiegeRoundKey) === String(roundKey));
+    const lockReason = strategicMovementLockReason(piece);
+    const entry = getCurrentTileEntryForToken(token, piece);
+    const armyCurrent = linkedArmy ? Math.max(0, Number(linkedArmyPiece.strengthCurrent ?? linkedArmyPiece.totalStrength ?? 0)) : 0;
+    const armyMax = linkedArmy ? Math.max(armyCurrent, Number(linkedArmyPiece.strengthMax ?? linkedArmyPiece.totalStrength ?? armyCurrent)) : 0;
+    const navyShips = linkedNavy ? Math.max(0, Math.floor(Number(linkedNavyPiece.shipsCurrent ?? linkedNavyPiece.totalShips ?? getNavyTotalShips(getNavyComposition(linkedNavyPiece)) ?? 0))) : 0;
+    const navyMovementUsed = linkedNavy ? Math.max(0, Number(linkedNavyPiece.movementUsed || 0)) : 0;
+    const navyMovementMax = linkedNavy ? Math.max(0, Number(linkedNavyPiece.movementMax || 0)) : 0;
+    const navyMovementRemaining = Math.max(0, navyMovementMax - navyMovementUsed);
+    const navyLockReason = linkedNavy ? strategicMovementLockReason(linkedNavyPiece) : "";
+    const navyEntry = linkedNavy ? (getCurrentTileEntryForToken(linkedNavy, linkedNavyPiece) || (linkedNavyPiece.currentTileId ? getTileById(linkedNavyPiece.currentTileId) : null)) : null;
+    const navyComposition = linkedNavy ? navyCompositionText(getNavyComposition(linkedNavyPiece)) : "None";
+    const transportCapacity = linkedNavy ? Math.max(0, Number(getFleetTransportCapacity(linkedNavyPiece) || 0)) : 0;
+    const liveEmbarkedArmies = linkedNavy ? getEmbarkedArmyTokensForFleet(linkedNavy) : [];
+    const transportUsed = linkedNavy ? Math.max(0, Number(getFleetUsedTransportCapacity(linkedNavy) || 0)) : 0;
+    const embarkedArmyCount = liveEmbarkedArmies.length;
+    return { token, piece, character, linkedArmy, linkedArmyPiece, linkedNavy, linkedNavyPiece, movementUsed, movementMax, movementRemaining, diplomacyUsed, siegeUsed, lockReason, armyCurrent, armyMax, navyShips, navyMovementUsed, navyMovementMax, navyMovementRemaining, navyLockReason, navyComposition, transportCapacity, transportUsed, embarkedArmyCount, navyLocation: navyEntry ? getTileName(navyEntry) : (linkedNavyPiece.currentTileName || "Unknown"), location: entry ? getTileName(entry) : (piece.currentTileName || "Unknown") };
+  }
+
+  async function selectCharacterTokenFromMenu(token, { action = "select" } = {}) {
+    if (!token) return;
+    const piece = getWorldPiece(token);
+    if (!piece || !canUserControlWorldPiece(token, piece)) { ui.notifications.warn("You can only select characters assigned to you."); return; }
+    token.control({ releaseOthers: true });
+    const center = getTokenCenter(token);
+    if (center && canvas?.animatePan) await canvas.animatePan({ x: center.x, y: center.y, duration: 250 });
+    if (action === "move") await pathMove();
+    if (action === "diplomacy") await diplomaticTakeover();
+  }
+
+  async function selectArmyFromCharacterMenu(characterToken, linkedArmy, action = "select") {
+    if (!linkedArmy) { ui.notifications.warn("This character does not currently have a linked army."); return; }
+    const armyPiece = getWorldPiece(linkedArmy);
+    if (!armyPiece || !canUserControlWorldPiece(linkedArmy, armyPiece)) { ui.notifications.warn("You do not control this character's linked army."); return; }
+    linkedArmy.control({ releaseOthers: true });
+    const center = getTokenCenter(linkedArmy);
+    if (center && canvas?.animatePan) await canvas.animatePan({ x: center.x, y: center.y, duration: 250 });
+    if (action === "siege") await siegeStorm();
+  }
+
+  async function selectNavyFromCharacterMenu(linkedNavy, action = "select") {
+    if (!linkedNavy) { ui.notifications.warn("This character does not currently have a linked navy."); return; }
+    const navyPiece = getWorldPiece(linkedNavy);
+    if (!navyPiece || !canUserControlWorldPiece(linkedNavy, navyPiece)) { ui.notifications.warn("You do not control this character's linked navy."); return; }
+    linkedNavy.control({ releaseOthers: true });
+    const center = getTokenCenter(linkedNavy);
+    if (center && canvas?.animatePan) await canvas.animatePan({ x: center.x, y: center.y, duration: 250 });
+    if (action === "move") await pathMove();
+    if (action === "disembark") await disembarkArmy();
+  }
+
+  async function characterMoveMenu() {
+    if (!requireOverviewScene()) return;
+    const characters = getCharacterTokens()
+      .filter(token => { const piece = getWorldPiece(token); return piece && canUserControlWorldPiece(token, piece); })
+      .map(getCharacterTurnStatusForMenu)
+      .sort((a, b) => String(a.character.characterName || a.piece.name || a.token.document.name).localeCompare(String(b.character.characterName || b.piece.name || b.token.document.name)));
+    if (!characters.length) { ui.notifications.warn("You do not currently have any assigned character tokens on this map."); return; }
+
+    const rows = characters.map(status => {
+      const name = status.character.characterName || status.piece.name || status.token.document.name;
+      const houseName = status.character.house || status.piece.house || status.piece.faction || "No House";
+      const movementText = `${status.movementUsed} / ${status.movementMax} used — ${status.movementRemaining} remaining`;
+      const diplomacyText = status.diplomacyUsed ? "Taken" : "Available";
+      const siegeText = status.linkedArmy ? (status.siegeUsed ? "Taken" : "Available") : "No army";
+      const armyText = status.linkedArmy ? `${status.armyCurrent.toLocaleString()} / ${status.armyMax.toLocaleString()}` : "None";
+      const navyText = status.linkedNavy ? `${status.navyShips.toLocaleString()} ships — ${status.navyLocation}` : "None";
+      const navyMovementText = status.linkedNavy ? `${status.navyMovementUsed} / ${status.navyMovementMax} used — ${status.navyMovementRemaining} remaining` : "—";
+      const transportText = status.linkedNavy ? `${status.transportUsed.toLocaleString()} / ${status.transportCapacity.toLocaleString()} troops (${status.embarkedArmyCount} embarked ${status.embarkedArmyCount === 1 ? "army" : "armies"})` : "—";
+      const moveDisabled = status.movementRemaining <= 0 || Boolean(status.lockReason);
+      const diplomacyDisabled = status.diplomacyUsed;
+      const siegeDisabled = !status.linkedArmy || status.siegeUsed;
+      const navyMoveDisabled = !status.linkedNavy || status.navyMovementRemaining <= 0 || Boolean(status.navyLockReason);
+      const disembarkDisabled = !status.linkedNavy || status.embarkedArmyCount <= 0;
+      return `<div style="display:grid;grid-template-columns:minmax(180px,1.15fr) minmax(360px,2.2fr) minmax(250px,auto);gap:10px;align-items:center;padding:10px;border:1px solid #777;border-radius:6px;margin-bottom:8px;">
+        <div><strong>${escapeHtml(name)}</strong><br><span class="notes">${escapeHtml(houseName)} — ${escapeHtml(status.location)}</span></div>
+        <div style="font-size:12px;line-height:1.45;">
+          <strong>Character Movement:</strong> ${escapeHtml(movementText)}<br>
+          <strong>Army:</strong> ${escapeHtml(armyText)}<br>
+          <strong>Diplomacy:</strong> ${escapeHtml(diplomacyText)} &nbsp; <strong>Siege:</strong> ${escapeHtml(siegeText)}
+          ${status.lockReason ? `<br><strong>Character movement locked:</strong> ${escapeHtml(status.lockReason)}` : ""}
+          <hr style="margin:5px 0;">
+          <strong>Navy:</strong> ${escapeHtml(navyText)}<br>
+          ${status.linkedNavy ? `<strong>Navy Movement:</strong> ${escapeHtml(navyMovementText)}<br><strong>Ships:</strong> ${escapeHtml(status.navyComposition)}<br><strong>Transport:</strong> ${escapeHtml(transportText)}${status.navyLockReason ? `<br><strong>Navy movement locked:</strong> ${escapeHtml(status.navyLockReason)}` : ""}` : ""}
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;">
+          <button type="button" data-character-token-id="${escapeHtml(status.token.document.id)}" data-character-action="select">Character</button>
+          <button type="button" data-character-token-id="${escapeHtml(status.token.document.id)}" data-character-action="move" ${moveDisabled ? "disabled" : ""}>Move Character</button>
+          <button type="button" data-character-token-id="${escapeHtml(status.token.document.id)}" data-character-action="diplomacy" ${diplomacyDisabled ? "disabled" : ""}>Diplomacy</button>
+          <button type="button" data-character-token-id="${escapeHtml(status.token.document.id)}" data-character-action="army" ${status.linkedArmy ? "" : "disabled"}>Army</button>
+          <button type="button" data-character-token-id="${escapeHtml(status.token.document.id)}" data-character-action="siege" ${siegeDisabled ? "disabled" : ""}>Siege</button>
+          <button type="button" data-character-token-id="${escapeHtml(status.token.document.id)}" data-character-action="navy" ${status.linkedNavy ? "" : "disabled"}>Navy</button>
+          <button type="button" data-character-token-id="${escapeHtml(status.token.document.id)}" data-character-action="navyMove" ${navyMoveDisabled ? "disabled" : ""}>Move Navy</button>
+          <button type="button" data-character-token-id="${escapeHtml(status.token.document.id)}" data-character-action="embark" ${status.linkedArmy && status.linkedNavy ? "" : "disabled"}>Embark Army</button>
+          <button type="button" data-character-token-id="${escapeHtml(status.token.document.id)}" data-character-action="disembark" ${disembarkDisabled ? "disabled" : ""}>Disembark</button>
+        </div>
+      </div>`;
+    }).join("");
+
+    let dialog = null;
+    dialog = new Dialog({
+      title: "My Turn — Characters",
+      content: `<div style="margin-bottom:10px;"><strong>${escapeHtml(game.user.name)}</strong><br><span class="notes">Manage your assigned characters, linked armies, and linked navies from one place. Character and navy movement are tracked separately; all existing movement, embarkation, Diplomacy, and Siege rules still apply.</span></div><div style="max-height:640px;overflow-y:auto;padding-right:4px;">${rows}</div>`,
+      buttons: { close: { label: "Close" } },
+      render: html => {
+        for (const button of html[0].querySelectorAll("[data-character-action]")) {
+          button.addEventListener("click", async event => {
+            event.preventDefault();
+            const tokenId = String(button.dataset.characterTokenId || "");
+            const action = String(button.dataset.characterAction || "select");
+            const token = canvas.tokens.placeables.find(candidate => String(candidate.document.id) === tokenId);
+            if (!token) { ui.notifications.warn("That character token is no longer available on this scene."); return; }
+            const status = getCharacterTurnStatusForMenu(token);
+            if (["move", "diplomacy", "siege", "navyMove", "embark", "disembark"].includes(action)) dialog?.close();
+            if (action === "army") await selectArmyFromCharacterMenu(token, status.linkedArmy, "select");
+            else if (action === "siege") await selectArmyFromCharacterMenu(token, status.linkedArmy, "siege");
+            else if (action === "navy") await selectNavyFromCharacterMenu(status.linkedNavy, "select");
+            else if (action === "navyMove") await selectNavyFromCharacterMenu(status.linkedNavy, "move");
+            else if (action === "embark") {
+              await selectArmyFromCharacterMenu(token, status.linkedArmy, "select");
+              await embarkArmy();
+            }
+            else if (action === "disembark") await selectNavyFromCharacterMenu(status.linkedNavy, "disembark");
+            else await selectCharacterTokenFromMenu(token, { action });
+          });
+        }
+      }
+    }, { width: 900, height: "auto", resizable: true });
+    dialog.render(true);
   }
 
   async function pathMove() {
@@ -10493,6 +10731,49 @@
     ui.notifications.info(`Hidden original world tile labels: ${updated}. Failed: ${failed}.`);
   }
 
+  async function auditProvinceHouseData() {
+    if (!game.user.isGM) { ui.notifications.warn("GM only."); return; }
+    if (!requireOverviewScene()) return;
+    const issues = [];
+    let checked = 0;
+
+    for (const entry of getWorldTileEntries()) {
+      if (isSeaByTile(entry.tile)) continue;
+      checked++;
+      const worldTile = entry.tile || {};
+      const house = getHouseData(entry.drawing) || {};
+      const tileName = getTileName(entry);
+      const houseName = String(house.house || "").trim();
+      const tileHouse = String(worldTile.house || worldTile.owner || "").trim();
+      const controllerId = String(getTileOwnerUserId(worldTile, house) || "").trim();
+      const controllerName = String(getTileOwnerUserName(worldTile, house) || "").trim();
+      const houseControllerId = String(house.ownerUserId || house.playerOwnerUserId || "").trim();
+      const tileControllerId = String(worldTile.ownerUserId || worldTile.playerOwnerUserId || "").trim();
+      const max = getProvinceManpowerMax(house);
+      const current = getProvinceManpowerCurrent(house);
+      const rawCurrent = numberOrBlank(house.manpowerCurrent);
+
+      const tileIssues = [];
+      if (!houseName && controllerId) tileIssues.push("player-controlled province has no House Data house name");
+      if (houseName && tileHouse && normalize(houseName) !== normalize(tileHouse)) tileIssues.push(`House mismatch: House Data '${houseName}' vs World Tile '${tileHouse}'`);
+      if (houseControllerId && tileControllerId && houseControllerId !== tileControllerId) tileIssues.push("controller mismatch between House Data and World Tile");
+      if (normalize(worldTile.ownershipType || house.ownershipType || "") === "player" && !controllerId) tileIssues.push("marked Player-owned but has no controller user id");
+      if (rawCurrent !== "" && (Number(rawCurrent) < 0 || Number(rawCurrent) > max)) tileIssues.push(`manpower out of bounds: raw ${rawCurrent}/${max} (effective ${current})`);
+      if (numberOrBlank(house.manpowerMaxCached) !== "" && Number(house.manpowerMaxCached) !== max) tileIssues.push(`cached manpower max ${house.manpowerMaxCached} differs from calculated ${max}`);
+      if (controllerId && !game.users.get(controllerId)) tileIssues.push(`controller user id '${controllerId}' is not a current Foundry user`);
+
+      if (tileIssues.length) issues.push({ tileName, houseName: houseName || tileHouse || "—", controllerName: controllerName || "—", issues: tileIssues });
+    }
+
+    const content = issues.length
+      ? `<p>Checked <strong>${escapeHtml(checked)}</strong> land provinces and found <strong>${escapeHtml(issues.length)}</strong> with possible data problems.</p><div style="max-height:520px;overflow-y:auto;">${issues.map(item => `<div style="border:1px solid #777;border-radius:5px;padding:8px;margin:6px 0;"><strong>${escapeHtml(item.tileName)}</strong> — ${escapeHtml(item.houseName)} / ${escapeHtml(item.controllerName)}<br>${item.issues.map(issue => `• ${escapeHtml(issue)}`).join("<br>")}</div>`).join("")}</div>`
+      : `<p>Checked <strong>${escapeHtml(checked)}</strong> land provinces. No House/controller/manpower inconsistencies were detected.</p>`;
+
+    new Dialog({ title: "Province / House Data Audit", content, buttons: { close: { label: "Close" } } }, { width: 760, height: "auto", resizable: true }).render(true);
+    ui.notifications.info(issues.length ? `Province audit found ${issues.length} possible issue(s).` : `Province audit clean: ${checked} province(s) checked.`);
+    return { checked, issues };
+  }
+
   function startSceneFeatures() {
     updateDateBanner();
     renderPanel();
@@ -10523,6 +10804,7 @@
     start: startSceneFeatures,
     stop: stopSceneFeatures,
     pathMove,
+    characterMoveMenu,
     spreadSelected,
     toggleClickMove,
     toggleRouteTooltip,
@@ -10560,6 +10842,7 @@
     assignPieceOwner,
     editWorldPiece,
     assignHouse,
+    auditProvinceHouseData,
     manageTileEconomy,
     manageMarketForces,
     collectEconomy,
