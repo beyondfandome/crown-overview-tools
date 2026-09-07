@@ -1,8 +1,8 @@
 {
   "id": "crown-overview-tools",
   "title": "Crown Overview Tools",
-  "description": "Scene-gated strategic overview map tools for Crown of Ashes. v0.5.16 hardens siege/diplomacy allegiance transfer and verifies the saved political allegiance.",
-  "version": "0.5.16",
+  "description": "Scene-gated strategic overview map tools for Crown of Ashes. v0.5.18 adds a GM Neutral/Unaligned territory reset while preserving local House identity.",
+  "version": "0.5.18",
   "authors": [
     {
       "name": "Beyond Fandome"
@@ -13,13 +13,13 @@
     "verified": "14"
   },
   "scripts": [
-    "scripts/crown-overview-tools-v0.5.16.js"
+    "scripts/crown-overview-tools-v0.5.18.js"
   ],
   "styles": [
     "styles/crown-overview-tools.css"
   ],
   "url": "https://github.com/beyondfandome/crown-overview-tools",
   "manifest": "https://raw.githubusercontent.com/beyondfandome/crown-overview-tools/main/module.json",
-  "download": "https://github.com/beyondfandome/crown-overview-tools/releases/download/v0.5.16/crown-overview-tools-v0.5.16.zip",
+  "download": "https://github.com/beyondfandome/crown-overview-tools/releases/download/v0.5.18/crown-overview-tools-v0.5.18.zip",
   "socket": true
 }
