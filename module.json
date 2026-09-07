@@ -1,8 +1,8 @@
 {
   "id": "crown-overview-tools",
   "title": "Crown Overview Tools",
-  "description": "Scene-gated strategic overview map tools for Crown of Ashes. v0.5.8 allows armies to finish a move by embarking, while embarkation consumes remaining movement and disembarkation still prevents further movement until the next refresh.",
-  "version": "0.5.8",
+  "description": "Scene-gated strategic overview map tools for Crown of Ashes. v0.5.10 fixes diplomatic takeovers so captured provinces are assigned to the attacking character’s actual player controller/House rather than whichever user resolved the roll.",
+  "version": "0.5.10",
   "authors": [
     {
       "name": "Beyond Fandome"
@@ -20,6 +20,6 @@
   ],
   "url": "https://github.com/beyondfandome/crown-overview-tools",
   "manifest": "https://raw.githubusercontent.com/beyondfandome/crown-overview-tools/main/module.json",
-  "download": "https://github.com/beyondfandome/crown-overview-tools/releases/download/v0.5.8/crown-overview-tools-v0.5.8.zip",
+  "download": "https://github.com/beyondfandome/crown-overview-tools/releases/download/v0.5.3/crown-overview-tools-v0.5.3.zip",
   "socket": true
 }
