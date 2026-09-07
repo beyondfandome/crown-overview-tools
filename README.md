@@ -1,3 +1,16 @@
+# Crown Overview Tools v0.6.1
+
+## Economy privacy and turn-lock polish
+- Economy collection details are no longer posted as one public all-realm breakdown.
+- GM receives the full Economy Collected report with every paid tile and all military upkeep.
+- Each player receives only their own economy income and their own military upkeep lines.
+- Diplomatic Takeover now checks strategic locks before sending a player request to the GM, so recently disembarked characters are blocked immediately with a useful warning.
+- Disembark/embark character lock data is also saved onto character data as well as world-piece data, reducing stale action-state mismatches.
+
+## Note on troop stockpiles
+- Military buildings still produce troop resources into stockpile when their construction is active.
+- Seasonal market scaling applies to non-Gold/Food outputs only when the configured general market multiplier is global; in Winter 0.5 this means a 500 Light Infantry building output can appear as Light Infantry: 250.
+
 # Crown Overview Tools v0.6.0
 
 ## Embark composition and visibility
