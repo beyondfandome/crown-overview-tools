@@ -1,8 +1,8 @@
 {
   "id": "crown-overview-tools",
   "title": "Crown Overview Tools",
-  "description": "Scene-gated strategic overview map tools for Crown of Ashes. v0.6.13 makes army mustering player-driven and automatically completes due musters when the Round Clock advances.",
-  "version": "0.6.13",
+  "description": "Scene-gated strategic overview map tools for Crown of Ashes. v0.6.14 changes military upkeep to a House-wide Realm Stockpile instead of charging one arbitrary province.",
+  "version": "0.6.14",
   "authors": [
     {
       "name": "Beyond Fandome"
@@ -13,13 +13,13 @@
     "verified": "14"
   },
   "scripts": [
-    "scripts/crown-overview-tools-v0.6.13.js"
+    "scripts/crown-overview-tools-v0.6.14.js"
   ],
   "styles": [
     "styles/crown-overview-tools.css"
   ],
   "url": "https://github.com/beyondfandome/crown-overview-tools",
   "manifest": "https://raw.githubusercontent.com/beyondfandome/crown-overview-tools/main/module.json",
-  "download": "https://github.com/beyondfandome/crown-overview-tools/releases/download/v0.6.13/crown-overview-tools-v0.6.13.zip",
+  "download": "https://github.com/beyondfandome/crown-overview-tools/releases/download/v0.6.14/crown-overview-tools-v0.6.14.zip",
   "socket": true
 }

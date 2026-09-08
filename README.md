@@ -1,103 +1,106 @@
-# Crown Overview Tools v0.6.13
+# Crown Overview Tools v0.6.14
 
-## What v0.6.13 changes
+## What v0.6.14 changes
 
-- Reworked Army Muster so normal player mustering no longer requires manual GM approval
+- Reworked military upkeep to use a House-wide Realm Stockpile
 
-- The Summon Army button now uses:
-  Begin Muster
-  instead of:
-  Request Muster
+- Armies and navies no longer charge their entire upkeep to one arbitrary province
 
-- The player-facing text no longer tells players that the GM must manually process the army
+- Previously the module:
+  totalled a player's military upkeep
+  found the first controlled economy tile
+  deducted the entire bill from that one province
 
-- Raising an army still takes 1 round
+- This is why messages could say things such as:
+  "Thom: -Gold 13.5; Food 14.5 from Wyl"
 
-- When Begin Muster is used, the module immediately validates:
-  Command Capacity
-  available House Manpower
-  trained troop capacity
-  Siege Capacity
-
-- Manpower and specialist capacity are reserved as soon as the muster begins
-
-- The player is shown the army's Ready date immediately
+- Wyl was not actually responsible for those armies
+- It was simply the first qualifying controlled tile found by the module
 
 
-- Army musters now complete automatically through the Round Clock
+- Military upkeep is now treated as a realm-level cost
 
-- When the GM advances to a new round, the module checks all pending army musters
+- All controlled land-province stockpiles are treated as one logical:
+  Realm Stockpile
 
-- Any army whose Ready date has arrived is automatically spawned
+- The player's total Gold / Food across their holdings is the military treasury
 
-- The GM does NOT need to press a separate Process Military Musters button during normal play
+- Army and navy upkeep is deducted from that combined realm balance
 
-- Newly completed armies are created before the new round's economy collection
-
-- This means the army is active in the new round and begins paying its normal military upkeep immediately
-
-- Movement is then reset normally for the new round
-
-
-- Foundry permission handling is now hidden from the gameplay flow
-
-- A player client still uses the active GM client as the privileged backend for:
-  reserving shared realm manpower
-  saving the pending muster
-  creating the future Actor/token
-
-- This is automatic and does not represent a GM approval step
-
-- The player receives:
-  Muster begun
-  Ready date
-  Muster complete
-  notifications without requiring the GM to approve anything
-
-- If no GM client is connected, the module explains that an active GM connection is required for the privileged Foundry operations
+- The economy message now says:
+  from Realm Stockpile
+  rather than naming an arbitrary province
 
 
-- Muster messages were cleaned up
+- Upkeep debits are distributed across the realm balances
 
-- "Army Muster Requested" is now:
-  Army Muster Begun
+- When the realm can afford the bill, the deduction is spread proportionally
+  across provinces according to the resources currently held there
 
-- The confirmation explains that:
-  manpower is reserved immediately
-  specialist capacity is reserved immediately
-  no GM approval is required
-  the Round Clock completes the muster automatically
+- This avoids randomly draining Wyl, Cinderholdt, Blackmont, or whichever
+  province happens to appear first internally
 
-- When the army finishes:
-  Army Muster Complete
-  is sent to the owning player / GM
+- If the total realm cannot afford the full upkeep, the available resources
+  are exhausted first and the remaining shortfall is distributed across the
+  realm rather than placing the entire deficit on one arbitrary province
 
-
-- The Round Clock report now includes:
-  Army Musters Completed
-  Army musters still preparing
-  failed musters, if any
+- This preserves the existing rule that military upkeep is always charged
+  while making the accounting House-wide
 
 
-- The old manual GM processor remains only as a fallback / testing tool
+- Military Upkeep reports now show:
 
-- The GM panel button is now labelled:
-  Process Muster Fallback
+  Total Upkeep
+  Realm Stockpile before payment
+  Realm Stockpile after payment
+  individual army / navy upkeep lines
 
-- Manual fallback processing can still be used to recover or test legacy pending musters
+- Example:
+
+  Thom: -Gold 13.5; Food 14.5 from Realm Stockpile
+  Realm: Gold 1,006; Food 967.5 → Gold 992.5; Food 953
+  Alester's Host: Gold 10; Food 12
+  Grand Maester Thomore's Host: Gold 3.5; Food 2.5
 
 
-- Navy behaviour is unchanged
+- My Holdings terminology has been updated
 
-- Summon Navy still launches immediately from a valid Port
-- The active GM client may still perform the privileged token-creation work silently in the background
+- The top summary card now says:
+  Realm Stockpile
+
+- "Total Stockpile" now says:
+  Total Realm Stockpile
+
+- Individual province stockpiles are still shown in the table because
+  construction and local economy data continue to use province records
 
 
-- All v0.6.12 and earlier systems remain included
+- Why this is implemented as one logical realm pool rather than creating a second duplicated bank
+
+- The existing campaign already stores Gold / Food inside each province
+
+- Creating a second independent Realm Treasury would duplicate those same resources
+  and require a risky migration of every existing campaign balance
+
+- v0.6.14 therefore treats the aggregate of all controlled province balances
+  as the authoritative Realm Stockpile for military costs
+
+- From the player's point of view it behaves as one House treasury
+- Internally the existing province records remain the backing ledger
+
+- This keeps all existing campaign resources intact while giving military upkeep
+  the realm-wide behaviour intended by the rules
+
+
+- Building and province-specific economy spending are NOT changed in this update
+
+- This update only changes army / navy military upkeep
+
+- All v0.6.13 and earlier gameplay systems remain included
 
 ## ZIP contents
 
 - module.json
 - README.md
-- scripts/crown-overview-tools-v0.6.13.js
+- scripts/crown-overview-tools-v0.6.14.js
 - styles/crown-overview-tools.css
