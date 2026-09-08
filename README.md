@@ -1,3 +1,17 @@
+# Crown Overview Tools v0.6.2
+
+## Manpower, training capacity, and army UI
+- My Holdings now promotes realm Manpower to the top summary and shows total trained-troop capacity from active Barracks, Archery Range, and Stable lines.
+- Population remains visible as secondary realm flavour rather than occupying one of the main summary cards.
+- Military troop buildings now grant training capacity only. They no longer create Light Infantry, Spearmen, Archers, cavalry, or other troop types as round income or stockpile resources.
+- Legacy troop values already sitting in a tile stockpile are ignored by the My Holdings stockpile/income display; the underlying old values are left untouched rather than silently deleting campaign data.
+- Training capacity still stacks across owned provinces. Two active Town Guards therefore provide 1,000 Light Infantry training capacity, while all trained troops still count against the same realm manpower pool.
+- Summon Army upkeep text is now written as `Round upkeep: X Gold + Y Food per 500 troops` for clearer costing.
+- Existing trained-troop locks and available-capacity validation are retained.
+
+## Siege engines
+- No new siege-engine cost rule is imposed in v0.6.2. The existing module still stores a numeric siege-engine count and applies the existing siege-roll bonus bands; siege procurement/capacity remains a separate rules pass.
+
 # Crown Overview Tools v0.6.1
 
 ## Economy privacy and turn-lock polish
