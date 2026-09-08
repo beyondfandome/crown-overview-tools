@@ -1,8 +1,8 @@
 {
   "id": "crown-overview-tools",
   "title": "Crown Overview Tools",
-  "description": "Scene-gated strategic overview map tools for Crown of Ashes. v0.6.4 adds structured siege equipment/capacity, development-based siege DCs, fortification corrections, and a cleaner category-driven building UI.",
-  "version": "0.6.4",
+  "description": "Scene-gated strategic overview map tools for Crown of Ashes. v0.6.5 adds political ownership overlays, a cleaner GM tile editor with direct tier overrides, and a reorganized control panel.",
+  "version": "0.6.5",
   "authors": [
     {
       "name": "Beyond Fandome"
@@ -13,13 +13,13 @@
     "verified": "14"
   },
   "scripts": [
-    "scripts/crown-overview-tools-v0.6.4.js"
+    "scripts/crown-overview-tools-v0.6.5.js"
   ],
   "styles": [
     "styles/crown-overview-tools.css"
   ],
   "url": "https://github.com/beyondfandome/crown-overview-tools",
   "manifest": "https://raw.githubusercontent.com/beyondfandome/crown-overview-tools/main/module.json",
-  "download": "https://github.com/beyondfandome/crown-overview-tools/releases/download/v0.6.4/crown-overview-tools-v0.6.4.zip",
+  "download": "https://github.com/beyondfandome/crown-overview-tools/releases/download/v0.6.5/crown-overview-tools-v0.6.5.zip",
   "socket": true
 }
