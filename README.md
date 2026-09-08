@@ -1,36 +1,45 @@
-# Crown Overview Tools v0.6.5
+# Crown Overview Tools v0.6.7
 
-## What v0.6.5 changes
+## What v0.6.7 changes
 
-- Added a Political Overlay toggle to the main panel
-- Political Overlay fills owned land tiles with semi-transparent colours
-- GM sees the full political map using per-player ownership shades
-- Players see owner-specific colours for revealed territory and regional base colours for unrevealed territory
-- Neutral / NPC territory uses a consistent grey overlay
-- Region colour families are now visually distinct, while different players inside the same region use different shades of that region colour
+### Political Overlay — persistent player colours
 
-- Reworked the GM Tile Ownership / House Data editor
-- Removed the old wall of building checkboxes
-- Buildings are now grouped by Economy, Infrastructure, Military, and Social categories
-- Each building line can be set directly to None, Tier 1, Tier 2, or Tier 3 from a dropdown
-- The GM editor now bypasses Statecraft requirements so you can jump directly to any building tier for testing or setup
-- The normal 4-building-line tile cap is still enforced
+- Player political colours are now House/owner-wide rather than region-specific
+- A player keeps the same political colour everywhere they control land
+- Conquering a province in another region therefore paints that revealed province in the conqueror's normal political colour
+- Example: if a green player from The Reach takes a Westerlands province, that province shows green once its ownership is visible
+- The overlay includes a palette large enough for the current 20–22 player campaign
+- Colours are assigned consistently from the player account rather than being recalculated separately inside each region
 
-- Reorganized the Crown Overview panel
-- Round Clock moved much higher in the GM tools so the turn progression controls are easier to reach
-- Player actions are now grouped into Characters & Movement, Military & Realm, and View Tools
-- GM actions are now grouped into Round Management, Characters & Pieces, Armies / Tiles / Economy, and Map Tools & Maintenance
-- Added a Political Overlay button to the player-facing View Tools section
+### Fog-of-war / unrevealed territory
 
-## Notes
+- Political Overlay still respects the existing player visibility system
+- A player does not learn exact ownership merely by switching the overlay on
+- Unrevealed land uses only its region's generic colour family
+- Example: an unrevealed Westerlands province appears in the generic Westerlands red family, regardless of which player currently owns it
+- Once the province becomes revealed, its true owner's persistent political colour is shown
+- Revealed Neutral / NPC territory uses the dedicated neutral grey colour
+- GM continues to see exact political ownership across the full map
 
-- Player fog-of-war behaviour for the Political Overlay uses the existing reveal system: revealed territory shows specific owner shading, while unrevealed territory falls back to a region-colour overlay rather than revealing the exact political owner.
-- Neutral / NPC territory keeps its own dedicated grey identity.
-- The GM editor is intended as an administrative and testing tool; it can bypass the normal character Statecraft gate that the player Build / Upgrade flow still uses.
+### Diplomacy / disembark state repair
+
+- Includes the embark/disembark diplomacy fix from the previous test build
+- Characters standing on a land tile are no longer incorrectly treated as still embarked because of stale fleet metadata
+- If stale embark / transport flags survive after returning to land, they are automatically cleaned from the character and world-piece data
+- Characters genuinely embarked at sea remain blocked from Diplomatic Takeover
+- Characters who disembarked during the current turn remain correctly blocked by the same-turn disembark action lock
+
+### Retained v0.6.5 features
+
+- Political Overlay toggle
+- Cleaner GM Tile Ownership / House Data editor
+- GM direct building-tier override for testing and setup
+- Reorganised player and GM control panels
+- Round Clock remains promoted near the top of the GM controls
 
 ## ZIP contents
 
 - module.json
 - README.md
-- scripts/crown-overview-tools-v0.6.5.js
+- scripts/crown-overview-tools-v0.6.7.js
 - styles/crown-overview-tools.css
