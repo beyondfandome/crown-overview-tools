@@ -1,8 +1,8 @@
 {
   "id": "crown-overview-tools",
   "title": "Crown Overview Tools",
-  "description": "Scene-gated strategic overview map tools for Crown of Ashes. v0.6.7 combines the diplomacy/disembark state repair with persistent cross-region political ownership colours.",
-  "version": "0.6.7",
+  "description": "Scene-gated strategic overview map tools for Crown of Ashes. v0.6.8 fixes province-transfer handling for successful diplomacy and siege conquest.",
+  "version": "0.6.8",
   "authors": [
     {
       "name": "Beyond Fandome"
@@ -13,13 +13,13 @@
     "verified": "14"
   },
   "scripts": [
-    "scripts/crown-overview-tools-v0.6.7.js"
+    "scripts/crown-overview-tools-v0.6.8.js"
   ],
   "styles": [
     "styles/crown-overview-tools.css"
   ],
   "url": "https://github.com/beyondfandome/crown-overview-tools",
   "manifest": "https://raw.githubusercontent.com/beyondfandome/crown-overview-tools/main/module.json",
-  "download": "https://github.com/beyondfandome/crown-overview-tools/releases/download/v0.6.7/crown-overview-tools-v0.6.7.zip",
+  "download": "https://github.com/beyondfandome/crown-overview-tools/releases/download/v0.6.8/crown-overview-tools-v0.6.8.zip",
   "socket": true
 }
