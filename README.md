@@ -1,3 +1,50 @@
+# Crown Overview Tools v0.6.4
+
+## Siege development, fortifications, and equipment
+- Siege settlement names now match the actual development ladder used by the realm system: **Ruins → Village → Holdfast → Town → City**.
+- Quick Siege difficulty is now presented as a consistent formula: **15 base + 10 per Development level + 5 per Fortification level**.
+- This preserves the existing effective DC range while making it understandable: Ruins begin at DC 15 and a City with a Castle reaches DC 70.
+- Watchtowers, Holdfasts, and Castles now correctly describe their real siege protection as **+5 / +10 / +15 Siege DC**. Their enemy movement penalties remain +0.5 / +1 / +1.5.
+- The Siege Workshop line no longer produces an abstract `Siege` stockpile resource. It now provides **House-wide Siege Capacity**:
+  - Ram Specialists: 5 capacity; unlock Battering Rams.
+  - Carpenters Guild: 10 capacity; unlock Ballistae and Onagers.
+  - Siege Workshop: 15 capacity; unlock Trebuchets.
+- Siege Capacity stacks across active holdings, while the highest active Siege Workshop tier determines which engine types are unlocked.
+- Existing legacy `Siege` stockpile values are left untouched for safety but are ignored by the player-facing Holdings stockpile/income display.
+
+## Structured siege equipment on armies
+- The old free-entry `Siege Engines` number box has been removed from Summon Army and Siege / Storm.
+- Siege equipment is now chosen when an army is mustered, using the same locked/unlocked presentation as troops and ships.
+- Fielded siege equipment consumes House Siege Capacity until that army is dismissed; pending army musters also reserve capacity for validation purposes.
+- Old pre-v0.6.4 armies with only a numeric siege-engine count remain compatible: the legacy count is treated as Battering Rams until the army is edited/saved in the new format.
+- Siege equipment adds **1 Gold round upkeep per 5 Siege Capacity fielded, rounded up**. Troop Food upkeep remains unchanged.
+- My Holdings now includes a Siege Capacity summary showing available, total, and committed capacity.
+
+### Siege equipment effects
+- **Battering Ram** — requires Tier 1; uses 1 capacity; +2% Storm chance, plus +2% against any fortified target.
+- **Ballista** — requires Tier 2; uses 1 capacity; +1% Storm chance and reduces attacker siege casualties by 1 percentage point each, capped at -5 percentage points.
+- **Onager** — requires Tier 2; uses 2 capacity; +6% Storm chance, plus +2% against Holdfasts, Towns, and Cities.
+- **Trebuchet** — requires Tier 3; uses 3 capacity; +10% Storm chance, plus +5% against Town/City targets or Fortification level 2-3.
+- Total Storm chance bonus from siege equipment is capped at **+30%**.
+- Siege / Storm now reads the equipment actually attached to the army; players can no longer type in extra engines at the moment of the assault.
+- Siege result cards show Development DC, Fortification DC, attached equipment, equipment bonus, and Ballista casualty reduction.
+
+## Building interface cleanup
+- The Build / Upgrade dialog has been reorganized around clear **Economy, Infrastructure, Military, Social, and Legacy** category buttons.
+- Building dropdown labels are now concise instead of trying to place the building name, tier, Statecraft, cost, effect, and lock reason into a single very long option line.
+- Selecting a building now opens a dedicated detail panel showing:
+  - target building and tier;
+  - current building/effect when upgrading;
+  - resulting effect;
+  - Statecraft requirement and lock reason;
+  - actual Gold cost after applicable discounts;
+  - construction duration;
+  - Building Slot impact; and
+  - Development impact.
+- The top summary now says **Building Slots** rather than the more technical `Building Lines` wording.
+- Upgrades explicitly show that they do not consume another slot or increase Development; new building lines show the resulting Development step.
+- The confusing Tier 4 building-rule text has been removed. Building lines currently have Tier 1-3 requirements of Statecraft 5 / 10 / 12 and build times of 1 / 2 / 3 rounds.
+
 # Crown Overview Tools v0.6.3
 
 ## Navy muster UI cleanup
