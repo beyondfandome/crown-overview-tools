@@ -1,96 +1,73 @@
-# Crown Overview Tools v0.6.11
+# Crown Overview Tools v0.6.12
 
-## What v0.6.11 changes
+## What v0.6.12 changes
 
-- Finalised the conquest behaviour for generic Neutral / NPC provinces
+- Fixed the GM "Repair Player Province Identity" tool skipping the exact partial-control state seen on Blackmont
 
-- When a player takes a generic Neutral / NPC province by Diplomacy or Siege,
-  the province now adopts the conquering House as BOTH:
-  its Local House
-  its Political Allegiance
+- v0.6.11 only repaired provinces whose Ownership Type already said Player
 
-- Example after Greenflame conquers a generic Neutral province:
+- Older failed / partial takeover states could instead contain:
   Player Owner: Thom
-  House: Greenflame
-  Allegiance: Greenflame
-
-- My Holdings will therefore match established holdings such as Cinderholdt:
-  Greenflame
-  Ruler: [existing ruler]
-  Allegiance: Greenflame
-
-- The old extra line:
+  Ownership Type: Neutral
   Local House: Neutral
-  will no longer remain on an absorbed generic Neutral province
+  Allegiance: Unaligned
+
+- Because Ownership Type still said Neutral, v0.6.11 skipped those provinces even though a real player controller was already present
+
+- v0.6.12 now treats a valid Player Owner / controller as the strongest evidence of player control
+
+- If a province has a real player controller, the repair can now correct:
+  Ownership Type → Player
+  Local House → player's House when the old House is generic Neutral / NPC
+  Allegiance → player's House when the old allegiance is generic Neutral / Unaligned
+  Public political label → player's House
+
+- This should repair Blackmont as well as other mixed states such as:
+  Cinder's Edge
+  Cider Hall
+  or any other province that shows a Player Owner but still says Neutral
 
 
-- Generic Neutral / NPC conquest now normalises the relevant identity fields together
+- Improved repair report
 
-- World Tile owner
-- World Tile House
-- World Tile local House
-- House Data House
-- Political allegiance
-- Public owner label
-- Player controller
-- Ownership type
-
-- This prevents mixed states such as:
-  Player Owner: Thom
-  Local House: Neutral
-  Allegiance: Greenflame
-
-
-- Existing NAMED local Houses are still preserved
-
-- This change only replaces generic identities such as:
-  Neutral
-  NPC
-  Unaligned
-  Unassigned
-  blank
-
-- A province with a genuine named local House can still retain that local identity
-  while changing political allegiance / player controller
-
-
-- Updated the GM repair tool
-
-- "Repair Player Allegiances" is now:
-  Repair Player Province Identity
-
-- The repair now fixes BOTH:
-  generic Neutral / Unaligned political allegiance
-  generic Neutral / NPC local House identity
-
-- This means provinces already affected by older versions can be corrected
-  without conquering them again
+- Each repaired province now says which parts were corrected:
+  ownership
+  allegiance
+  House
 
 
 - Updated Province / House Data Audit
 
-- Player-owned provinces with a generic Neutral local House are now flagged
-- Where possible the audit shows the player's expected House
-- The repair action can correct those records
+- The audit now explicitly flags:
+  a province with a player controller but a Neutral / NPC ownership type
+
+- Generic Neutral / Unaligned allegiance and generic Local House checks now run whenever a valid player controller exists,
+  not only when Ownership Type already says Player
 
 
-- Political Overlay clarification
+- Hardened Political Overlay
 
-- Revealed player territory is primarily coloured from its Player Owner / controller
-  and Player ownership state
+- On revealed territory, a valid Player Owner / controller now takes priority over stale Neutral ownership metadata
 
-- Local House text by itself is not what chooses the player's overlay colour
+- This means a province showing:
+  Player Owner: Thom
+  but stale Ownership Type: Neutral
 
-- v0.6.11 keeps ownership, House and allegiance data aligned anyway,
-  so My Holdings, the tooltip, diplomacy and the political map all agree
+  will use Thom's political colour rather than grey
+
+- Unrevealed territory still uses only its generic regional colour and does not leak exact ownership
+
+- Truly Neutral / NPC / unowned revealed territory remains grey
 
 
-- Religion / culture normalisation is intentionally not changed in v0.6.11
-- That can be handled as a separate pass after the conquest ownership data is stable
+- All v0.6.11 conquest behaviour remains:
+  generic Neutral / NPC provinces absorbed by conquest adopt the conquering House
+  named local Houses can remain distinct
+  existing rulers are not automatically replaced
 
 ## ZIP contents
 
 - module.json
 - README.md
-- scripts/crown-overview-tools-v0.6.11.js
+- scripts/crown-overview-tools-v0.6.12.js
 - styles/crown-overview-tools.css
