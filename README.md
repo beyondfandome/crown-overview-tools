@@ -1,59 +1,96 @@
-# Crown Overview Tools v0.6.9
+# Crown Overview Tools v0.6.11
 
-## What v0.6.9 changes
+## What v0.6.11 changes
 
-- Fixed successful Diplomatic Takeover not persisting province ownership
+- Finalised the conquest behaviour for generic Neutral / NPC provinces
 
-- The diplomacy roll could succeed and correctly calculate the new House/controller,
-  but the module then saved the old pre-transfer World Tile and House Data objects back to the province
+- When a player takes a generic Neutral / NPC province by Diplomacy or Siege,
+  the province now adopts the conquering House as BOTH:
+  its Local House
+  its Political Allegiance
 
-- This caused the verification step to report:
-  "Province transfer did not persist world-tile allegiance.
-  Expected Greenflame, found Unaligned."
+- Example after Greenflame conquers a generic Neutral province:
+  Player Owner: Thom
+  House: Greenflame
+  Allegiance: Greenflame
 
-- Successful Diplomatic Takeover now replaces the local tile/House working data
-  with the transferred ownership data before saving
+- My Holdings will therefore match established holdings such as Cinderholdt:
+  Greenflame
+  Ruler: [existing ruler]
+  Allegiance: Greenflame
 
-- A successful takeover now persists:
-  new political allegiance
-  new player controller
-  Player ownership type
-  public owner label
-  ownership-change audit data
-
-- Named local Houses and rulers remain in place where appropriate
-- Generic Neutral / NPC holdings can adopt the conquering House identity
-
-
-- Updated Province / House Data Audit to match the newer political model
-
-- The audit no longer reports a mismatch simply because one House field contains
-  Neutral / NPC / Unaligned while the other contains a named local House
-
-- This prevents expected local-House vs political-status differences from being
-  reported as broken data
-
-- The audit still flags two different named local Houses when they conflict
-
-- Audit results now display:
-  Local House
-  Political Allegiance
-  Controller
-  Actual detected issue
+- The old extra line:
+  Local House: Neutral
+  will no longer remain on an absorbed generic Neutral province
 
 
-- All v0.6.8 and v0.6.7 changes remain included:
-  province-transfer helper repair
-  diplomacy embark/disembark state repair
-  persistent player political colours across regions
-  fog-safe regional colours for unseen territory
-  political overlay
-  cleaner GM building editor
-  reorganised player and GM panels
+- Generic Neutral / NPC conquest now normalises the relevant identity fields together
+
+- World Tile owner
+- World Tile House
+- World Tile local House
+- House Data House
+- Political allegiance
+- Public owner label
+- Player controller
+- Ownership type
+
+- This prevents mixed states such as:
+  Player Owner: Thom
+  Local House: Neutral
+  Allegiance: Greenflame
+
+
+- Existing NAMED local Houses are still preserved
+
+- This change only replaces generic identities such as:
+  Neutral
+  NPC
+  Unaligned
+  Unassigned
+  blank
+
+- A province with a genuine named local House can still retain that local identity
+  while changing political allegiance / player controller
+
+
+- Updated the GM repair tool
+
+- "Repair Player Allegiances" is now:
+  Repair Player Province Identity
+
+- The repair now fixes BOTH:
+  generic Neutral / Unaligned political allegiance
+  generic Neutral / NPC local House identity
+
+- This means provinces already affected by older versions can be corrected
+  without conquering them again
+
+
+- Updated Province / House Data Audit
+
+- Player-owned provinces with a generic Neutral local House are now flagged
+- Where possible the audit shows the player's expected House
+- The repair action can correct those records
+
+
+- Political Overlay clarification
+
+- Revealed player territory is primarily coloured from its Player Owner / controller
+  and Player ownership state
+
+- Local House text by itself is not what chooses the player's overlay colour
+
+- v0.6.11 keeps ownership, House and allegiance data aligned anyway,
+  so My Holdings, the tooltip, diplomacy and the political map all agree
+
+
+- Religion / culture normalisation is intentionally not changed in v0.6.11
+- That can be handled as a separate pass after the conquest ownership data is stable
 
 ## ZIP contents
 
 - module.json
 - README.md
-- scripts/crown-overview-tools-v0.6.9.js
+- scripts/crown-overview-tools-v0.6.11.js
 - styles/crown-overview-tools.css
