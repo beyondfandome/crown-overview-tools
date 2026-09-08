@@ -1,3 +1,12 @@
+# Crown Overview Tools v0.6.3
+
+## Navy muster UI cleanup
+- Summon Navy now uses the same clearer upkeep wording as Summon Army.
+- Ship costs are displayed as `Round upkeep: X Gold + Y Food per 5 ships` instead of the older `X Gold / 5, Y Food / 5` shorthand.
+- Ship quality, role notes, Drydock unlock requirements, command capacity, and ship-capacity rules are unchanged.
+- The underlying navy upkeep calculation is unchanged: each ship type charges its listed Gold and Food for every 5 ships fielded.
+- The GM Edit Navy dialog uses the same cleaned-up upkeep wording for consistency.
+
 # Crown Overview Tools v0.6.2
 
 ## Manpower, training capacity, and army UI

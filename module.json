@@ -1,8 +1,8 @@
 {
   "id": "crown-overview-tools",
   "title": "Crown Overview Tools",
-  "description": "Scene-gated strategic overview map tools for Crown of Ashes. v0.6.2 fixes military training capacity so troop buildings no longer generate troop income, improves Holdings manpower/training visibility, and cleans army upkeep labels.",
-  "version": "0.6.2",
+  "description": "Scene-gated strategic overview map tools for Crown of Ashes. v0.6.3 cleans navy upkeep labels to match the army muster UI while retaining the existing per-5-ship upkeep rules.",
+  "version": "0.6.3",
   "authors": [
     {
       "name": "Beyond Fandome"
@@ -13,13 +13,13 @@
     "verified": "14"
   },
   "scripts": [
-    "scripts/crown-overview-tools-v0.6.2.js"
+    "scripts/crown-overview-tools-v0.6.3.js"
   ],
   "styles": [
     "styles/crown-overview-tools.css"
   ],
   "url": "https://github.com/beyondfandome/crown-overview-tools",
   "manifest": "https://raw.githubusercontent.com/beyondfandome/crown-overview-tools/main/module.json",
-  "download": "https://github.com/beyondfandome/crown-overview-tools/releases/download/v0.6.2/crown-overview-tools-v0.6.2.zip",
+  "download": "https://github.com/beyondfandome/crown-overview-tools/releases/download/v0.6.3/crown-overview-tools-v0.6.3.zip",
   "socket": true
 }
