@@ -1,73 +1,103 @@
-# Crown Overview Tools v0.6.12
+# Crown Overview Tools v0.6.13
 
-## What v0.6.12 changes
+## What v0.6.13 changes
 
-- Fixed the GM "Repair Player Province Identity" tool skipping the exact partial-control state seen on Blackmont
+- Reworked Army Muster so normal player mustering no longer requires manual GM approval
 
-- v0.6.11 only repaired provinces whose Ownership Type already said Player
+- The Summon Army button now uses:
+  Begin Muster
+  instead of:
+  Request Muster
 
-- Older failed / partial takeover states could instead contain:
-  Player Owner: Thom
-  Ownership Type: Neutral
-  Local House: Neutral
-  Allegiance: Unaligned
+- The player-facing text no longer tells players that the GM must manually process the army
 
-- Because Ownership Type still said Neutral, v0.6.11 skipped those provinces even though a real player controller was already present
+- Raising an army still takes 1 round
 
-- v0.6.12 now treats a valid Player Owner / controller as the strongest evidence of player control
+- When Begin Muster is used, the module immediately validates:
+  Command Capacity
+  available House Manpower
+  trained troop capacity
+  Siege Capacity
 
-- If a province has a real player controller, the repair can now correct:
-  Ownership Type → Player
-  Local House → player's House when the old House is generic Neutral / NPC
-  Allegiance → player's House when the old allegiance is generic Neutral / Unaligned
-  Public political label → player's House
+- Manpower and specialist capacity are reserved as soon as the muster begins
 
-- This should repair Blackmont as well as other mixed states such as:
-  Cinder's Edge
-  Cider Hall
-  or any other province that shows a Player Owner but still says Neutral
+- The player is shown the army's Ready date immediately
 
 
-- Improved repair report
+- Army musters now complete automatically through the Round Clock
 
-- Each repaired province now says which parts were corrected:
-  ownership
-  allegiance
-  House
+- When the GM advances to a new round, the module checks all pending army musters
 
+- Any army whose Ready date has arrived is automatically spawned
 
-- Updated Province / House Data Audit
+- The GM does NOT need to press a separate Process Military Musters button during normal play
 
-- The audit now explicitly flags:
-  a province with a player controller but a Neutral / NPC ownership type
+- Newly completed armies are created before the new round's economy collection
 
-- Generic Neutral / Unaligned allegiance and generic Local House checks now run whenever a valid player controller exists,
-  not only when Ownership Type already says Player
+- This means the army is active in the new round and begins paying its normal military upkeep immediately
+
+- Movement is then reset normally for the new round
 
 
-- Hardened Political Overlay
+- Foundry permission handling is now hidden from the gameplay flow
 
-- On revealed territory, a valid Player Owner / controller now takes priority over stale Neutral ownership metadata
+- A player client still uses the active GM client as the privileged backend for:
+  reserving shared realm manpower
+  saving the pending muster
+  creating the future Actor/token
 
-- This means a province showing:
-  Player Owner: Thom
-  but stale Ownership Type: Neutral
+- This is automatic and does not represent a GM approval step
 
-  will use Thom's political colour rather than grey
+- The player receives:
+  Muster begun
+  Ready date
+  Muster complete
+  notifications without requiring the GM to approve anything
 
-- Unrevealed territory still uses only its generic regional colour and does not leak exact ownership
-
-- Truly Neutral / NPC / unowned revealed territory remains grey
+- If no GM client is connected, the module explains that an active GM connection is required for the privileged Foundry operations
 
 
-- All v0.6.11 conquest behaviour remains:
-  generic Neutral / NPC provinces absorbed by conquest adopt the conquering House
-  named local Houses can remain distinct
-  existing rulers are not automatically replaced
+- Muster messages were cleaned up
+
+- "Army Muster Requested" is now:
+  Army Muster Begun
+
+- The confirmation explains that:
+  manpower is reserved immediately
+  specialist capacity is reserved immediately
+  no GM approval is required
+  the Round Clock completes the muster automatically
+
+- When the army finishes:
+  Army Muster Complete
+  is sent to the owning player / GM
+
+
+- The Round Clock report now includes:
+  Army Musters Completed
+  Army musters still preparing
+  failed musters, if any
+
+
+- The old manual GM processor remains only as a fallback / testing tool
+
+- The GM panel button is now labelled:
+  Process Muster Fallback
+
+- Manual fallback processing can still be used to recover or test legacy pending musters
+
+
+- Navy behaviour is unchanged
+
+- Summon Navy still launches immediately from a valid Port
+- The active GM client may still perform the privileged token-creation work silently in the background
+
+
+- All v0.6.12 and earlier systems remain included
 
 ## ZIP contents
 
 - module.json
 - README.md
-- scripts/crown-overview-tools-v0.6.12.js
+- scripts/crown-overview-tools-v0.6.13.js
 - styles/crown-overview-tools.css
