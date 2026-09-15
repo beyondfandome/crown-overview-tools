@@ -1,6 +1,6 @@
 (() => {
   const MODULE_ID = "crown-overview-tools";
-  const MODULE_VERSION = "0.6.28";
+  const MODULE_VERSION = "0.6.22";
   const FLAG_SCOPE = "world";
   const WORLD_TILE_KEY = "worldTile";
   const WORLD_PIECE_KEY = "worldPiece";
@@ -238,13 +238,10 @@
     3: { Gold: 24 }
   };
 
-  // Development is the number of physical building pieces in the province, not the tier of a line.
-  // A tier III line therefore occupies three of the province's four Development slots.
-  const BUILDING_DEVELOPMENT_STATECRAFT_REQUIREMENTS = {
+  const BUILDING_TIER_STATECRAFT_REQUIREMENTS = {
     1: 5,
     2: 10,
-    3: 12,
-    4: 16
+    3: 12
   };
 
   const BUILDING_LINES = [
@@ -294,9 +291,9 @@
       { level: 3, name: "Deep Sea Fishing Boats", income: { Food: 15 }, effect: "+15 Food" }
     ]},
     { key: "stone", group: "Economy", label: "Break Open The Stone Pits", levels: [
-      { level: 1, name: "Stone Pit", income: { Gold: 3 }, stoneSiegeDc: 2, effect: "+3 Gold; +2 siege DC on this tile" },
-      { level: 2, name: "Stone Quarry", income: { Gold: 6 }, stoneSiegeDc: 4, effect: "+6 Gold; +4 siege DC on this tile" },
-      { level: 3, name: "Quarrying Complex", income: { Gold: 9 }, stoneSiegeDc: 6, effect: "+9 Gold; +6 siege DC on this tile" }
+      { level: 1, name: "Stone Pit", income: { Gold: 2 }, infrastructureDiscount: 1, effect: "+2 Gold; Roads, Ports, and Watchtowers cost -1 Gold on this tile" },
+      { level: 2, name: "Stone Quarry", income: { Gold: 4 }, infrastructureDiscount: 2, effect: "+4 Gold; Roads, Ports, and Watchtowers cost -2 Gold on this tile" },
+      { level: 3, name: "Quarrying Complex", income: { Gold: 6 }, infrastructureDiscount: 3, effect: "+6 Gold; Roads, Ports, and Watchtowers cost -3 Gold on this tile" }
     ]},
     { key: "road", group: "Infrastructure", label: "Road", levels: [
       { level: 1, name: "Road", income: {}, effect: "One-and-done; -0.5 movement cost through this tile" }
@@ -1136,14 +1133,11 @@
   }
 
   function getBuildingSlotCount(house = {}) {
-    // Each tier is a physical piece of its building set. A Tier III line consumes
-    // three Development slots even for legacy saves that only stored the highest tier name.
     const state = getBuildingLineState(house);
     const legacyBuilt = Array.isArray(house.builtBuildings) ? house.builtBuildings : [];
-    let count = 0;
-    for (const item of state.values()) count += Math.max(1, Number(item?.level?.level || 1));
-    for (const name of legacyBuilt) if (!getBuildingMetaByName(name)) count++;
-    return Math.min(4, count);
+    let legacyCount = 0;
+    for (const name of legacyBuilt) if (!getBuildingMetaByName(name)) legacyCount++;
+    return state.size + legacyCount;
   }
 
   function getNextBuildingLevel(line, currentLevel = 0) {
@@ -1180,13 +1174,14 @@
     return Number.isFinite(value) ? value : null;
   }
 
-  function getBuildingStatecraftRequirement(developmentLevel) {
-    return Number(BUILDING_DEVELOPMENT_STATECRAFT_REQUIREMENTS[Number(developmentLevel)] || 0);
+  function getBuildingStatecraftRequirement(levelNumber) {
+    return Number(BUILDING_TIER_STATECRAFT_REQUIREMENTS[Number(levelNumber)] || 0);
   }
 
   function getStoneInfrastructureDiscount(house = {}, clock = getClock()) {
-    // Stone is now a Gold/fortification hybrid and no longer discounts construction.
-    return 0;
+    const state = getActiveBuildingLineState(house, clock).get("stone");
+    const discount = Number(state?.level?.infrastructureDiscount || 0);
+    return Number.isFinite(discount) ? Math.max(0, discount) : 0;
   }
 
   function getBuildingTierCost(levelNumber, line = null, house = {}) {
@@ -1205,10 +1200,9 @@
     const built = Array.isArray(house.builtBuildings) ? house.builtBuildings.map(String) : [];
     const meta = getBuildingMetaByName(targetName);
     if (!meta) return built.includes(targetName) ? built : [...built, targetName];
-    // Building tiers are pieces of a set: upgrading adds the next physical piece
-    // instead of replacing the earlier one. Effects still resolve from the highest tier.
-    if (!built.includes(meta.level.name)) built.push(meta.level.name);
-    return built;
+    const clean = built.filter(name => getBuildingMetaByName(name)?.line?.key !== meta.line.key);
+    clean.push(meta.level.name);
+    return clean;
   }
 
   function getBuildingSlotsAfterCatalogChange(house = {}, targetName) {
@@ -1223,7 +1217,7 @@
       tradeCategory: item.line.tradeCategory || "",
       level: item.level.level,
       name: item.level.name,
-      statecraftRequired: getBuildingStatecraftRequirement(Math.min(4, Number(item.level.level || 1))),
+      statecraftRequired: getBuildingStatecraftRequirement(item.level.level),
       cost: getBuildingTierCost(item.level.level, item.line, house),
       effect: getBuildingDisplayEffect(item.line, item.level, house)
     }));
@@ -1235,9 +1229,7 @@
   }
 
   function makeBuildingOption(line, level, mode, house = {}, piece = {}) {
-    const currentSlots = getBuildingSlotCount(house);
-    const resultingDevelopment = Math.min(4, currentSlots + 1);
-    const statecraftRequired = getBuildingStatecraftRequirement(resultingDevelopment);
+    const statecraftRequired = getBuildingStatecraftRequirement(level?.level || 0);
     const pieceStatecraft = getPieceStatecraft(piece);
     const lockedByStatecraft = !game.user.isGM && pieceStatecraft !== null && statecraftRequired > 0 && pieceStatecraft < statecraftRequired;
     const current = getBuildingLineState(house).get(line.key) || null;
@@ -1294,7 +1286,7 @@
       const current = state.get(line.key);
       if (current) {
         const next = getNextBuildingLevel(line, current.level.level);
-        if (next && slotCount < 4) options.push(makeBuildingOption(line, next, `Upgrade ${current.level.name}`, house, piece));
+        if (next) options.push(makeBuildingOption(line, next, `Upgrade ${current.level.name}`, house, piece));
       } else if (slotCount < 4) {
         const first = line.levels?.[0];
         if (first) options.push(makeBuildingOption(line, first, "Build", house, piece));
@@ -1660,42 +1652,6 @@
 
   function getMovementRemaining(piece) {
     return Math.max(0, Number(piece.movementMax ?? 0) - Number(piece.movementUsed ?? 0));
-  }
-
-  function getAttachedArmyForCharacterToken(characterToken, characterPiece = getWorldPiece(characterToken) || {}) {
-    if (!characterToken || normalize(characterPiece?.pieceType) !== "character") return null;
-    const character = getCharacterDataFromToken(characterToken) || {};
-    const characterId = character.characterId || characterPiece.characterId || characterPiece.linkedCharacterId || "";
-    if (!characterId) return null;
-    const armyToken = getExistingArmyForCharacter(characterId);
-    if (!armyToken) return null;
-    const armyPiece = getWorldPiece(armyToken) || {};
-    if (armyPiece.followCharacter === false || armyPiece.detached || armyPiece.siegeStatus || armyPiece.embarkedFleetTokenId) return null;
-    return { token: armyToken, piece: armyPiece };
-  }
-
-  function getEffectiveMovementForToken(token, piece = getWorldPiece(token) || {}) {
-    const type = normalize(piece?.pieceType);
-    if (type === "character") {
-      const attached = getAttachedArmyForCharacterToken(token, piece);
-      if (attached) {
-        const max = Math.max(0, Number(attached.piece.movementMax ?? 2));
-        const used = Math.max(Number(piece.movementUsed || 0), Number(attached.piece.movementUsed || 0));
-        return { max, used, remaining: Math.max(0, max - used), attachedArmy: attached };
-      }
-    }
-    if (type === "army" && piece.followCharacter !== false && !piece.detached && !piece.siegeStatus && !piece.embarkedFleetTokenId) {
-      const commander = getArmyCommanderToken(piece);
-      if (commander) {
-        const commanderPiece = getWorldPiece(commander) || {};
-        const max = Math.max(0, Number(piece.movementMax ?? 2));
-        const used = Math.max(Number(piece.movementUsed || 0), Number(commanderPiece.movementUsed || 0));
-        return { max, used, remaining: Math.max(0, max - used), commander };
-      }
-    }
-    const max = Math.max(0, Number(piece.movementMax ?? 0));
-    const used = Math.max(0, Number(piece.movementUsed ?? 0));
-    return { max, used, remaining: Math.max(0, max - used) };
   }
 
   function getCurrentActionRoundKey() {
@@ -2671,8 +2627,7 @@ function removePanel() {
     const path = getPathForMode(startTile, destinationTile, piece, choice.routeMode);
     if (!path) { ui.notifications.warn(`No valid ${routeModeLabel(choice.routeMode)} from ${startTile.name} to ${destinationTile.name}.`); return; }
 
-    const effectiveMovement = getEffectiveMovementForToken(token, piece);
-    const remaining = effectiveMovement.remaining;
+    const remaining = getMovementRemaining(piece);
     if (path.cost > remaining) { ui.notifications.warn(`Move blocked: needs ${path.cost} movement, but only has ${remaining} remaining.`); return; }
 
     await executeWorldPathMove(token, piece, startTile, destinationTile, path, 350, "Click World Move");
@@ -3179,13 +3134,6 @@ function removePanel() {
     if (!path) return null;
 
     let currentPiece = foundry.utils.deepClone(piece);
-    const effectiveAtStart = getEffectiveMovementForToken(token, currentPiece);
-    if (normalize(currentPiece.pieceType) === "character" && effectiveAtStart.attachedArmy) {
-      currentPiece.movementMax = effectiveAtStart.max;
-      currentPiece.movementUsed = effectiveAtStart.used;
-    } else if (normalize(currentPiece.pieceType) === "army" && effectiveAtStart.commander) {
-      currentPiece.movementUsed = effectiveAtStart.used;
-    }
     let spentThisMove = 0;
 
     for (let i = 1; i < path.tileIds.length; i++) {
@@ -3217,8 +3165,7 @@ function removePanel() {
 
       await saveWorldPiece(token, currentPiece);
       await token.document.update({ x: position.x, y: position.y }, { animate: true, worldMovementBypass: true, bypassWorldMovementWatcher: true, clickMoveBypass: true });
-      await moveLinkedArmyToCharacter(token, currentPiece, entry, { syncMovement: true });
-      await moveLinkedCharacterWithArmy(token, currentPiece, entry, { syncMovement: true });
+      await moveLinkedArmyToCharacter(token, currentPiece, entry);
       await moveLinkedCharacterWithFleet(token, currentPiece, entry);
       await moveEmbarkedArmiesWithFleet(token, currentPiece, entry);
 
@@ -5590,7 +5537,7 @@ function removePanel() {
       followCharacter: muster.followCharacter !== false,
       detached: false,
       siegeTurns: 1,
-      movementMax: 2,
+      movementMax: Number(characterPiece.movementMax || character.landMovement || 2),
       movementUsed: 0,
       allowedTileTypes: getAllowedTileTypes("army"),
       currentTileId: getTileId(entry),
@@ -5841,7 +5788,7 @@ function removePanel() {
     return { processed, skipped, waiting, failed, rows };
   }
 
-  async function moveLinkedArmyToCharacter(characterToken, characterPiece, destinationEntry, { syncMovement = false } = {}) {
+  async function moveLinkedArmyToCharacter(characterToken, characterPiece, destinationEntry) {
     if (!characterToken || normalize(characterPiece?.pieceType) !== "character" || !destinationEntry?.tile) return;
     const character = getCharacterDataFromToken(characterToken) || {};
     const characterId = character.characterId || characterPiece.characterId;
@@ -5860,37 +5807,10 @@ function removePanel() {
       army.lastMovedAt = new Date().toISOString();
       army.lastMovedBy = game.user.name;
       army.lastMovedSource = `Following ${character.characterName || characterPiece.name}`;
-      if (syncMovement) {
-        army.movementUsed = Number(characterPiece.movementUsed || 0);
-        characterPiece.movementMax = Math.max(0, Number(army.movementMax ?? 2));
-      }
       await saveWorldPiece(armyToken, army);
       const pos = getTokenTopLeftForTileSlot(armyToken, destinationEntry);
       await armyToken.document.update({ x: pos.x, y: pos.y }, { animate: true, worldMovementBypass: true, bypassWorldMovementWatcher: true, followCharacterBypass: true });
     }
-  }
-
-  async function moveLinkedCharacterWithArmy(armyToken, armyPiece, destinationEntry, { syncMovement = false } = {}) {
-    if (!armyToken || normalize(armyPiece?.pieceType) !== "army" || !destinationEntry?.tile) return;
-    if (armyPiece.followCharacter === false || armyPiece.detached || armyPiece.siegeStatus || armyPiece.embarkedFleetTokenId) return;
-    const characterToken = getArmyCommanderToken(armyPiece);
-    if (!characterToken) return;
-    const characterPiece = foundry.utils.deepClone(getWorldPiece(characterToken) || {});
-    characterPiece.previousTileId = characterPiece.currentTileId;
-    characterPiece.previousTileName = characterPiece.currentTileName;
-    characterPiece.currentTileId = getTileId(destinationEntry);
-    characterPiece.currentTileName = getTileName(destinationEntry);
-    characterPiece.currentRegion = destinationEntry.tile?.region || "";
-    characterPiece.lastMovedAt = new Date().toISOString();
-    characterPiece.lastMovedBy = game.user.name;
-    characterPiece.lastMovedSource = `Moving with ${armyPiece.name || armyToken.document.name}`;
-    if (syncMovement) {
-      characterPiece.movementMax = Math.max(0, Number(armyPiece.movementMax ?? 2));
-      characterPiece.movementUsed = Number(armyPiece.movementUsed || 0);
-    }
-    await saveWorldPiece(characterToken, characterPiece);
-    const pos = getTokenTopLeftForTileSlot(characterToken, destinationEntry);
-    await characterToken.document.update({ x: pos.x, y: pos.y }, { animate: true, worldMovementBypass: true, bypassWorldMovementWatcher: true, armyCarryBypass: true });
   }
 
   async function moveLinkedCharacterWithFleet(fleetToken, fleetPiece, destinationEntry) {
@@ -6750,9 +6670,7 @@ function removePanel() {
     const fortLevel = getFortificationLevelForHouse(house, clock);
     const developmentDc = Number(SIEGE_DEVELOPMENT_BASE_DC[settlementKey] ?? (15 + settlementLevel * 10));
     const fortificationDc = fortLevel * 5;
-    const stoneState = getActiveBuildingLineState(house, clock).get("stone");
-    const stoneDc = Math.max(0, Number(stoneState?.level?.stoneSiegeDc || 0));
-    return { settlementKey, settlementLevel, fortLevel, developmentDc, fortificationDc, stoneDc, total: developmentDc + fortificationDc + stoneDc };
+    return { settlementKey, settlementLevel, fortLevel, developmentDc, fortificationDc, total: developmentDc + fortificationDc };
   }
 
   function getSiegeEngineEffects(equipment = {}, settlementKey = "ruins", fortLevel = 0) {
@@ -7056,7 +6974,7 @@ function removePanel() {
         <p><strong>Roll:</strong> ${escapeHtml(d100)} on d100</p>
         <p><strong>Storm Chance:</strong> ${escapeHtml(chance)}%</p>
         <p><strong>Formula:</strong> 50 + Martial ${escapeHtml(martial)}×2 (${escapeHtml(martialBonus)}) + Manpower ${escapeHtml(manpowerBonus)} + Siege Equipment ${escapeHtml(engineBonus)} + Duration ${escapeHtml(durationBonus)}${footholdBonus ? ` + Foothold ${escapeHtml(footholdBonus)}` : ""} - DC ${escapeHtml(dc.total)}</p>
-        <p><strong>Development:</strong> ${escapeHtml(siegeSettlementLabel(dc.settlementKey))} (${escapeHtml(dc.developmentDc)} DC); <strong>Fortification:</strong> Level ${escapeHtml(dc.fortLevel)} (+${escapeHtml(dc.fortificationDc)} DC); <strong>Quarry:</strong> +${escapeHtml(dc.stoneDc || 0)} DC</p>
+        <p><strong>Development:</strong> ${escapeHtml(siegeSettlementLabel(dc.settlementKey))} (${escapeHtml(dc.developmentDc)} DC); <strong>Fortification:</strong> Level ${escapeHtml(dc.fortLevel)} (+${escapeHtml(dc.fortificationDc)} DC)</p>
         <p><strong>Siege Equipment:</strong> ${escapeHtml(siegeEquipmentText(equipment))}<br><span style="opacity:0.8;">${escapeHtml(engineDetailText)}${engineEffects.rawBonus > engineEffects.bonus ? `; capped at +${MAX_SIEGE_ENGINE_BONUS}%` : ""}</span></p>
         <p>${escapeHtml(outcome.text)}</p>
         <p><strong>Attacker Casualties:</strong> ${escapeHtml(casualties.percent)}%${casualties.reduction ? ` (${escapeHtml(casualties.basePercent)}% base, -${escapeHtml(casualties.reduction)}% from Ballistae)` : ""} — ${escapeHtml(casualties.lost.toLocaleString())} lost. <strong>Strength Remaining:</strong> ${escapeHtml(casualties.after.toLocaleString())} / ${escapeHtml(Number(updatedPiece.strengthMax || updatedPiece.totalStrength || casualties.before).toLocaleString())}</p>
@@ -7069,7 +6987,7 @@ function removePanel() {
 
   function getRaidDefense(house = {}) {
     const state = getActiveBuildingLineState(house);
-    const fortLevel = Math.max(0, Number(state.get("watchtower")?.level?.level || 0));
+    const fortLevel = Math.max(0, Number(state.get("defense")?.level?.level || 0));
     const barracksLevel = Math.max(0, Number(state.get("barracks")?.level?.level || 0));
     const fortBonus = [0, 10, 20, 30][Math.min(3, fortLevel)] || 0;
     const barracksBonus = [0, 5, 10, 15][Math.min(3, barracksLevel)] || 0;
@@ -7293,7 +7211,6 @@ function removePanel() {
             <strong>Current Owner:</strong> ${escapeHtml(ownerName || house.house || entry.tile.owner || "NPC / Neutral")}<br>
             <strong>Development:</strong> ${escapeHtml(siegeSettlementLabel(dc.settlementKey))} — ${escapeHtml(dc.developmentDc)} DC<br>
             <strong>Fortification:</strong> Level ${escapeHtml(dc.fortLevel)} — +${escapeHtml(dc.fortificationDc)} DC<br>
-            <strong>Quarry:</strong> +${escapeHtml(dc.stoneDc || 0)} DC<br>
             <strong>Total Siege DC:</strong> ${escapeHtml(dc.total)}
           </div>
           <div style="padding:8px;margin-bottom:10px;border:1px solid #777;border-radius:6px;">
@@ -8512,68 +8429,8 @@ async function normalizeCharacterEmbarkState(token, piece = getWorldPiece(token)
     await saveBankLedger(ledger); return {repaid,defaulted};
   }
 
-  async function executeDemolishBuilding({ requesterUserId, requesterUserName, characterTokenId, tileId, lineKey }) {
-    if (!game.user.isGM) throw new Error("Only the GM may commit demolition changes.");
-    const requester = game.users.get(String(requesterUserId || ""));
-    if (!requester) throw new Error("Requesting player could not be found.");
-    const token = getSceneTokenById(characterTokenId);
-    if (!token || !isCharacterToken(token)) throw new Error("The demolition character could not be found.");
-    const piece = getWorldPiece(token) || {};
-    if (!canUserControlWorldPieceForUser(token, piece, requester)) throw new Error("That player does not control the selected character.");
-    const entry = getTileById(tileId) || getCurrentTileEntryForToken(token, piece);
-    if (!entry || isSeaByTile(entry.tile)) throw new Error("The character must be standing in a land territory.");
-    const actualEntry = getCurrentTileEntryForToken(token, piece);
-    if (!actualEntry || String(getTileId(actualEntry)) !== String(getTileId(entry))) throw new Error("The character is no longer standing in that territory.");
-    let house = foundry.utils.deepClone(getHouseData(entry.drawing) || {});
-    const ownerId = getTileOwnerUserId(entry.tile, house);
-    const ownerName = getTileOwnerUserName(entry.tile, house);
-    if (!requester.isGM && ownerId && String(ownerId) !== String(requester.id)) throw new Error("That territory belongs to another player.");
-    if (!requester.isGM && !ownerId && ownerName && normalize(ownerName) !== normalize(requester.name)) throw new Error("That territory belongs to another player.");
-    const opposing = getOpposingArmiesOnTileForRaid(entry, piece, requester.id);
-    if (opposing.length) throw new Error(`Building management is locked: opposing army present in ${getTileName(entry)}.`);
-    const state = [...getBuildingLineState(house).entries()];
-    const meta = state.find(([key]) => key === lineKey)?.[1];
-    if (!meta) throw new Error("That building line is no longer present.");
-    const names = new Set((meta.line?.levels || []).map(level => String(level.name)));
-    house.builtBuildings = (house.builtBuildings || []).filter(name => !names.has(String(name)));
-    if (Array.isArray(house.buildingData)) house.buildingData = house.buildingData.filter(row => !names.has(String(row?.name || row?.building || row)));
-    house.buildingSlots = getBuildingSlotsAfterCatalogChange({ ...house, buildingSlots: [] }, "");
-    house.developmentLevel = getBuildingSlotCount(house);
-    house.developmentLabel = DEVELOPMENT_LEVELS[house.developmentLevel]?.label || "Ruins";
-    house.population = randomPopulation(house.developmentLevel);
-    await entry.drawing.document.unsetFlag(FLAG_SCOPE, HOUSE_KEY);
-    await entry.drawing.document.setFlag(FLAG_SCOPE, HOUSE_KEY, house);
-    await ChatMessage.create({ speaker: ChatMessage.getSpeaker({ alias: "Crown Construction" }), content: `<h2>Building Demolished</h2><p><strong>${escapeHtml(meta.line?.label || lineKey)}</strong> was removed from <strong>${escapeHtml(getTileName(entry))}</strong>. No resources were refunded.</p>` });
-    return meta.line?.label || lineKey;
-  }
-
   async function demolishBuilding() {
-    if (!requireOverviewScene()) return;
-    const selected = canvas.tokens.controlled.filter(token => isCharacterToken(token));
-    if (selected.length !== 1) { ui.notifications.warn("Select exactly one character standing in the territory whose building you want to demolish."); return; }
-    const token = selected[0];
-    const piece = getWorldPiece(token) || {};
-    if (!canUserControlWorldPiece(token, piece)) { ui.notifications.warn("You can only demolish buildings in your own territory."); return; }
-    const entry = getCurrentTileEntryForToken(token, piece);
-    if (!entry || isSeaByTile(entry.tile)) { ui.notifications.warn("The character must be standing in a land territory."); return; }
-    const house = foundry.utils.deepClone(getHouseData(entry.drawing) || {});
-    const ownerId = getTileOwnerUserId(entry.tile, house);
-    if (ownerId && String(ownerId) !== String(game.user.id) && !game.user.isGM) { ui.notifications.warn("You can only demolish buildings in your own territory."); return; }
-    const opposing = getOpposingArmiesOnTileForRaid(entry, piece, game.user.id);
-    if (opposing.length) { ui.notifications.warn(`Building management is locked: opposing army present in ${getTileName(entry)}.`); return; }
-    const state = [...getBuildingLineState(house).entries()];
-    if (!state.length) { ui.notifications.warn("This territory has no building lines to demolish."); return; }
-    const result = await new Promise(resolve => new Dialog({ title: `Demolish Building — ${getTileName(entry)}`, content: `<form><div class="form-group"><label>Building line</label><select name="line">${state.map(([key,v]) => `<option value="${escapeHtml(key)}">${escapeHtml(v.level.name)} (${escapeHtml(v.line.label)})</option>`).join("")}</select></div><p class="notes">Demolition removes the entire upgrade line, gives no refund, and immediately frees its Development slots.</p></form>`, buttons: { demolish: { label: "Demolish", callback: html => resolve(html[0].querySelector('[name="line"]').value) }, cancel: { label: "Cancel", callback: () => resolve(null) } }, default: "cancel" }, { width: 500 }).render(true));
-    if (!result) return;
-    if (game.user.isGM) {
-      try { await executeDemolishBuilding({ requesterUserId: game.user.id, requesterUserName: game.user.name, characterTokenId: token.document.id, tileId: getTileId(entry), lineKey: result }); ui.notifications.info("Building line demolished."); }
-      catch (err) { ui.notifications.error(`Demolition failed: ${err.message || err}`); }
-      return;
-    }
-    const gm = findActiveGmForScene(canvas.scene?.id);
-    if (!gm) { ui.notifications.warn("No active GM is online to process demolition."); return; }
-    game.socket.emit(SOCKET_NAME, { type: "demolishBuildingRequest", targetGmId: gm.id, sceneId: canvas.scene?.id, requesterUserId: game.user.id, requesterUserName: game.user.name, characterTokenId: token.document.id, tileId: getTileId(entry), lineKey: result });
-    ui.notifications.info("Demolition request sent to the GM.");
+    if(!requireOverviewScene())return; const selected=canvas.tokens.controlled.filter(t=>isCharacterToken(t)); if(selected.length!==1){ui.notifications.warn("Select exactly one character standing in the territory whose building you want to demolish.");return;} const token=selected[0],piece=getWorldPiece(token)||{};if(!canUserControlWorldPiece(token,piece)){ui.notifications.warn("You can only demolish buildings in your own territory.");return;} const entry=getCurrentTileEntryForToken(token,piece);if(!entry||isSeaByTile(entry.tile)){ui.notifications.warn("The character must be standing in a land territory.");return;} let house=foundry.utils.deepClone(getHouseData(entry.drawing)||{});const ownerId=getTileOwnerUserId(entry.tile,house);if(ownerId&&String(ownerId)!==String(game.user.id)&&!game.user.isGM){ui.notifications.warn("You can only demolish buildings in your own territory.");return;} const opposing=getOpposingArmiesOnTileForRaid(entry,piece,game.user.id);if(opposing.length){ui.notifications.warn(`Building management is locked: opposing army present in ${getTileName(entry)}.`);return;} const state=[...getBuildingLineState(house).entries()];if(!state.length){ui.notifications.warn("This territory has no building lines to demolish.");return;} const result=await new Promise(resolve=>new Dialog({title:`Demolish Building — ${getTileName(entry)}`,content:`<form><div class="form-group"><label>Building line</label><select name="line">${state.map(([key,v])=>`<option value="${escapeHtml(key)}">${escapeHtml(v.level.name)} (${escapeHtml(v.line.label)})</option>`).join("")}</select></div><p class="notes">Demolition removes the entire upgrade line, gives no refund, and immediately frees the building/resource slot.</p></form>`,buttons:{demolish:{label:"Demolish",callback:html=>resolve(html[0].querySelector('[name="line"]').value)},cancel:{label:"Cancel",callback:()=>resolve(null)}},default:"cancel"},{width:500}).render(true));if(!result)return; const freshOpposing=getOpposingArmiesOnTileForRaid(entry,piece,game.user.id);if(freshOpposing.length){ui.notifications.warn("Demolition aborted: an opposing army is now present.");return;} const meta=state.find(([k])=>k===result)?.[1];const names=new Set((meta?.line?.levels||[]).map(l=>String(l.name)));house.builtBuildings=(house.builtBuildings||[]).filter(name=>!names.has(String(name))); if(Array.isArray(house.buildingData))house.buildingData=house.buildingData.filter(row=>!names.has(String(row?.name||row?.building||row)));await entry.drawing.document.unsetFlag(FLAG_SCOPE,HOUSE_KEY);await entry.drawing.document.setFlag(FLAG_SCOPE,HOUSE_KEY,house);await ChatMessage.create({speaker:ChatMessage.getSpeaker({alias:"Crown Construction"}),content:`<h2>Building Demolished</h2><p><strong>${escapeHtml(meta?.line?.label||result)}</strong> was removed from <strong>${escapeHtml(getTileName(entry))}</strong>. No resources were refunded.</p>`});ui.notifications.info("Building line demolished.");
   }
 
   async function roundClock() {
@@ -9583,12 +9440,12 @@ async function togglePoliticalOverlay() {
     const isUpgrade = option.mode === "upgrade";
     const costText = resourceMapToText(option.cost || {}, "None");
     const constructionRounds = Math.max(1, Number(option.tier || 1));
-    const slotText = `${currentSlots} / 4 → ${Math.min(4, currentSlots + 1)} / 4`;
-    const developmentText = `${currentDevelopment} → ${nextDevelopment}`;
+    const slotText = isUpgrade ? `${currentSlots} / 4 — unchanged` : `${currentSlots} / 4 → ${Math.min(4, currentSlots + 1)} / 4`;
+    const developmentText = isUpgrade ? `${currentDevelopment} — unchanged` : `${currentDevelopment} → ${nextDevelopment}`;
     const lockHtml = option.disabled ? `<div style="margin-top:8px;padding:7px;border:1px solid rgba(180,70,70,0.8);border-radius:5px;"><strong>LOCKED:</strong> ${escapeHtml(option.lockedReason || "Requirements not met.")}</div>` : `<div style="margin-top:8px;"><strong>Requirements:</strong> Statecraft ${escapeHtml(option.statecraftRequired || 0)} ✓</div>`;
     const currentHtml = isUpgrade ? `<div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(120,120,120,0.45);"><strong>Current:</strong> ${escapeHtml(option.currentName || "Tier " + option.currentTier)}<br><span style="opacity:0.8;">${escapeHtml(option.currentEffect || "")}</span></div>` : "";
     return `<div style="padding:12px;border:1px solid #777;border-radius:6px;line-height:1.45;">
-      <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start;"><div><strong style="font-size:16px;">${escapeHtml(option.value)}</strong><br><span style="opacity:0.75;">${escapeHtml(option.lineLabel || option.category || "Building")}</span></div><div style="text-align:right;"><strong>Tier ${escapeHtml(option.tier || 1)}</strong><br><span style="opacity:0.75;">${isUpgrade ? "Upgrade" : "New building piece"}</span></div></div>
+      <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start;"><div><strong style="font-size:16px;">${escapeHtml(option.value)}</strong><br><span style="opacity:0.75;">${escapeHtml(option.lineLabel || option.category || "Building")}</span></div><div style="text-align:right;"><strong>Tier ${escapeHtml(option.tier || 1)}</strong><br><span style="opacity:0.75;">${isUpgrade ? "Upgrade" : "New building line"}</span></div></div>
       ${currentHtml}
       <div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(120,120,120,0.45);"><strong>${isUpgrade ? "After upgrade" : "Provides"}:</strong><br>${escapeHtml(option.effect || "No passive effect")}</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:9px;"><div><strong>Cost:</strong> ${escapeHtml(costText)}</div><div><strong>Construction:</strong> ${escapeHtml(constructionRounds)} round${constructionRounds === 1 ? "" : "s"}</div><div><strong>Building Slots:</strong> ${escapeHtml(slotText)}</div><div><strong>Development:</strong> ${escapeHtml(developmentText)}</div></div>
@@ -10049,7 +9906,7 @@ async function togglePoliticalOverlay() {
         lineKey: meta.line.key,
         lineLabel: meta.line.label,
         level: meta.level.level,
-        statecraftRequired: getBuildingStatecraftRequirement(Math.min(4, getBuildingSlotCount(house) + 1))
+        statecraftRequired: getBuildingStatecraftRequirement(meta.level.level)
       };
     }
     return BUILDING_RULES[building] || { cost: {}, income: {}, effect: "" };
@@ -10062,18 +9919,11 @@ async function togglePoliticalOverlay() {
     const currentSort = roundSortValue(clock);
     let total = {};
 
-    const activeNames = [];
     for (const building of built) {
-      const buildMeta = detailsByName.get(String(building));
-      const isActive = !buildMeta || roundSortValueFromBuildMeta(buildMeta) <= currentSort;
-      if (isActive) activeNames.push(String(building));
-    }
-    const activeState = getBuildingLineState({ ...house, builtBuildings: activeNames });
-    for (const item of activeState.values()) {
-      total = addResourceMaps(total, getBuildingIncomeForLevel(item.line, item.level, house));
-    }
-    for (const building of activeNames) {
-      if (!getBuildingMetaByName(building)) total = addResourceMaps(total, getBuildingRule(building, house).income);
+      const meta = detailsByName.get(String(building));
+      const isActive = !meta || roundSortValueFromBuildMeta(meta) <= currentSort;
+      if (!isActive) continue;
+      total = addResourceMaps(total, getBuildingRule(building, house).income);
     }
 
     return total;
@@ -10331,7 +10181,7 @@ async function togglePoliticalOverlay() {
     if (mineFoodConflict) throw new Error(mineFoodConflict);
 
     if (!targetMeta && existingBuildings.length >= 4) throw new Error(`${worldTile.name || "This tile"} already has the maximum of 4 buildings.`);
-    if (targetMeta && currentSlotCount >= 4) throw new Error(`${worldTile.name || "This tile"} already has the maximum of 4 building pieces.`);
+    if (targetMeta && !currentLineState && currentSlotCount >= 4) throw new Error(`${worldTile.name || "This tile"} already has the maximum of 4 building lines.`);
     if (existingBuildings.includes(building)) throw new Error(`${building} already exists in ${worldTile.name || "this tile"}.`);
     if (targetMeta && currentLineState && !isUpgrade) throw new Error(`${worldTile.name || "This tile"} already has ${currentLineState.level.name} in the ${targetMeta.line.label} line.`);
 
@@ -10346,8 +10196,7 @@ async function togglePoliticalOverlay() {
     // Older piece-level lastBuildRoundKey flags can become stale when a GM rewinds the round clock or edits test data.
 
     const rule = getBuildingRule(building, house);
-    const resultingDevelopment = Math.min(4, currentSlotCount + 1);
-    const statecraftRequired = getBuildingStatecraftRequirement(resultingDevelopment);
+    const statecraftRequired = Number(rule.statecraftRequired || 0);
     const pieceStatecraft = getPieceStatecraft(piece);
     if (!builderIsGm && pieceStatecraft !== null && statecraftRequired > 0 && pieceStatecraft < statecraftRequired) {
       throw new Error(`${piece.name || token.document.name} needs Statecraft ${statecraftRequired} to build ${building}, but has ${pieceStatecraft}.`);
@@ -10365,9 +10214,9 @@ async function togglePoliticalOverlay() {
     const stockpileAfterCost = economyActive ? spendResources(currentStockpile, buildingCost) : currentStockpile;
     const activation = getNextRoundActivation(clock, Math.max(1, Number(rule.level || 1)));
 
-    const updatedBuildings = getBuiltBuildingsAfterCatalogChange(house, building);
-    const updatedBuildingSlots = getBuildingSlotsAfterCatalogChange({ ...house, builtBuildings: updatedBuildings }, building);
-    const developmentLevel = Math.min(4, currentSlotCount + 1);
+    const updatedBuildings = getBuiltBuildingsAfterCatalogChange(house, building).slice(0, 4);
+    const updatedBuildingSlots = getBuildingSlotsAfterCatalogChange(house, building);
+    const developmentLevel = Math.min(updatedBuildings.length, 4);
     const developmentLabel = DEVELOPMENT_LEVELS[developmentLevel]?.label || "City";
     const oldPopulation = house.population;
     const population = randomPopulation(developmentLevel);
@@ -10376,7 +10225,9 @@ async function togglePoliticalOverlay() {
     const cleanManualIncome = getHouseResourceIncome(house);
 
     const buildingData = Array.isArray(house.buildingData) ? house.buildingData : [];
-    const filteredBuildingData = buildingData.filter(item => String(item.name || item.building || "") !== String(building));
+    const filteredBuildingData = targetMeta
+      ? buildingData.filter(item => getBuildingMetaByName(String(item.name || item.building || ""))?.line?.key !== targetMeta.line.key)
+      : buildingData.filter(item => String(item.name || item.building || "") !== String(building));
 
     const updatedHouse = {
       ...house,
@@ -10576,16 +10427,6 @@ async function togglePoliticalOverlay() {
       }
       if (message.type === "raidTerritoryRequest") {
         await handleRaidTerritoryRequest(message);
-        return;
-      }
-      if (message.type === "demolishBuildingRequest") {
-        if (!game.user.isGM || (message.targetGmId && String(message.targetGmId) !== String(game.user.id))) return;
-        try {
-          await executeDemolishBuilding({ requesterUserId: message.requesterUserId, requesterUserName: message.requesterUserName, characterTokenId: message.characterTokenId, tileId: message.tileId, lineKey: message.lineKey });
-          game.socket.emit(SOCKET_NAME, { type: "playerNotification", targetUserId: message.requesterUserId, level: "info", message: "Building line demolished." });
-        } catch (err) {
-          game.socket.emit(SOCKET_NAME, { type: "playerNotification", targetUserId: message.requesterUserId, level: "error", message: `Demolition failed: ${err.message || err}` });
-        }
         return;
       }
       if (message.type === "resourceTradeRequest") {
@@ -11176,7 +11017,7 @@ async function togglePoliticalOverlay() {
           <div class="form-group"><label><strong>Building / Upgrade</strong></label><select name="building" style="width:100%;">${conciseBuildingOptionsHtml(catalogOptions, firstCategory, firstOption?.value || "")}</select></div>
           <div data-building-detail>${buildBuildingDetailCard(firstOption, { currentDevelopment, nextDevelopment, currentSlots: existingBuildingSlots })}</div>
           <div style="padding:8px;margin-top:10px;border:1px solid #777;border-radius:6px;"><strong>Existing Buildings:</strong><br>${existingBuildings.length ? escapeHtml(existingBuildings.join(", ")) : "None"}</div>
-          <p class="notes"><strong>Building rule:</strong> Each building tier is a physical piece of its set and uses one of four Development slots. Upgrading adds the next piece; the line uses the highest completed tier bonus rather than stacking tier bonuses. Development 1/2/3/4 requires Statecraft 5/10/12/16. Construction takes a number of rounds equal to the tier. Players may build or upgrade once per world round.</p>
+          <p class="notes"><strong>Building rule:</strong> New building lines use one of four slots. Upgrades replace the existing tier and do not use another slot. Tier 1 requires Statecraft 5, Tier 2 requires 10, and Tier 3 requires 12. Construction takes a number of rounds equal to the tier. Players may build or upgrade once per world round.</p>
         </form>`,
         buttons: {
           build: {

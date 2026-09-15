@@ -1,6 +1,6 @@
 (() => {
   const MODULE_ID = "crown-overview-tools";
-  const MODULE_VERSION = "0.6.28";
+  const MODULE_VERSION = "0.6.26";
   const FLAG_SCOPE = "world";
   const WORLD_TILE_KEY = "worldTile";
   const WORLD_PIECE_KEY = "worldPiece";
@@ -8574,84 +8574,6 @@ async function normalizeCharacterEmbarkState(token, piece = getWorldPiece(token)
     if (!gm) { ui.notifications.warn("No active GM is online to process demolition."); return; }
     game.socket.emit(SOCKET_NAME, { type: "demolishBuildingRequest", targetGmId: gm.id, sceneId: canvas.scene?.id, requesterUserId: game.user.id, requesterUserName: game.user.name, characterTokenId: token.document.id, tileId: getTileId(entry), lineKey: result });
     ui.notifications.info("Demolition request sent to the GM.");
-  }
-
-  async function roundClock() {
-    if (!requireOverviewScene()) return;
-    if (!game.user.isGM) { ui.notifications.warn("Only the GM can adjust the world clock."); return; }
-    let clock = getClock();
-    if (!clock) {
-      clock = getDefaultClock();
-      await saveClock(clock);
-      await resetMovement();
-      ui.notifications.info(`World clock initialized: ${getDateLabel(clock)}.`);
-      return;
-    }
-    const currentLabel = getDateLabel(clock);
-    const nextClock = advanceClockData(clock);
-    const previousClock = rewindClockData(clock);
-    const result = await new Promise(resolve => {
-      new Dialog({
-        title: "World Round Clock",
-        content: `<div style="text-align:center;padding:12px;"><div style="font-size:14px;opacity:0.8;margin-bottom:5px;">Current Date</div><div style="font-size:28px;font-weight:bold;margin-bottom:16px;">${escapeHtml(currentLabel)}</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:10px;border:1px solid #777;border-radius:6px;margin-bottom:12px;"><div><strong>Previous:</strong><br>${escapeHtml(getDateLabel(previousClock))}</div><div><strong>Next:</strong><br>${escapeHtml(getDateLabel(nextClock))}</div></div><p class="notes">Advance/back changes the campaign clock. Advancing automatically completes army musters whose Ready date has arrived, then collects economy and charges active army/navy upkeep once for the new round. Use Reset Economy Ledger if you reset/rewind during testing and need to collect again.</p></div>`,
-        buttons: {
-          advance: { label: "Advance Round + Economy", callback: () => resolve("advance") },
-          back: { label: "Go Back One Round", callback: () => resolve("back") },
-          collect: { label: "Collect Current Round", callback: () => resolve("collect") },
-          resetLedger: { label: "Reset Economy Ledger", callback: () => resolve("resetLedger") },
-          resetMovement: { label: "Reset Movement Only", callback: () => resolve("resetMovement") },
-          resetClock: { label: "Reset Clock", callback: () => resolve("resetClock") },
-          cancel: { label: "Cancel", callback: () => resolve(null) }
-        },
-        default: "advance"
-      }, { width: 620, height: 500, resizable: true }).render(true);
-    });
-    if (!result) return;
-    if (result === "resetMovement") { await resetMovement(); return; }
-    if (result === "collect") { await collectEconomyForRound(clock, { scope: "all", force: false, silent: false }); return; }
-    if (result === "resetLedger") {
-      const confirmed = await Dialog.confirm({ title: "Reset Economy Ledger?", content: `<p>This clears collection locks so the current/all rounds can be collected again.</p><p><strong>Use this only for testing or corrections.</strong></p>`, yes: () => true, no: () => false, defaultYes: false });
-      if (!confirmed) return;
-      await clearEconomyLedger("all");
-      await ChatMessage.create({ speaker: ChatMessage.getSpeaker({ alias: "Crown Economy" }), content: `<h2>Economy Ledger Reset</h2><p>All economy collection ledger entries were cleared. Income can now be collected again for any round.</p>` });
-      ui.notifications.info("Economy ledger reset.");
-      return;
-    }
-    if (result === "resetClock") {
-      const confirmed = await Dialog.confirm({ title: "Reset World Clock?", content: "<p>This will reset the campaign clock to <strong>Spring 1, 100 AF</strong> and reset movement. It does <strong>not</strong> clear the economy ledger unless you use Reset Economy Ledger.</p>", yes: () => true, no: () => false, defaultYes: false });
-      if (!confirmed) return;
-      const newClock = getDefaultClock();
-      await saveClock(newClock);
-      await resetMovement();
-      return;
-    }
-    if (result === "back") {
-      const oldClock = foundry.utils.deepClone(clock);
-      const newClock = rewindClockData(clock);
-      await saveClock(newClock);
-      await resetMovement();
-      await ChatMessage.create({ speaker: ChatMessage.getSpeaker({ alias: "World Round Clock" }), content: `<h2>Round Rewound</h2><p><strong>Previous:</strong> ${escapeHtml(getDateLabel(oldClock))}</p><p><strong>Current:</strong> ${escapeHtml(getDateLabel(newClock))}</p><p>Movement has been reset. Economy was not automatically collected while rewinding.</p>` });
-      return;
-    }
-    if (result === "advance") {
-      const oldClock = foundry.utils.deepClone(clock);
-      const newClock = advanceClockData(clock);
-      await saveClock(newClock);
-
-      // Armies that began mustering last round become active automatically as the
-      // new round begins. Spawn them before economy so their upkeep applies normally.
-      const tradeSummary = await processTradeDeliveries(newClock);
-      const musterSummary = await processArmyMusters({ onlyReady: true, silent: true, clock: newClock, source: "Round Clock" });
-
-      await resetMovement();
-      const manpowerRecovery = await recoverManpowerForRound();
-      const economySummary = await collectEconomyForRound(newClock, { scope: "all", force: false, silent: false });
-      const bankSummary = await processBankLoans(newClock);
-      await ChatMessage.create({
-        speaker: ChatMessage.getSpeaker({ alias: "World Round Clock" }),
-        content: `<h2>Round Advanced</h2><p><strong>Previous:</strong> ${escapeHtml(getDateLabel(oldClock))}</p><p><strong>Current:</strong> ${escapeHtml(getDateLabel(newClock))}</p><p>All World Pieces now have their full movement available.</p><p><strong>Army Musters Completed:</strong> ${escapeHtml(Number(musterSummary?.processed || 0))}${Number(musterSummary?.waiting || 0) ? ` (${escapeHtml(Number(musterSummary.waiting))} still preparing)` : ""}${Number(musterSummary?.failed || 0) ? `; ${escapeHtml(Number(musterSummary.failed))} failed` : ""}</p><p><strong>Trade Shipments Delivered:</strong> ${escapeHtml(Number(tradeSummary?.delivered || 0))}</p><p><strong>Economy:</strong> ${economySummary.skipped ? "Already collected" : `${escapeHtml(economySummary.applied)} tile(s) paid ${escapeHtml(resourceMapToText(economySummary.totals))}`}</p><p><strong>Bank:</strong> ${escapeHtml(Number(bankSummary?.repaid || 0))} repaid; ${escapeHtml(Number(bankSummary?.defaulted || 0))} defaulted.</p><p><strong>Military Upkeep:</strong> ${escapeHtml(resourceMapToText(economySummary.militaryUpkeep || {}, "None"))}</p><p><strong>Manpower Recovery:</strong> ${escapeHtml(Number(manpowerRecovery.recovered || 0).toLocaleString())} men across ${escapeHtml(Number(manpowerRecovery.provinces || 0))} province(s).</p>`
-      });
-    }
   }
 
   function buildRouteModeOptions(piece) {

@@ -1,6 +1,6 @@
 (() => {
   const MODULE_ID = "crown-overview-tools";
-  const MODULE_VERSION = "0.6.28";
+  const MODULE_VERSION = "0.6.24";
   const FLAG_SCOPE = "world";
   const WORLD_TILE_KEY = "worldTile";
   const WORLD_PIECE_KEY = "worldPiece";
@@ -1662,42 +1662,6 @@
     return Math.max(0, Number(piece.movementMax ?? 0) - Number(piece.movementUsed ?? 0));
   }
 
-  function getAttachedArmyForCharacterToken(characterToken, characterPiece = getWorldPiece(characterToken) || {}) {
-    if (!characterToken || normalize(characterPiece?.pieceType) !== "character") return null;
-    const character = getCharacterDataFromToken(characterToken) || {};
-    const characterId = character.characterId || characterPiece.characterId || characterPiece.linkedCharacterId || "";
-    if (!characterId) return null;
-    const armyToken = getExistingArmyForCharacter(characterId);
-    if (!armyToken) return null;
-    const armyPiece = getWorldPiece(armyToken) || {};
-    if (armyPiece.followCharacter === false || armyPiece.detached || armyPiece.siegeStatus || armyPiece.embarkedFleetTokenId) return null;
-    return { token: armyToken, piece: armyPiece };
-  }
-
-  function getEffectiveMovementForToken(token, piece = getWorldPiece(token) || {}) {
-    const type = normalize(piece?.pieceType);
-    if (type === "character") {
-      const attached = getAttachedArmyForCharacterToken(token, piece);
-      if (attached) {
-        const max = Math.max(0, Number(attached.piece.movementMax ?? 2));
-        const used = Math.max(Number(piece.movementUsed || 0), Number(attached.piece.movementUsed || 0));
-        return { max, used, remaining: Math.max(0, max - used), attachedArmy: attached };
-      }
-    }
-    if (type === "army" && piece.followCharacter !== false && !piece.detached && !piece.siegeStatus && !piece.embarkedFleetTokenId) {
-      const commander = getArmyCommanderToken(piece);
-      if (commander) {
-        const commanderPiece = getWorldPiece(commander) || {};
-        const max = Math.max(0, Number(piece.movementMax ?? 2));
-        const used = Math.max(Number(piece.movementUsed || 0), Number(commanderPiece.movementUsed || 0));
-        return { max, used, remaining: Math.max(0, max - used), commander };
-      }
-    }
-    const max = Math.max(0, Number(piece.movementMax ?? 0));
-    const used = Math.max(0, Number(piece.movementUsed ?? 0));
-    return { max, used, remaining: Math.max(0, max - used) };
-  }
-
   function getCurrentActionRoundKey() {
     return getRoundKey(getClock()) || "unknown-round";
   }
@@ -2671,8 +2635,7 @@ function removePanel() {
     const path = getPathForMode(startTile, destinationTile, piece, choice.routeMode);
     if (!path) { ui.notifications.warn(`No valid ${routeModeLabel(choice.routeMode)} from ${startTile.name} to ${destinationTile.name}.`); return; }
 
-    const effectiveMovement = getEffectiveMovementForToken(token, piece);
-    const remaining = effectiveMovement.remaining;
+    const remaining = getMovementRemaining(piece);
     if (path.cost > remaining) { ui.notifications.warn(`Move blocked: needs ${path.cost} movement, but only has ${remaining} remaining.`); return; }
 
     await executeWorldPathMove(token, piece, startTile, destinationTile, path, 350, "Click World Move");
@@ -3179,13 +3142,6 @@ function removePanel() {
     if (!path) return null;
 
     let currentPiece = foundry.utils.deepClone(piece);
-    const effectiveAtStart = getEffectiveMovementForToken(token, currentPiece);
-    if (normalize(currentPiece.pieceType) === "character" && effectiveAtStart.attachedArmy) {
-      currentPiece.movementMax = effectiveAtStart.max;
-      currentPiece.movementUsed = effectiveAtStart.used;
-    } else if (normalize(currentPiece.pieceType) === "army" && effectiveAtStart.commander) {
-      currentPiece.movementUsed = effectiveAtStart.used;
-    }
     let spentThisMove = 0;
 
     for (let i = 1; i < path.tileIds.length; i++) {
@@ -3217,8 +3173,7 @@ function removePanel() {
 
       await saveWorldPiece(token, currentPiece);
       await token.document.update({ x: position.x, y: position.y }, { animate: true, worldMovementBypass: true, bypassWorldMovementWatcher: true, clickMoveBypass: true });
-      await moveLinkedArmyToCharacter(token, currentPiece, entry, { syncMovement: true });
-      await moveLinkedCharacterWithArmy(token, currentPiece, entry, { syncMovement: true });
+      await moveLinkedArmyToCharacter(token, currentPiece, entry);
       await moveLinkedCharacterWithFleet(token, currentPiece, entry);
       await moveEmbarkedArmiesWithFleet(token, currentPiece, entry);
 
@@ -5590,7 +5545,7 @@ function removePanel() {
       followCharacter: muster.followCharacter !== false,
       detached: false,
       siegeTurns: 1,
-      movementMax: 2,
+      movementMax: Number(characterPiece.movementMax || character.landMovement || 2),
       movementUsed: 0,
       allowedTileTypes: getAllowedTileTypes("army"),
       currentTileId: getTileId(entry),
@@ -5841,7 +5796,7 @@ function removePanel() {
     return { processed, skipped, waiting, failed, rows };
   }
 
-  async function moveLinkedArmyToCharacter(characterToken, characterPiece, destinationEntry, { syncMovement = false } = {}) {
+  async function moveLinkedArmyToCharacter(characterToken, characterPiece, destinationEntry) {
     if (!characterToken || normalize(characterPiece?.pieceType) !== "character" || !destinationEntry?.tile) return;
     const character = getCharacterDataFromToken(characterToken) || {};
     const characterId = character.characterId || characterPiece.characterId;
@@ -5860,37 +5815,10 @@ function removePanel() {
       army.lastMovedAt = new Date().toISOString();
       army.lastMovedBy = game.user.name;
       army.lastMovedSource = `Following ${character.characterName || characterPiece.name}`;
-      if (syncMovement) {
-        army.movementUsed = Number(characterPiece.movementUsed || 0);
-        characterPiece.movementMax = Math.max(0, Number(army.movementMax ?? 2));
-      }
       await saveWorldPiece(armyToken, army);
       const pos = getTokenTopLeftForTileSlot(armyToken, destinationEntry);
       await armyToken.document.update({ x: pos.x, y: pos.y }, { animate: true, worldMovementBypass: true, bypassWorldMovementWatcher: true, followCharacterBypass: true });
     }
-  }
-
-  async function moveLinkedCharacterWithArmy(armyToken, armyPiece, destinationEntry, { syncMovement = false } = {}) {
-    if (!armyToken || normalize(armyPiece?.pieceType) !== "army" || !destinationEntry?.tile) return;
-    if (armyPiece.followCharacter === false || armyPiece.detached || armyPiece.siegeStatus || armyPiece.embarkedFleetTokenId) return;
-    const characterToken = getArmyCommanderToken(armyPiece);
-    if (!characterToken) return;
-    const characterPiece = foundry.utils.deepClone(getWorldPiece(characterToken) || {});
-    characterPiece.previousTileId = characterPiece.currentTileId;
-    characterPiece.previousTileName = characterPiece.currentTileName;
-    characterPiece.currentTileId = getTileId(destinationEntry);
-    characterPiece.currentTileName = getTileName(destinationEntry);
-    characterPiece.currentRegion = destinationEntry.tile?.region || "";
-    characterPiece.lastMovedAt = new Date().toISOString();
-    characterPiece.lastMovedBy = game.user.name;
-    characterPiece.lastMovedSource = `Moving with ${armyPiece.name || armyToken.document.name}`;
-    if (syncMovement) {
-      characterPiece.movementMax = Math.max(0, Number(armyPiece.movementMax ?? 2));
-      characterPiece.movementUsed = Number(armyPiece.movementUsed || 0);
-    }
-    await saveWorldPiece(characterToken, characterPiece);
-    const pos = getTokenTopLeftForTileSlot(characterToken, destinationEntry);
-    await characterToken.document.update({ x: pos.x, y: pos.y }, { animate: true, worldMovementBypass: true, bypassWorldMovementWatcher: true, armyCarryBypass: true });
   }
 
   async function moveLinkedCharacterWithFleet(fleetToken, fleetPiece, destinationEntry) {
@@ -8512,68 +8440,8 @@ async function normalizeCharacterEmbarkState(token, piece = getWorldPiece(token)
     await saveBankLedger(ledger); return {repaid,defaulted};
   }
 
-  async function executeDemolishBuilding({ requesterUserId, requesterUserName, characterTokenId, tileId, lineKey }) {
-    if (!game.user.isGM) throw new Error("Only the GM may commit demolition changes.");
-    const requester = game.users.get(String(requesterUserId || ""));
-    if (!requester) throw new Error("Requesting player could not be found.");
-    const token = getSceneTokenById(characterTokenId);
-    if (!token || !isCharacterToken(token)) throw new Error("The demolition character could not be found.");
-    const piece = getWorldPiece(token) || {};
-    if (!canUserControlWorldPieceForUser(token, piece, requester)) throw new Error("That player does not control the selected character.");
-    const entry = getTileById(tileId) || getCurrentTileEntryForToken(token, piece);
-    if (!entry || isSeaByTile(entry.tile)) throw new Error("The character must be standing in a land territory.");
-    const actualEntry = getCurrentTileEntryForToken(token, piece);
-    if (!actualEntry || String(getTileId(actualEntry)) !== String(getTileId(entry))) throw new Error("The character is no longer standing in that territory.");
-    let house = foundry.utils.deepClone(getHouseData(entry.drawing) || {});
-    const ownerId = getTileOwnerUserId(entry.tile, house);
-    const ownerName = getTileOwnerUserName(entry.tile, house);
-    if (!requester.isGM && ownerId && String(ownerId) !== String(requester.id)) throw new Error("That territory belongs to another player.");
-    if (!requester.isGM && !ownerId && ownerName && normalize(ownerName) !== normalize(requester.name)) throw new Error("That territory belongs to another player.");
-    const opposing = getOpposingArmiesOnTileForRaid(entry, piece, requester.id);
-    if (opposing.length) throw new Error(`Building management is locked: opposing army present in ${getTileName(entry)}.`);
-    const state = [...getBuildingLineState(house).entries()];
-    const meta = state.find(([key]) => key === lineKey)?.[1];
-    if (!meta) throw new Error("That building line is no longer present.");
-    const names = new Set((meta.line?.levels || []).map(level => String(level.name)));
-    house.builtBuildings = (house.builtBuildings || []).filter(name => !names.has(String(name)));
-    if (Array.isArray(house.buildingData)) house.buildingData = house.buildingData.filter(row => !names.has(String(row?.name || row?.building || row)));
-    house.buildingSlots = getBuildingSlotsAfterCatalogChange({ ...house, buildingSlots: [] }, "");
-    house.developmentLevel = getBuildingSlotCount(house);
-    house.developmentLabel = DEVELOPMENT_LEVELS[house.developmentLevel]?.label || "Ruins";
-    house.population = randomPopulation(house.developmentLevel);
-    await entry.drawing.document.unsetFlag(FLAG_SCOPE, HOUSE_KEY);
-    await entry.drawing.document.setFlag(FLAG_SCOPE, HOUSE_KEY, house);
-    await ChatMessage.create({ speaker: ChatMessage.getSpeaker({ alias: "Crown Construction" }), content: `<h2>Building Demolished</h2><p><strong>${escapeHtml(meta.line?.label || lineKey)}</strong> was removed from <strong>${escapeHtml(getTileName(entry))}</strong>. No resources were refunded.</p>` });
-    return meta.line?.label || lineKey;
-  }
-
   async function demolishBuilding() {
-    if (!requireOverviewScene()) return;
-    const selected = canvas.tokens.controlled.filter(token => isCharacterToken(token));
-    if (selected.length !== 1) { ui.notifications.warn("Select exactly one character standing in the territory whose building you want to demolish."); return; }
-    const token = selected[0];
-    const piece = getWorldPiece(token) || {};
-    if (!canUserControlWorldPiece(token, piece)) { ui.notifications.warn("You can only demolish buildings in your own territory."); return; }
-    const entry = getCurrentTileEntryForToken(token, piece);
-    if (!entry || isSeaByTile(entry.tile)) { ui.notifications.warn("The character must be standing in a land territory."); return; }
-    const house = foundry.utils.deepClone(getHouseData(entry.drawing) || {});
-    const ownerId = getTileOwnerUserId(entry.tile, house);
-    if (ownerId && String(ownerId) !== String(game.user.id) && !game.user.isGM) { ui.notifications.warn("You can only demolish buildings in your own territory."); return; }
-    const opposing = getOpposingArmiesOnTileForRaid(entry, piece, game.user.id);
-    if (opposing.length) { ui.notifications.warn(`Building management is locked: opposing army present in ${getTileName(entry)}.`); return; }
-    const state = [...getBuildingLineState(house).entries()];
-    if (!state.length) { ui.notifications.warn("This territory has no building lines to demolish."); return; }
-    const result = await new Promise(resolve => new Dialog({ title: `Demolish Building — ${getTileName(entry)}`, content: `<form><div class="form-group"><label>Building line</label><select name="line">${state.map(([key,v]) => `<option value="${escapeHtml(key)}">${escapeHtml(v.level.name)} (${escapeHtml(v.line.label)})</option>`).join("")}</select></div><p class="notes">Demolition removes the entire upgrade line, gives no refund, and immediately frees its Development slots.</p></form>`, buttons: { demolish: { label: "Demolish", callback: html => resolve(html[0].querySelector('[name="line"]').value) }, cancel: { label: "Cancel", callback: () => resolve(null) } }, default: "cancel" }, { width: 500 }).render(true));
-    if (!result) return;
-    if (game.user.isGM) {
-      try { await executeDemolishBuilding({ requesterUserId: game.user.id, requesterUserName: game.user.name, characterTokenId: token.document.id, tileId: getTileId(entry), lineKey: result }); ui.notifications.info("Building line demolished."); }
-      catch (err) { ui.notifications.error(`Demolition failed: ${err.message || err}`); }
-      return;
-    }
-    const gm = findActiveGmForScene(canvas.scene?.id);
-    if (!gm) { ui.notifications.warn("No active GM is online to process demolition."); return; }
-    game.socket.emit(SOCKET_NAME, { type: "demolishBuildingRequest", targetGmId: gm.id, sceneId: canvas.scene?.id, requesterUserId: game.user.id, requesterUserName: game.user.name, characterTokenId: token.document.id, tileId: getTileId(entry), lineKey: result });
-    ui.notifications.info("Demolition request sent to the GM.");
+    if(!requireOverviewScene())return; const selected=canvas.tokens.controlled.filter(t=>isCharacterToken(t)); if(selected.length!==1){ui.notifications.warn("Select exactly one character standing in the territory whose building you want to demolish.");return;} const token=selected[0],piece=getWorldPiece(token)||{};if(!canUserControlWorldPiece(token,piece)){ui.notifications.warn("You can only demolish buildings in your own territory.");return;} const entry=getCurrentTileEntryForToken(token,piece);if(!entry||isSeaByTile(entry.tile)){ui.notifications.warn("The character must be standing in a land territory.");return;} let house=foundry.utils.deepClone(getHouseData(entry.drawing)||{});const ownerId=getTileOwnerUserId(entry.tile,house);if(ownerId&&String(ownerId)!==String(game.user.id)&&!game.user.isGM){ui.notifications.warn("You can only demolish buildings in your own territory.");return;} const opposing=getOpposingArmiesOnTileForRaid(entry,piece,game.user.id);if(opposing.length){ui.notifications.warn(`Building management is locked: opposing army present in ${getTileName(entry)}.`);return;} const state=[...getBuildingLineState(house).entries()];if(!state.length){ui.notifications.warn("This territory has no building lines to demolish.");return;} const result=await new Promise(resolve=>new Dialog({title:`Demolish Building — ${getTileName(entry)}`,content:`<form><div class="form-group"><label>Building line</label><select name="line">${state.map(([key,v])=>`<option value="${escapeHtml(key)}">${escapeHtml(v.level.name)} (${escapeHtml(v.line.label)})</option>`).join("")}</select></div><p class="notes">Demolition removes the entire upgrade line, gives no refund, and immediately frees the building/resource slot.</p></form>`,buttons:{demolish:{label:"Demolish",callback:html=>resolve(html[0].querySelector('[name="line"]').value)},cancel:{label:"Cancel",callback:()=>resolve(null)}},default:"cancel"},{width:500}).render(true));if(!result)return; const freshOpposing=getOpposingArmiesOnTileForRaid(entry,piece,game.user.id);if(freshOpposing.length){ui.notifications.warn("Demolition aborted: an opposing army is now present.");return;} const meta=state.find(([k])=>k===result)?.[1];const names=new Set((meta?.line?.levels||[]).map(l=>String(l.name)));house.builtBuildings=(house.builtBuildings||[]).filter(name=>!names.has(String(name))); if(Array.isArray(house.buildingData))house.buildingData=house.buildingData.filter(row=>!names.has(String(row?.name||row?.building||row))); house.buildingSlots=getBuildingSlotsAfterCatalogChange(house, ""); house.developmentLevel=getBuildingSlotCount(house); house.developmentLabel=DEVELOPMENT_LEVELS[house.developmentLevel]?.label||"Ruins"; house.population=randomPopulation(house.developmentLevel); await entry.drawing.document.unsetFlag(FLAG_SCOPE,HOUSE_KEY);await entry.drawing.document.setFlag(FLAG_SCOPE,HOUSE_KEY,house);await ChatMessage.create({speaker:ChatMessage.getSpeaker({alias:"Crown Construction"}),content:`<h2>Building Demolished</h2><p><strong>${escapeHtml(meta?.line?.label||result)}</strong> was removed from <strong>${escapeHtml(getTileName(entry))}</strong>. No resources were refunded.</p>`});ui.notifications.info("Building line demolished.");
   }
 
   async function roundClock() {
@@ -10576,16 +10444,6 @@ async function togglePoliticalOverlay() {
       }
       if (message.type === "raidTerritoryRequest") {
         await handleRaidTerritoryRequest(message);
-        return;
-      }
-      if (message.type === "demolishBuildingRequest") {
-        if (!game.user.isGM || (message.targetGmId && String(message.targetGmId) !== String(game.user.id))) return;
-        try {
-          await executeDemolishBuilding({ requesterUserId: message.requesterUserId, requesterUserName: message.requesterUserName, characterTokenId: message.characterTokenId, tileId: message.tileId, lineKey: message.lineKey });
-          game.socket.emit(SOCKET_NAME, { type: "playerNotification", targetUserId: message.requesterUserId, level: "info", message: "Building line demolished." });
-        } catch (err) {
-          game.socket.emit(SOCKET_NAME, { type: "playerNotification", targetUserId: message.requesterUserId, level: "error", message: `Demolition failed: ${err.message || err}` });
-        }
         return;
       }
       if (message.type === "resourceTradeRequest") {
