@@ -1,8 +1,8 @@
 {
   "id": "crown-overview-tools",
   "title": "Crown Overview Tools",
-  "description": "Scene-gated strategic overview map tools for Crown of Ashes. v0.6.31 raises professional army and naval field upkeep while keeping Mob levy upkeep affordable for early expansion.",
-  "version": "0.6.31",
+  "description": "Scene-gated strategic overview map tools for Crown of Ashes. v0.6.34 strengthens the Market line: Town Square realizes both exports at 100%, Market Square raises both to 150%, and Trading Hall raises both to 250%. Includes the demolition-income fix, military upkeep rebalance, trade-good rebalance, and 5/15/30 Gold construction costs.",
+  "version": "0.6.34",
   "authors": [
     {
       "name": "Beyond Fandome"
@@ -20,6 +20,6 @@
   ],
   "url": "https://github.com/beyondfandome/crown-overview-tools",
   "manifest": "https://raw.githubusercontent.com/beyondfandome/crown-overview-tools/main/module.json",
-  "download": "https://github.com/beyondfandome/crown-overview-tools/releases/download/v0.6.31/crown-overview-tools-v0.6.31.zip",
+  "download": "https://github.com/beyondfandome/crown-overview-tools/releases/download/v0.6.34/crown-overview-tools-v0.6.34.zip",
   "socket": true
 }
