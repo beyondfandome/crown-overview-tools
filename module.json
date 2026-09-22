@@ -1,8 +1,8 @@
 {
   "id": "crown-overview-tools",
   "title": "Crown Overview Tools",
-  "description": "Crown Overview Tools 1.0.0 for Crown of Ashes. Adds permission-gated foreign Port Travel: another player must explicitly allow entry through their port before movement or crossing risk resolves; offline owners fall back to an active GM. Includes dangerous army Port Crossing, automatic character Wound updates from dangerous crossings, the v0.6.34 Market rebalance, demolition-income fix, military upkeep rebalance, trade-good rebalance, and 5/15/30 Gold construction costs.",
-  "version": "1.0.0",
+  "description": "Crown Overview Tools 1.0.3 stabilization patch. Port Travel now consumes all remaining movement, Port-crossing Wounds synchronize to character token/actor data, Foundries grant cumulative +100 Light Infantry / +100 Crossbowmen / +100 Lancers capacity, and obsolete versioned scripts are removed. Retains GM House resource controls and raid cleanup fixes.",
+  "version": "1.0.3",
   "authors": [
     {
       "name": "Beyond Fandome"
@@ -20,6 +20,6 @@
   ],
   "url": "https://github.com/beyondfandome/crown-overview-tools",
   "manifest": "https://raw.githubusercontent.com/beyondfandome/crown-overview-tools/main/module.json",
-  "download": "https://github.com/beyondfandome/crown-overview-tools/releases/download/v1.0.0/crown-overview-tools-v1.0.0.zip",
+  "download": "https://github.com/beyondfandome/crown-overview-tools/releases/download/v1.0.3/crown-overview-tools-v1.0.3.zip",
   "socket": true
 }
