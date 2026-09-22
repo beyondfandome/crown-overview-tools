@@ -1,8 +1,8 @@
 {
   "id": "crown-overview-tools",
   "title": "Crown Overview Tools",
-  "description": "Crown Overview Tools 1.0.3 stabilization patch. Port Travel now consumes all remaining movement, Port-crossing Wounds synchronize to character token/actor data, Foundries grant cumulative +100 Light Infantry / +100 Crossbowmen / +100 Lancers capacity, and obsolete versioned scripts are removed. Retains GM House resource controls and raid cleanup fixes.",
-  "version": "1.0.3",
+  "description": "Crown Overview Tools 1.0.4 hotfix. Restores the full v1.0.2 release package structure and sidebar while retaining stabilization fixes: Port Travel consumes all movement, Wounds synchronize, Foundry specialist capacities are corrected, GM resource controls remain, and raid cleanup remains fixed.",
+  "version": "1.0.4",
   "authors": [
     {
       "name": "Beyond Fandome"
@@ -20,6 +20,6 @@
   ],
   "url": "https://github.com/beyondfandome/crown-overview-tools",
   "manifest": "https://raw.githubusercontent.com/beyondfandome/crown-overview-tools/main/module.json",
-  "download": "https://github.com/beyondfandome/crown-overview-tools/releases/download/v1.0.3/crown-overview-tools-v1.0.3.zip",
+  "download": "https://github.com/beyondfandome/crown-overview-tools/releases/download/v1.0.4/crown-overview-tools-v1.0.4.zip",
   "socket": true
 }
