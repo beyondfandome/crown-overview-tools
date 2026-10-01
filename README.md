@@ -1,15 +1,28 @@
-# Crown Overview Tools v1.1.20
+# Crown Overview Tools v1.1.22
 
-**Military sustainability and round-edge hardening on the boxed Crown of Ashes release.**
+## v1.1.22 — Realm Control / Muster / Upkeep Hotfix
+
+- Player-facing province detail permissions now use the same political-control rules as Holdings: explicit controller, sworn-to-player, then current House allegiance. A player can see full House/economy/building data for every province their realm currently controls.
+- **Neutral / Unaligned is authoritative.** A province made neutral keeps its local House identity for lore, but no longer falls back into that former House's Holdings, manpower, levy, training, siege, or ship-capacity pools.
+- Player build/demolish permission checks now use current realm control rather than only legacy explicit owner fields.
+- Military upkeep scans both rendered token placeables and Scene TokenDocuments, so an army that finishes mustering during Round Advance cannot miss upkeep merely because Foundry has not rendered its token placeable yet. Legacy `forceType` and `navy` records are also recognized.
+- Over-cap attrition uses the same document-safe active-army scan, so newly mustered armies participate in the levy check immediately.
+
+
+**GM province editing hotfix on the boxed Crown of Ashes release.**
+
+v1.1.21 adds a persistent-in-session **Edit Provinces / Finish Editing Provinces** GM toggle. While enabled, Crown keeps province Drawing geometry visible and selectable across repeated Drawing/House/Economy edits instead of immediately re-suppressing it after the first update. Tile-name labels stay visible but do not steal province clicks. Finishing edit mode restores the clean map and validation-safe near-transparent stored province appearance.
 
 The canonical loaded script is `scripts/crown-overview-tools.js`.
+
+v1.1.20 military sustainability and round-edge hardening remains intact.
 
 v1.1.20 keeps the v1.1.19 political-intelligence system intact and adds the campaign sustainability loop: military upkeep may drive Gold/Food negative; a realm that remains negative after military upkeep loses 1 Influence that round; Influence below 7 now follows the Guidebook's exact -10% levy capacity per point; and fielded armies above the resulting realm levy cap suffer 5% attrition per round, capped at the actual overage and distributed proportionally across the realm's armies. It also stamps zero-income provinces as collected, makes overdue trade shipments safely retry instead of aborting Round Advance, and allows legacy pending navy musters to complete through the Round Clock.
  v1.1.19 keeps the once-per-strategic-round political snapshot from v1.1.18, but adds per-player last-known political intelligence. Current visible provinces show the round snapshot at full overlay strength; provinces a player has previously seen remain as a faded last-known owner when they leave vision; never-seen provinces reveal nothing.
 
 Political memory is stored on the viewing Foundry User, not on provinces or Houses, and never changes authoritative ownership, visibility, movement, economy, or military state. Seeing a province updates only that player's remembered record and that one remembered province graphic; it does not rebuild the political map.
 
-For the current hotfix, see `PATCH-NOTES-v1.1.20.md`; political intelligence memory is in `PATCH-NOTES-v1.1.19.md`; the round-snapshot performance repair is in `PATCH-NOTES-v1.1.18.md`, strict fog hardening is in `PATCH-NOTES-v1.1.17.md`, the Foundry v14 renderer repair in `PATCH-NOTES-v1.1.16.md`, and the boxed baseline audit in `PATCH-NOTES-v1.1.15.md`. Historical patch notes remain for regression archaeology.
+For the current hotfix, see `PATCH-NOTES-v1.1.22.md`; province edit mode is in `PATCH-NOTES-v1.1.21.md`; military sustainability is in `PATCH-NOTES-v1.1.20.md`; political intelligence memory is in `PATCH-NOTES-v1.1.19.md`; the round-snapshot performance repair is in `PATCH-NOTES-v1.1.18.md`, strict fog hardening is in `PATCH-NOTES-v1.1.17.md`, the Foundry v14 renderer repair in `PATCH-NOTES-v1.1.16.md`, and the boxed baseline audit in `PATCH-NOTES-v1.1.15.md`. Historical patch notes remain for regression archaeology.
 
 ---
 
