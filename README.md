@@ -1,4 +1,14 @@
-# Crown Overview Tools v0.6.14
+# Crown Overview Tools v1.1.17
+
+**Strict Political Overlay fog-of-war hotfix on the boxed Crown of Ashes release.**
+
+The canonical loaded script is `scripts/crown-overview-tools.js`. v1.1.17 retains the boxed v1.1.15 systems and the v1.1.16 Political Overlay renderer, while enforcing strict fog-of-war: non-GM Political Overlay graphics are drawn only for provinces already present in Crown visibility `revealedEntries`.
+
+For this hotfix, see `PATCH-NOTES-v1.1.17.md`; the renderer repair is documented in `PATCH-NOTES-v1.1.16.md`, and the full boxed baseline audit remains in `PATCH-NOTES-v1.1.15.md`. Historical patch notes remain in the module folder for regression archaeology.
+
+---
+
+# Historical notes — v0.6.14
 
 ## What v0.6.14 changes
 
