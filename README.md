@@ -1,4 +1,13 @@
-# Crown Overview Tools v1.1.22
+# Crown Overview Tools v1.1.23
+
+## v1.1.23 — Unified Realm Identity Hotfix
+
+- Province detail visibility now uses the same current political-control resolver as Holdings and realm systems.
+- Legacy `controllerPlayerUserId` / `controllerPlayerName` province fields are recognized as explicit player control.
+- Stale/deleted Foundry user IDs can fall back to a still-valid stored player name instead of incorrectly denying the current player.
+- Political House names are canonicalized for realm comparisons, so `Karstark`, `House Karstark`, and `House of Karstark` resolve as the same House.
+- Holdings, muster contribution, economy ownership, political overlay identity, and military upkeep use the unified resolver.
+- Deliberately Neutral / Unaligned provinces remain excluded even when their preserved local House name matches a former player House.
 
 ## v1.1.22 — Realm Control / Muster / Upkeep Hotfix
 
@@ -22,7 +31,7 @@ v1.1.20 keeps the v1.1.19 political-intelligence system intact and adds the camp
 
 Political memory is stored on the viewing Foundry User, not on provinces or Houses, and never changes authoritative ownership, visibility, movement, economy, or military state. Seeing a province updates only that player's remembered record and that one remembered province graphic; it does not rebuild the political map.
 
-For the current hotfix, see `PATCH-NOTES-v1.1.22.md`; province edit mode is in `PATCH-NOTES-v1.1.21.md`; military sustainability is in `PATCH-NOTES-v1.1.20.md`; political intelligence memory is in `PATCH-NOTES-v1.1.19.md`; the round-snapshot performance repair is in `PATCH-NOTES-v1.1.18.md`, strict fog hardening is in `PATCH-NOTES-v1.1.17.md`, the Foundry v14 renderer repair in `PATCH-NOTES-v1.1.16.md`, and the boxed baseline audit in `PATCH-NOTES-v1.1.15.md`. Historical patch notes remain for regression archaeology.
+For the current hotfix, see `PATCH-NOTES-v1.1.23.md`; the previous realm-control hotfix is in `PATCH-NOTES-v1.1.22.md`; province edit mode is in `PATCH-NOTES-v1.1.21.md`; military sustainability is in `PATCH-NOTES-v1.1.20.md`; political intelligence memory is in `PATCH-NOTES-v1.1.19.md`; the round-snapshot performance repair is in `PATCH-NOTES-v1.1.18.md`, strict fog hardening is in `PATCH-NOTES-v1.1.17.md`, the Foundry v14 renderer repair in `PATCH-NOTES-v1.1.16.md`, and the boxed baseline audit in `PATCH-NOTES-v1.1.15.md`. Historical patch notes remain for regression archaeology.
 
 ---
 
