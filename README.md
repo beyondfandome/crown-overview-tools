@@ -1,10 +1,15 @@
-# Crown Overview Tools v1.1.17
+# Crown Overview Tools v1.1.20
 
-**Strict Political Overlay fog-of-war hotfix on the boxed Crown of Ashes release.**
+**Military sustainability and round-edge hardening on the boxed Crown of Ashes release.**
 
-The canonical loaded script is `scripts/crown-overview-tools.js`. v1.1.17 retains the boxed v1.1.15 systems and the v1.1.16 Political Overlay renderer, while enforcing strict fog-of-war: non-GM Political Overlay graphics are drawn only for provinces already present in Crown visibility `revealedEntries`.
+The canonical loaded script is `scripts/crown-overview-tools.js`.
 
-For this hotfix, see `PATCH-NOTES-v1.1.17.md`; the renderer repair is documented in `PATCH-NOTES-v1.1.16.md`, and the full boxed baseline audit remains in `PATCH-NOTES-v1.1.15.md`. Historical patch notes remain in the module folder for regression archaeology.
+v1.1.20 keeps the v1.1.19 political-intelligence system intact and adds the campaign sustainability loop: military upkeep may drive Gold/Food negative; a realm that remains negative after military upkeep loses 1 Influence that round; Influence below 7 now follows the Guidebook's exact -10% levy capacity per point; and fielded armies above the resulting realm levy cap suffer 5% attrition per round, capped at the actual overage and distributed proportionally across the realm's armies. It also stamps zero-income provinces as collected, makes overdue trade shipments safely retry instead of aborting Round Advance, and allows legacy pending navy musters to complete through the Round Clock.
+ v1.1.19 keeps the once-per-strategic-round political snapshot from v1.1.18, but adds per-player last-known political intelligence. Current visible provinces show the round snapshot at full overlay strength; provinces a player has previously seen remain as a faded last-known owner when they leave vision; never-seen provinces reveal nothing.
+
+Political memory is stored on the viewing Foundry User, not on provinces or Houses, and never changes authoritative ownership, visibility, movement, economy, or military state. Seeing a province updates only that player's remembered record and that one remembered province graphic; it does not rebuild the political map.
+
+For the current hotfix, see `PATCH-NOTES-v1.1.20.md`; political intelligence memory is in `PATCH-NOTES-v1.1.19.md`; the round-snapshot performance repair is in `PATCH-NOTES-v1.1.18.md`, strict fog hardening is in `PATCH-NOTES-v1.1.17.md`, the Foundry v14 renderer repair in `PATCH-NOTES-v1.1.16.md`, and the boxed baseline audit in `PATCH-NOTES-v1.1.15.md`. Historical patch notes remain for regression archaeology.
 
 ---
 
