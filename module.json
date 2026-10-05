@@ -1,8 +1,8 @@
 {
   "id": "crown-overview-tools",
   "title": "Crown Overview Tools",
-  "description": "Crown Overview Tools 1.1.26 final player UI consolidation: Realm/Military sections, combined summon and embark controls, My Holdings Realm/Raised Armies tabs with real income/upkeep, and Marriage Diplomacy toggle with 3-slot realm tracking.",
-  "version": "1.1.26",
+  "description": "Crown Overview Tools 1.1.29 adds player-editable character identity/roleplay details (Culture, Religion/Faith, age, physical description, preferred weapons, marriage/children, and public notes) while keeping mechanical stats, House, ownership, location, traits/quirks, and GM notes protected. Includes v1.1.28 private strategic-action chat and v1.1.27 political-overlay fixes.",
+  "version": "1.1.29",
   "authors": [
     {
       "name": "Beyond Fandome"
@@ -20,6 +20,6 @@
   ],
   "url": "https://github.com/beyondfandome/crown-overview-tools",
   "manifest": "https://raw.githubusercontent.com/beyondfandome/crown-overview-tools/main/module.json",
-  "download": "https://github.com/beyondfandome/crown-overview-tools/releases/download/v1.1.26/crown-overview-tools-v1.1.26.zip",
+  "download": "https://github.com/beyondfandome/crown-overview-tools/releases/download/v1.1.29/crown-overview-tools-v1.1.29.zip",
   "socket": true
 }
