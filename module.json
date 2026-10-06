@@ -1,8 +1,8 @@
 {
   "id": "crown-overview-tools",
   "title": "Crown Overview Tools",
-  "description": "Scene-gated strategic overview map tools for Crown of Ashes. v1.1.69 closes a hover-tooltip LOS leak so unseen provinces no longer reveal player owner, local House, ruler, allegiance, buildings, or economy; harmless geographic/public data remains hoverable.",
-  "version": "1.1.69",
+  "description": "Scene-gated strategic overview map tools for Crown of Ashes. v1.1.73 separates Main Actions from movement, replaces Intrigue Action with flexible Out-of-Map Actions that do not ground characters, and labels major actions clearly in the UI.",
+  "version": "1.1.73",
   "authors": [
     {
       "name": "Beyond Fandome"
@@ -20,6 +20,6 @@
   ],
   "url": "https://github.com/beyondfandome/crown-overview-tools",
   "manifest": "https://raw.githubusercontent.com/beyondfandome/crown-overview-tools/main/module.json",
-  "download": "https://github.com/beyondfandome/crown-overview-tools/releases/download/v1.1.69/crown-overview-tools-v1.1.69.zip",
+  "download": "https://github.com/beyondfandome/crown-overview-tools/releases/download/v1.1.73/crown-overview-tools-v1.1.73.zip",
   "socket": true
 }
