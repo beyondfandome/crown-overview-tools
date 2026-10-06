@@ -1,8 +1,8 @@
 {
   "id": "crown-overview-tools",
   "title": "Crown Overview Tools",
-  "description": "Crown of Ashes strategic overview tools. v1.1.51 adds a general stale-province scrub: removes obsolete/orphan building records, canonicalizes current building data, recalculates Development, and removes legacy troop/ship/siege values from province economy stockpiles.",
-  "version": "1.1.51",
+  "description": "Crown of Ashes strategic overview tools. v1.1.56 makes Diligent construction sales persist until consumed and adds an ALL BUILDINGS ON SALE banner with struck-through original prices and discounted costs in the Build UI.",
+  "version": "1.1.56",
   "authors": [
     {
       "name": "Beyond Fandome"
@@ -20,6 +20,6 @@
   ],
   "url": "https://github.com/beyondfandome/crown-overview-tools",
   "manifest": "https://raw.githubusercontent.com/beyondfandome/crown-overview-tools/main/module.json",
-  "download": "https://github.com/beyondfandome/crown-overview-tools/releases/download/v1.1.51/crown-overview-tools-v1.1.51.zip",
+  "download": "https://github.com/beyondfandome/crown-overview-tools/releases/download/v1.1.56/crown-overview-tools-v1.1.56.zip",
   "socket": true
 }
