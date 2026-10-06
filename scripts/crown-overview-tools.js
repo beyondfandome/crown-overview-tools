@@ -1,8 +1,9 @@
 (() => {
   const MODULE_ID = "crown-overview-tools";
-  const MODULE_VERSION = "0.6.29";
+  const MODULE_VERSION = "1.1.74";
   const FLAG_SCOPE = "world";
   const WORLD_TILE_KEY = "worldTile";
+  const WORLD_LABEL_KEY = "worldTileLabel";
   const WORLD_PIECE_KEY = "worldPiece";
   const WORLD_CHARACTER_KEY = "worldCharacter";
   const HOUSE_KEY = "houseData";
@@ -26,8 +27,22 @@
   const LINK_VIEWER_KEY = "COA_WORLD_TILE_LINK_VIEWER";
   const POLITICAL_OVERLAY_KEY = "COA_WORLD_POLITICAL_OVERLAY";
   const POLITICAL_OVERLAY_STATE_KEY = "COA_WORLD_POLITICAL_OVERLAY_STATE";
+  const POLITICAL_MEMORY_KEY = "politicalMemoryV1";
+  const POLITICAL_MEMORY_MANAGER_KEY = "COA_WORLD_POLITICAL_MEMORY_MANAGER";
+  const PROVINCE_HIGHLIGHTS_STATE_KEY = "COA_WORLD_PROVINCE_HIGHLIGHTS_STATE";
+  const MAP_VISUAL_MANAGER_KEY = "COA_WORLD_MAP_VISUAL_MANAGER";
+  const WORLD_TILE_CACHE_KEY = "COA_WORLD_TILE_CACHE_V1";
+  const TILE_NAME_EDIT_MODE_KEY = "COA_WORLD_TILE_NAME_EDIT_MODE";
+  const PROVINCE_EDIT_MODE_KEY = "COA_WORLD_PROVINCE_EDIT_MODE";
+  const PROVINCE_CONTROLLER_SYNC_MANAGER_KEY = "COA_PROVINCE_CONTROLLER_SYNC_MANAGER_V1";
+  const PORT_PERMISSION_PENDING_KEY = "COA_PORT_TRAVEL_PERMISSION_PENDING";
   const BUILD_LEDGER_KEY = "worldBuildLedger";
   const ECONOMY_LEDGER_KEY = "worldEconomyLedger";
+  const MILITARY_UPKEEP_LEDGER_KEY = "worldMilitaryUpkeepLedger";
+  const MARRIAGE_LEDGER_KEY = "worldMarriageLedger";
+  const MARRIAGE_SLOT_LIMIT = 3;
+  const NEGATIVE_UPKEEP_INFLUENCE_LOSS = 1;
+  const LEVY_OVERCAP_ATTRITION_RATE = 0.05;
   const MARKET_FORCES_KEY = "worldMarketForces";
   const PENDING_BUILD_STATUS_PENDING = "pending";
   const PENDING_BUILD_STATUS_APPLIED = "applied";
@@ -114,24 +129,24 @@
 
   const ARMY_TROOP_TYPES = [
     { key: "Mob", label: "Mob", gold: 1, food: 1 },
-    { key: "Light Infantry", label: "Light Infantry", gold: 1, food: 2 },
-    { key: "Spearmen", label: "Spearmen", gold: 1, food: 2 },
-    { key: "Archers", label: "Archers", gold: 2, food: 2 },
-    { key: "Heavy Infantry", label: "Heavy Infantry", gold: 3, food: 2 },
-    { key: "Pikemen", label: "Pikemen", gold: 3, food: 2 },
-    { key: "Crossbowmen", label: "Crossbowmen", gold: 3, food: 2 },
-    { key: "Light Cavalry", label: "Light Cavalry", gold: 3, food: 3 },
-    { key: "Lancers", label: "Lancers", gold: 4, food: 3 },
-    { key: "Heavy Cavalry", label: "Heavy Cavalry", gold: 5, food: 4 }
+    { key: "Light Infantry", label: "Light Infantry", gold: 2, food: 3 },
+    { key: "Spearmen", label: "Spearmen", gold: 2, food: 3 },
+    { key: "Archers", label: "Archers", gold: 3, food: 3 },
+    { key: "Heavy Infantry", label: "Heavy Infantry", gold: 4, food: 4 },
+    { key: "Pikemen", label: "Pikemen", gold: 4, food: 4 },
+    { key: "Crossbowmen", label: "Crossbowmen", gold: 4, food: 4 },
+    { key: "Light Cavalry", label: "Light Cavalry", gold: 5, food: 5 },
+    { key: "Lancers", label: "Lancers", gold: 6, food: 5 },
+    { key: "Heavy Cavalry", label: "Heavy Cavalry", gold: 8, food: 6 }
   ];
 
   const NAVY_SHIP_TYPES = [
-    { key: "Fishing / Conscripted Vessel", label: "Fishing / Conscripted Vessel", quality: 1, gold: 1, food: 1, troopEquivalent: "Mob", note: "Improvised force, poorly suited to battle" },
-    { key: "Longship", label: "Longship", quality: 2, gold: 2, food: 1, troopEquivalent: "Light Infantry", note: "Cheap, mobile, effective basic combat ship" },
-    { key: "Galley", label: "Galley", quality: 3, gold: 3, food: 2, troopEquivalent: "Archers", note: "Proper trained naval unit, but not a heavy hitter" },
-    { key: "War Galley", label: "War Galley", quality: 4, gold: 4, food: 2, troopEquivalent: "Heavy Infantry / Crossbowmen / Light Cavalry", note: "Dedicated, powerful military ship" },
-    { key: "Greatship", label: "Greatship", quality: 5, gold: 5, food: 3, troopEquivalent: "Lancers", note: "Expensive elite naval asset" },
-    { key: "Dromond", label: "Dromond", quality: 6, gold: 6, food: 3, troopEquivalent: "Heavy Cavalry", note: "Premier, extremely expensive military ship" }
+    { key: "Fishing / Conscripted Vessel", label: "Fishing / Conscripted Vessel", quality: 1, gold: 2, food: 2, troopEquivalent: "Mob", note: "Improvised force, poorly suited to battle" },
+    { key: "Longship", label: "Longship", quality: 2, gold: 3, food: 2, troopEquivalent: "Light Infantry", note: "Cheap, mobile, effective basic combat ship" },
+    { key: "Galley", label: "Galley", quality: 3, gold: 4, food: 3, troopEquivalent: "Archers", note: "Proper trained naval unit, but not a heavy hitter" },
+    { key: "War Galley", label: "War Galley", quality: 4, gold: 6, food: 4, troopEquivalent: "Heavy Infantry / Crossbowmen / Light Cavalry", note: "Dedicated, powerful military ship" },
+    { key: "Greatship", label: "Greatship", quality: 5, gold: 8, food: 5, troopEquivalent: "Lancers", note: "Expensive elite naval asset" },
+    { key: "Dromond", label: "Dromond", quality: 6, gold: 10, food: 6, troopEquivalent: "Heavy Cavalry", note: "Premier, extremely expensive military ship" }
   ];
 
 
@@ -228,14 +243,33 @@
     4: { label: "City", minPopulation: 25000, maxPopulation: 34999 }
   };
 
-  const CULTURES = ["First Men", "Andal", "Ironborn", "Rhoynar", "Valyrian", "Free Folk", "Other"];
+  const CULTURES = [
+    "First Men",
+    "First Andal",
+    "Crannogmen",
+    "Wildling",
+    "Ironborn",
+    "Valeman",
+    "Riverlander",
+    "Westerman",
+    "Reachman",
+    "Reach Marcher",
+    "Stormlander",
+    "Storm Marcher",
+    "Salt Dornish",
+    "Stone Dornish",
+    "Ashenlander",
+    "High Valyrian",
+    "Sisterman",
+    "Other"
+  ];
 
   const DEFAULT_RESOURCE_NAMES = ["Gold", "Food", "Influence", "Mob", "Light Infantry", "Spearmen", "Heavy Infantry", "Pikemen", "Archers", "Crossbowmen", "Light Cavalry", "Lancers", "Heavy Cavalry", "Ships", "Siege", "Grain", "Wood", "Stone", "Iron", "Wool", "Fish", "Horses"];
 
   const BUILDING_TIER_COSTS = {
-    1: { Gold: 4 },
-    2: { Gold: 12 },
-    3: { Gold: 24 }
+    1: { Gold: 5 },
+    2: { Gold: 15 },
+    3: { Gold: 30 }
   };
 
   // Development is the number of physical building pieces in the province, not the tier of a line.
@@ -274,14 +308,14 @@
       { level: 3, name: "Monster Hunters League", income: { Gold: 6, Food: 6 }, effect: "+6 Gold, +6 Food" }
     ]},
     { key: "market", group: "Economy", label: "Clear Away The Rubble In The Square", levels: [
-      { level: 1, name: "Town Square", income: { Gold: 3, Food: 1 }, effect: "+3 Gold, +1 Food" },
-      { level: 2, name: "Market Square", income: { Gold: 6, Food: 2 }, effect: "+6 Gold, +2 Food" },
-      { level: 3, name: "Trading Hall", income: { Gold: 9, Food: 3 }, effect: "+9 Gold, +3 Food" }
+      { level: 1, name: "Town Square", income: {}, primaryTradeMultiplier: 1, secondaryTradeMultiplier: 1, effect: "Trade goods: Primary 100%; Secondary 100%; no flat income" },
+      { level: 2, name: "Market Square", income: {}, primaryTradeMultiplier: 1.5, secondaryTradeMultiplier: 1.5, effect: "Trade goods: Primary 150%; Secondary 150%; no flat income" },
+      { level: 3, name: "Trading Hall", income: {}, primaryTradeMultiplier: 3, secondaryTradeMultiplier: 3, effect: "Trade goods: Primary 300%; Secondary 300%; no flat income" }
     ]},
     { key: "foundry", group: "Economy", label: "Stoke The Forges Anew", levels: [
-      { level: 1, name: "Foundry", income: { Gold: 4 }, troopSupport: { basicEquipment: true }, effect: "+4 Gold; supplies basic military equipment" },
-      { level: 2, name: "Blacksmith", income: { Gold: 8 }, troopSupport: { basicEquipment: true, trainedCapacityBonus: 250 }, effect: "+8 Gold; supplies better arms; +250 trained-troop support when recruitment is added" },
-      { level: 3, name: "Armorer", aliases: ["Armoror"], income: { Gold: 12 }, troopSupport: { basicEquipment: true, trainedCapacityBonus: 500, heavyEquipment: true }, effect: "+12 Gold; supplies heavy arms/armor; heavy-troop support when recruitment is added" }
+      { level: 1, name: "Foundry", income: { Gold: 4 }, trainingCapacityBonus: { "Light Infantry": 100 }, troopSupport: { basicEquipment: true }, effect: "+4 Gold; +100 Light Infantry training capacity" },
+      { level: 2, name: "Blacksmith", income: { Gold: 8 }, trainingCapacityBonus: { Crossbowmen: 100 }, troopSupport: { basicEquipment: true }, effect: "+8 Gold; +100 Crossbowmen training capacity (cumulative with Foundry)" },
+      { level: 3, name: "Armorer", aliases: ["Armoror"], income: { Gold: 12 }, trainingCapacityBonus: { Lancers: 100 }, troopSupport: { basicEquipment: true, heavyEquipment: true }, effect: "+12 Gold; +100 Lancers training capacity (cumulative with Foundry + Blacksmith)" }
     ]},
     { key: "pastures", group: "Economy", label: "Pen The Lost Herds", levels: [
       { level: 1, name: "Pastures", income: { Food: 4 }, effect: "+4 Food" },
@@ -370,20 +404,12 @@
 
   const BUILDINGS = BUILDING_LINES.map(line => line.levels[0]?.name).filter(Boolean);
 
-  const BUILDING_RULES = {
-    "Great Hall": { cost: { Gold: 4 }, income: { Gold: 1 }, effect: "Legacy building" },
-    "Keep": { cost: { Gold: 5, Stone: 1 }, income: { Gold: 1 }, effect: "Legacy building" },
-    "Barracks": { cost: { Gold: 3, Wood: 1 }, income: {}, effect: "Legacy building" },
-    "Stable": { cost: { Gold: 3, Wood: 1 }, income: {}, effect: "Legacy building" },
-    "Smithy": { cost: { Gold: 3, Iron: 1 }, income: { Gold: 1 }, effect: "Legacy building" },
-    "Market": { cost: { Gold: 4 }, income: { Gold: 2 }, effect: "Legacy building" },
-    "Temple": { cost: { Gold: 3, Stone: 1 }, income: { Gold: 1 }, effect: "Legacy building" },
-    "Shipyard": { cost: { Gold: 4, Wood: 2 }, income: {}, effect: "Legacy building" },
-    "Whaling Dock": { cost: { Gold: 3, Wood: 1 }, income: { Gold: 1, Food: 2 }, effect: "Legacy building" },
-    "Smokehouse": { cost: { Gold: 2, Wood: 1 }, income: { Food: 1 }, effect: "Legacy building" },
-    "Workshop": { cost: { Gold: 3, Wood: 1 }, income: { Gold: 1 }, effect: "Legacy building" },
-    "Harbor": { cost: { Gold: 5, Wood: 2 }, income: { Gold: 2, Food: 1 }, effect: "Legacy building" }
-  };
+  // Old pre-catalog building rules (Keep, Smithy, Market, Temple, Shipyard,
+  // etc.) are intentionally retired. Modern construction is defined solely by
+  // BUILDING_LINES above. Keeping old rules here allowed imported fossil data
+  // to continue generating income even though those buildings no longer exist.
+  const BUILDING_RULES = {};
+
 
   // v0.3.4: Market Forces are now the source of truth for seasonal scaling.
   // Keep this legacy constant neutral so Winter does not half some income twice while
@@ -399,634 +425,1173 @@
     {
         "category": "Grains & Field Crops",
         "name": "Barley",
+        "tier": 3,
         "goldValue": 1,
-        "foodValue": 3
+        "foodValue": 2
     },
     {
         "category": "Grains & Field Crops",
         "name": "Buckwheat",
-        "goldValue": 1,
-        "foodValue": 3
+        "tier": 2,
+        "goldValue": 0,
+        "foodValue": 2
     },
     {
         "category": "Grains & Field Crops",
         "name": "Oat",
+        "tier": 3,
         "goldValue": 1,
-        "foodValue": 3
+        "foodValue": 2
     },
     {
         "category": "Grains & Field Crops",
         "name": "Rye",
-        "goldValue": 1,
-        "foodValue": 3
+        "tier": 4,
+        "goldValue": 0,
+        "foodValue": 4
     },
     {
         "category": "Grains & Field Crops",
         "name": "Wheat",
-        "goldValue": 2,
-        "foodValue": 3
+        "tier": 5,
+        "goldValue": 0,
+        "foodValue": 5
     },
     {
         "category": "Fruits & Orchard Crops",
         "name": "Blueberries",
+        "tier": 3,
         "goldValue": 1,
         "foodValue": 2
     },
     {
         "category": "Fruits & Orchard Crops",
         "name": "Green Apples",
+        "tier": 3,
         "goldValue": 1,
         "foodValue": 2
     },
     {
         "category": "Fruits & Orchard Crops",
         "name": "Pears",
+        "tier": 3,
         "goldValue": 1,
         "foodValue": 2
     },
     {
         "category": "Fruits & Orchard Crops",
         "name": "Plums",
+        "tier": 3,
         "goldValue": 1,
         "foodValue": 2
     },
     {
         "category": "Fruits & Orchard Crops",
         "name": "Pumpkins",
-        "goldValue": 1,
+        "tier": 3,
+        "goldValue": 0,
         "foodValue": 3
     },
     {
         "category": "Fruits & Orchard Crops",
         "name": "Red Apples",
+        "tier": 3,
         "goldValue": 1,
         "foodValue": 2
     },
     {
         "category": "Fruits & Orchard Crops",
         "name": "Cantaloupes",
-        "goldValue": 2,
-        "foodValue": 2
+        "tier": 4,
+        "goldValue": 1,
+        "foodValue": 3
     },
     {
         "category": "Fruits & Orchard Crops",
         "name": "Grapes",
+        "tier": 4,
         "goldValue": 2,
         "foodValue": 2
     },
     {
         "category": "Fruits & Orchard Crops",
         "name": "Lemons",
+        "tier": 4,
         "goldValue": 2,
         "foodValue": 2
     },
     {
         "category": "Fruits & Orchard Crops",
         "name": "Olives",
+        "tier": 5,
         "goldValue": 2,
         "foodValue": 3
     },
     {
         "category": "Fruits & Orchard Crops",
         "name": "Peaches",
-        "goldValue": 2,
-        "foodValue": 2
-    },
-    {
-        "category": "Fruits & Orchard Crops",
-        "name": "Peppers",
-        "goldValue": 2,
-        "foodValue": 2
-    },
-    {
-        "category": "Fruits & Orchard Crops",
-        "name": "Watermelons",
-        "goldValue": 2,
-        "foodValue": 2
-    },
-    {
-        "category": "Fruits & Orchard Crops",
-        "name": "Fireplums",
-        "goldValue": 3,
-        "foodValue": 2
-    },
-    {
-        "category": "Fruits & Orchard Crops",
-        "name": "Spicy Peppers",
-        "goldValue": 3,
-        "foodValue": 2
-    },
-    {
-        "category": "Livestock & Mounts",
-        "name": "Cattle",
+        "tier": 4,
         "goldValue": 1,
         "foodValue": 3
     },
     {
+        "category": "Fruits & Orchard Crops",
+        "name": "Peppers",
+        "tier": 4,
+        "goldValue": 1,
+        "foodValue": 3
+    },
+    {
+        "category": "Fruits & Orchard Crops",
+        "name": "Watermelons",
+        "tier": 4,
+        "goldValue": 0,
+        "foodValue": 4
+    },
+    {
+        "category": "Fruits & Orchard Crops",
+        "name": "Fireplums",
+        "tier": 6,
+        "goldValue": 0,
+        "foodValue": 6
+    },
+    {
+        "category": "Fruits & Orchard Crops",
+        "name": "Spicy Peppers",
+        "tier": 5,
+        "goldValue": 2,
+        "foodValue": 3
+    },
+    {
+        "category": "Livestock & Mounts",
+        "name": "Cattle",
+        "tier": 5,
+        "goldValue": 1,
+        "foodValue": 4
+    },
+    {
         "category": "Livestock & Mounts",
         "name": "Chickens",
-        "goldValue": 1,
+        "tier": 3,
+        "goldValue": 0,
         "foodValue": 3
     },
     {
         "category": "Livestock & Mounts",
         "name": "Ducks",
-        "goldValue": 1,
-        "foodValue": 2
+        "tier": 3,
+        "goldValue": 0,
+        "foodValue": 3
     },
     {
         "category": "Livestock & Mounts",
         "name": "Geese",
-        "goldValue": 1,
-        "foodValue": 2
+        "tier": 3,
+        "goldValue": 0,
+        "foodValue": 3
     },
     {
         "category": "Livestock & Mounts",
         "name": "Goats",
+        "tier": 4,
         "goldValue": 1,
         "foodValue": 3
     },
     {
         "category": "Livestock & Mounts",
         "name": "Pigs",
-        "goldValue": 1,
-        "foodValue": 3
+        "tier": 4,
+        "goldValue": 0,
+        "foodValue": 4
     },
     {
         "category": "Livestock & Mounts",
         "name": "Sheep",
-        "goldValue": 1,
-        "foodValue": 3
-    },
-    {
-        "category": "Livestock & Mounts",
-        "name": "Bracken Browns",
-        "goldValue": 2,
-        "foodValue": 0
-    },
-    {
-        "category": "Livestock & Mounts",
-        "name": "Highland Cows",
+        "tier": 4,
         "goldValue": 2,
         "foodValue": 2
     },
     {
         "category": "Livestock & Mounts",
+        "name": "Bracken Browns",
+        "tier": 4,
+        "goldValue": 4,
+        "foodValue": 0
+    },
+    {
+        "category": "Livestock & Mounts",
+        "name": "Highland Cows",
+        "tier": 6,
+        "goldValue": 0,
+        "foodValue": 6
+    },
+    {
+        "category": "Livestock & Mounts",
         "name": "Honeybees",
+        "tier": 4,
         "goldValue": 2,
         "foodValue": 2
     },
     {
         "category": "Livestock & Mounts",
         "name": "Pack Horses",
-        "goldValue": 2,
+        "tier": 3,
+        "goldValue": 3,
         "foodValue": 0
     },
     {
         "category": "Livestock & Mounts",
         "name": "Westerland Golds",
-        "goldValue": 3,
+        "tier": 5,
+        "goldValue": 5,
+        "foodValue": 0
+    },
+    {
+        "category": "Livestock & Mounts",
+        "name": "Westerland Reds",
+        "tier": 5,
+        "goldValue": 5,
         "foodValue": 0
     },
     {
         "category": "Livestock & Mounts",
         "name": "Sand Steed",
-        "goldValue": 3,
+        "tier": 5,
+        "goldValue": 5,
         "foodValue": 0
     },
     {
         "category": "Livestock & Mounts",
         "name": "Snow Steeds",
-        "goldValue": 3,
+        "tier": 5,
+        "goldValue": 5,
         "foodValue": 0
     },
     {
         "category": "Livestock & Mounts",
         "name": "Vale Greys",
-        "goldValue": 3,
+        "tier": 5,
+        "goldValue": 5,
         "foodValue": 0
     },
     {
         "category": "Game & Animal Products",
         "name": "Boar",
+        "tier": 4,
         "goldValue": 1,
-        "foodValue": 2
+        "foodValue": 3
     },
     {
         "category": "Game & Animal Products",
         "name": "Deer",
+        "tier": 4,
         "goldValue": 1,
-        "foodValue": 2
+        "foodValue": 3
     },
     {
         "category": "Game & Animal Products",
         "name": "Elk",
+        "tier": 5,
         "goldValue": 1,
-        "foodValue": 2
+        "foodValue": 4
     },
     {
         "category": "Game & Animal Products",
         "name": "Hides",
-        "goldValue": 1,
+        "tier": 2,
+        "goldValue": 2,
         "foodValue": 0
     },
     {
         "category": "Game & Animal Products",
         "name": "Small Game",
-        "goldValue": 1,
+        "tier": 2,
+        "goldValue": 0,
         "foodValue": 2
     },
     {
         "category": "Game & Animal Products",
         "name": "Bear Pelts",
-        "goldValue": 2,
+        "tier": 3,
+        "goldValue": 3,
         "foodValue": 0
     },
     {
         "category": "Game & Animal Products",
         "name": "Falcons",
-        "goldValue": 2,
+        "tier": 4,
+        "goldValue": 4,
         "foodValue": 0
     },
     {
         "category": "Game & Animal Products",
         "name": "Fox Furs",
-        "goldValue": 2,
+        "tier": 3,
+        "goldValue": 3,
         "foodValue": 0
     },
     {
         "category": "Game & Animal Products",
         "name": "Hunting Hounds",
-        "goldValue": 2,
+        "tier": 3,
+        "goldValue": 3,
         "foodValue": 0
     },
     {
         "category": "Game & Animal Products",
         "name": "Marten Pelts",
-        "goldValue": 2,
+        "tier": 4,
+        "goldValue": 4,
         "foodValue": 0
     },
     {
         "category": "Game & Animal Products",
         "name": "Otter Pelts",
-        "goldValue": 2,
+        "tier": 3,
+        "goldValue": 3,
         "foodValue": 0
     },
     {
         "category": "Game & Animal Products",
         "name": "Ravens",
-        "goldValue": 2,
+        "tier": 3,
+        "goldValue": 3,
         "foodValue": 0
     },
     {
         "category": "Game & Animal Products",
         "name": "Wolf Pelts",
-        "goldValue": 2,
+        "tier": 3,
+        "goldValue": 3,
         "foodValue": 0
     },
     {
         "category": "Game & Animal Products",
         "name": "Exotic Birds",
-        "goldValue": 3,
-        "foodValue": 1
+        "tier": 4,
+        "goldValue": 4,
+        "foodValue": 0
     },
     {
         "category": "Game & Animal Products",
         "name": "Pale Hide",
-        "goldValue": 4,
+        "tier": 5,
+        "goldValue": 5,
         "foodValue": 0
     },
     {
         "category": "Game & Animal Products",
         "name": "Unicorns",
-        "goldValue": 4,
+        "tier": 5,
+        "goldValue": 5,
         "foodValue": 0
     },
     {
         "category": "Game & Animal Products",
         "name": "Unicorn Horn",
-        "goldValue": 4,
+        "tier": 6,
+        "goldValue": 6,
         "foodValue": 0
     },
     {
         "category": "Fish & Aquatic Resources",
         "name": "Catfish",
-        "goldValue": 1,
+        "tier": 3,
+        "goldValue": 0,
         "foodValue": 3
     },
     {
         "category": "Fish & Aquatic Resources",
         "name": "Cod",
-        "goldValue": 1,
-        "foodValue": 3
+        "tier": 4,
+        "goldValue": 0,
+        "foodValue": 4
     },
     {
         "category": "Fish & Aquatic Resources",
         "name": "River Pike",
-        "goldValue": 1,
+        "tier": 3,
+        "goldValue": 0,
         "foodValue": 3
     },
     {
         "category": "Fish & Aquatic Resources",
         "name": "River Trout",
-        "goldValue": 1,
+        "tier": 3,
+        "goldValue": 0,
         "foodValue": 3
     },
     {
         "category": "Fish & Aquatic Resources",
         "name": "Crab",
-        "goldValue": 2,
-        "foodValue": 2
+        "tier": 4,
+        "goldValue": 1,
+        "foodValue": 3
     },
     {
         "category": "Fish & Aquatic Resources",
         "name": "Fermented Crab",
-        "goldValue": 2,
-        "foodValue": 2
+        "tier": 6,
+        "goldValue": 0,
+        "foodValue": 6
     },
     {
         "category": "Fish & Aquatic Resources",
         "name": "Seals",
+        "tier": 4,
         "goldValue": 2,
         "foodValue": 2
     },
     {
         "category": "Fish & Aquatic Resources",
         "name": "Tuna",
-        "goldValue": 2,
-        "foodValue": 3
+        "tier": 5,
+        "goldValue": 1,
+        "foodValue": 4
     },
     {
         "category": "Fish & Aquatic Resources",
         "name": "Turtles",
-        "goldValue": 2,
-        "foodValue": 2
+        "tier": 4,
+        "goldValue": 1,
+        "foodValue": 3
     },
     {
         "category": "Fish & Aquatic Resources",
         "name": "Whale Oil",
-        "goldValue": 2,
-        "foodValue": 1
+        "tier": 4,
+        "goldValue": 4,
+        "foodValue": 0
     },
     {
         "category": "Fish & Aquatic Resources",
         "name": "Pearls",
-        "goldValue": 3,
+        "tier": 5,
+        "goldValue": 5,
         "foodValue": 0
     },
     {
         "category": "Metals & Ores",
         "name": "Bog Iron",
-        "goldValue": 1,
+        "tier": 2,
+        "goldValue": 2,
         "foodValue": 0
     },
     {
         "category": "Metals & Ores",
         "name": "Lead",
-        "goldValue": 1,
+        "tier": 2,
+        "goldValue": 2,
         "foodValue": 0
     },
     {
         "category": "Metals & Ores",
         "name": "Bronze",
-        "goldValue": 2,
+        "tier": 3,
+        "goldValue": 3,
         "foodValue": 0
     },
     {
         "category": "Metals & Ores",
         "name": "Copper",
-        "goldValue": 2,
+        "tier": 3,
+        "goldValue": 3,
         "foodValue": 0
     },
     {
         "category": "Metals & Ores",
         "name": "Iron",
-        "goldValue": 2,
+        "tier": 4,
+        "goldValue": 4,
         "foodValue": 0
     },
     {
         "category": "Metals & Ores",
         "name": "Tin",
+        "tier": 2,
         "goldValue": 2,
         "foodValue": 0
     },
     {
         "category": "Metals & Ores",
         "name": "Gold",
-        "goldValue": 3,
+        "tier": 5,
+        "goldValue": 5,
         "foodValue": 0
     },
     {
         "category": "Metals & Ores",
         "name": "Silver",
-        "goldValue": 3,
+        "tier": 4,
+        "goldValue": 4,
         "foodValue": 0
     },
     {
         "category": "Stone & Minerals",
         "name": "Clay",
-        "goldValue": 1,
+        "tier": 2,
+        "goldValue": 2,
         "foodValue": 0
     },
     {
         "category": "Stone & Minerals",
         "name": "Sandstone",
-        "goldValue": 1,
+        "tier": 2,
+        "goldValue": 2,
         "foodValue": 0
     },
     {
         "category": "Stone & Minerals",
         "name": "Stone",
-        "goldValue": 1,
+        "tier": 2,
+        "goldValue": 2,
         "foodValue": 0
     },
     {
         "category": "Stone & Minerals",
         "name": "Cut Stone",
-        "goldValue": 2,
+        "tier": 3,
+        "goldValue": 3,
         "foodValue": 0
     },
     {
         "category": "Stone & Minerals",
         "name": "Granite",
-        "goldValue": 2,
+        "tier": 3,
+        "goldValue": 3,
         "foodValue": 0
     },
     {
         "category": "Stone & Minerals",
         "name": "Ice",
-        "goldValue": 2,
-        "foodValue": 0
+        "tier": 3,
+        "goldValue": 1,
+        "foodValue": 2
     },
     {
         "category": "Stone & Minerals",
         "name": "Salt",
+        "tier": 3,
         "goldValue": 2,
-        "foodValue": 0
+        "foodValue": 1
     },
     {
         "category": "Stone & Minerals",
         "name": "Sulfur",
-        "goldValue": 2,
+        "tier": 4,
+        "goldValue": 4,
         "foodValue": 0
     },
     {
         "category": "Stone & Minerals",
         "name": "Amber",
-        "goldValue": 3,
+        "tier": 4,
+        "goldValue": 4,
         "foodValue": 0
     },
     {
         "category": "Stone & Minerals",
         "name": "Jewels",
-        "goldValue": 3,
+        "tier": 6,
+        "goldValue": 6,
         "foodValue": 0
     },
     {
         "category": "Stone & Minerals",
         "name": "Marble",
-        "goldValue": 3,
+        "tier": 4,
+        "goldValue": 4,
         "foodValue": 0
     },
     {
         "category": "Timber & Natural Materials",
         "name": "Beech",
-        "goldValue": 1,
+        "tier": 2,
+        "goldValue": 2,
         "foodValue": 0
     },
     {
         "category": "Timber & Natural Materials",
         "name": "Peat",
-        "goldValue": 1,
+        "tier": 2,
+        "goldValue": 2,
         "foodValue": 0
     },
     {
         "category": "Timber & Natural Materials",
         "name": "Reeds",
-        "goldValue": 1,
+        "tier": 2,
+        "goldValue": 2,
         "foodValue": 0
     },
     {
         "category": "Timber & Natural Materials",
         "name": "Ash",
-        "goldValue": 2,
+        "tier": 3,
+        "goldValue": 3,
         "foodValue": 0
     },
     {
         "category": "Timber & Natural Materials",
         "name": "Oak",
-        "goldValue": 2,
+        "tier": 4,
+        "goldValue": 4,
         "foodValue": 0
     },
     {
         "category": "Timber & Natural Materials",
         "name": "Ironwood",
-        "goldValue": 3,
+        "tier": 5,
+        "goldValue": 5,
         "foodValue": 0
     },
     {
         "category": "Crafted & Manufactured Goods",
         "name": "Candles",
-        "goldValue": 1,
+        "tier": 2,
+        "goldValue": 2,
         "foodValue": 0
     },
     {
         "category": "Crafted & Manufactured Goods",
         "name": "Fertilizer",
+        "tier": 3,
         "goldValue": 1,
-        "foodValue": 0
+        "foodValue": 2
     },
     {
         "category": "Crafted & Manufactured Goods",
         "name": "Dyes",
-        "goldValue": 2,
+        "tier": 3,
+        "goldValue": 3,
         "foodValue": 0
     },
     {
         "category": "Crafted & Manufactured Goods",
         "name": "Glass",
-        "goldValue": 2,
+        "tier": 3,
+        "goldValue": 3,
         "foodValue": 0
     },
     {
         "category": "Crafted & Manufactured Goods",
         "name": "Goosefeather Arrows",
-        "goldValue": 2,
+        "tier": 3,
+        "goldValue": 3,
         "foodValue": 0
     },
     {
         "category": "Crafted & Manufactured Goods",
         "name": "Paper",
-        "goldValue": 2,
+        "tier": 3,
+        "goldValue": 3,
         "foodValue": 0
     },
     {
         "category": "Crafted & Manufactured Goods",
         "name": "Yew Bows",
-        "goldValue": 2,
+        "tier": 4,
+        "goldValue": 4,
         "foodValue": 0
     },
     {
         "category": "Crafted & Manufactured Goods",
         "name": "Obsidian Blades",
-        "goldValue": 4,
+        "tier": 5,
+        "goldValue": 5,
         "foodValue": 0
     },
     {
         "category": "Crafted & Manufactured Goods",
         "name": "Poison",
-        "goldValue": 3,
+        "tier": 5,
+        "goldValue": 5,
         "foodValue": 0
     },
     {
         "category": "Crafted & Manufactured Goods",
         "name": "Weirwood Bows",
-        "goldValue": 4,
+        "tier": 6,
+        "goldValue": 6,
         "foodValue": 0
     },
     {
         "category": "Trade & Industry",
         "name": "Ale",
-        "goldValue": 1,
+        "tier": 3,
+        "goldValue": 2,
         "foodValue": 1
     },
     {
         "category": "Trade & Industry",
         "name": "Cider",
-        "goldValue": 1,
+        "tier": 3,
+        "goldValue": 2,
         "foodValue": 1
     },
     {
         "category": "Trade & Industry",
         "name": "Whiskey",
-        "goldValue": 2,
-        "foodValue": 1
+        "tier": 4,
+        "goldValue": 4,
+        "foodValue": 0
     },
     {
         "category": "Trade & Industry",
         "name": "Wine",
-        "goldValue": 2,
+        "tier": 4,
+        "goldValue": 3,
         "foodValue": 1
     },
     {
         "category": "Trade & Industry",
         "name": "Dornish Red",
-        "goldValue": 3,
-        "foodValue": 1
+        "tier": 5,
+        "goldValue": 5,
+        "foodValue": 0
     },
     {
         "category": "Trade & Industry",
         "name": "Eyrie Purple (Wine)",
-        "goldValue": 3,
-        "foodValue": 1
+        "tier": 5,
+        "goldValue": 5,
+        "foodValue": 0
     },
     {
         "category": "Trade & Industry",
         "name": "Tradeports",
-        "goldValue": 3,
+        "tier": 5,
+        "goldValue": 5,
         "foodValue": 0
     }
 ];
+
+  const LEGACY_TRADE_GOOD_VALUES = {
+    "Barley": {
+        "goldValue": 1,
+        "foodValue": 3
+    },
+    "Buckwheat": {
+        "goldValue": 1,
+        "foodValue": 3
+    },
+    "Oat": {
+        "goldValue": 1,
+        "foodValue": 3
+    },
+    "Rye": {
+        "goldValue": 1,
+        "foodValue": 3
+    },
+    "Wheat": {
+        "goldValue": 2,
+        "foodValue": 3
+    },
+    "Blueberries": {
+        "goldValue": 1,
+        "foodValue": 2
+    },
+    "Green Apples": {
+        "goldValue": 1,
+        "foodValue": 2
+    },
+    "Pears": {
+        "goldValue": 1,
+        "foodValue": 2
+    },
+    "Plums": {
+        "goldValue": 1,
+        "foodValue": 2
+    },
+    "Pumpkins": {
+        "goldValue": 1,
+        "foodValue": 3
+    },
+    "Red Apples": {
+        "goldValue": 1,
+        "foodValue": 2
+    },
+    "Cantaloupes": {
+        "goldValue": 2,
+        "foodValue": 2
+    },
+    "Grapes": {
+        "goldValue": 2,
+        "foodValue": 2
+    },
+    "Lemons": {
+        "goldValue": 2,
+        "foodValue": 2
+    },
+    "Olives": {
+        "goldValue": 2,
+        "foodValue": 3
+    },
+    "Peaches": {
+        "goldValue": 2,
+        "foodValue": 2
+    },
+    "Peppers": {
+        "goldValue": 2,
+        "foodValue": 2
+    },
+    "Watermelons": {
+        "goldValue": 2,
+        "foodValue": 2
+    },
+    "Fireplums": {
+        "goldValue": 3,
+        "foodValue": 2
+    },
+    "Spicy Peppers": {
+        "goldValue": 3,
+        "foodValue": 2
+    },
+    "Cattle": {
+        "goldValue": 1,
+        "foodValue": 3
+    },
+    "Chickens": {
+        "goldValue": 1,
+        "foodValue": 3
+    },
+    "Ducks": {
+        "goldValue": 1,
+        "foodValue": 2
+    },
+    "Geese": {
+        "goldValue": 1,
+        "foodValue": 2
+    },
+    "Goats": {
+        "goldValue": 1,
+        "foodValue": 3
+    },
+    "Pigs": {
+        "goldValue": 1,
+        "foodValue": 3
+    },
+    "Sheep": {
+        "goldValue": 1,
+        "foodValue": 3
+    },
+    "Bracken Browns": {
+        "goldValue": 2,
+        "foodValue": 0
+    },
+    "Highland Cows": {
+        "goldValue": 2,
+        "foodValue": 2
+    },
+    "Honeybees": {
+        "goldValue": 2,
+        "foodValue": 2
+    },
+    "Pack Horses": {
+        "goldValue": 2,
+        "foodValue": 0
+    },
+    "Westerland Golds": {
+        "goldValue": 3,
+        "foodValue": 0
+    },
+    "Westerland Reds": {
+        "goldValue": 5,
+        "foodValue": 0
+    },
+    "Sand Steed": {
+        "goldValue": 3,
+        "foodValue": 0
+    },
+    "Snow Steeds": {
+        "goldValue": 3,
+        "foodValue": 0
+    },
+    "Vale Greys": {
+        "goldValue": 3,
+        "foodValue": 0
+    },
+    "Boar": {
+        "goldValue": 1,
+        "foodValue": 2
+    },
+    "Deer": {
+        "goldValue": 1,
+        "foodValue": 2
+    },
+    "Elk": {
+        "goldValue": 1,
+        "foodValue": 2
+    },
+    "Hides": {
+        "goldValue": 1,
+        "foodValue": 0
+    },
+    "Small Game": {
+        "goldValue": 1,
+        "foodValue": 2
+    },
+    "Bear Pelts": {
+        "goldValue": 2,
+        "foodValue": 0
+    },
+    "Falcons": {
+        "goldValue": 2,
+        "foodValue": 0
+    },
+    "Fox Furs": {
+        "goldValue": 2,
+        "foodValue": 0
+    },
+    "Hunting Hounds": {
+        "goldValue": 2,
+        "foodValue": 0
+    },
+    "Marten Pelts": {
+        "goldValue": 2,
+        "foodValue": 0
+    },
+    "Otter Pelts": {
+        "goldValue": 2,
+        "foodValue": 0
+    },
+    "Ravens": {
+        "goldValue": 2,
+        "foodValue": 0
+    },
+    "Wolf Pelts": {
+        "goldValue": 2,
+        "foodValue": 0
+    },
+    "Exotic Birds": {
+        "goldValue": 3,
+        "foodValue": 1
+    },
+    "Pale Hide": {
+        "goldValue": 4,
+        "foodValue": 0
+    },
+    "Unicorns": {
+        "goldValue": 4,
+        "foodValue": 0
+    },
+    "Unicorn Horn": {
+        "goldValue": 4,
+        "foodValue": 0
+    },
+    "Catfish": {
+        "goldValue": 1,
+        "foodValue": 3
+    },
+    "Cod": {
+        "goldValue": 1,
+        "foodValue": 3
+    },
+    "River Pike": {
+        "goldValue": 1,
+        "foodValue": 3
+    },
+    "River Trout": {
+        "goldValue": 1,
+        "foodValue": 3
+    },
+    "Crab": {
+        "goldValue": 2,
+        "foodValue": 2
+    },
+    "Fermented Crab": {
+        "goldValue": 2,
+        "foodValue": 2
+    },
+    "Seals": {
+        "goldValue": 2,
+        "foodValue": 2
+    },
+    "Tuna": {
+        "goldValue": 2,
+        "foodValue": 3
+    },
+    "Turtles": {
+        "goldValue": 2,
+        "foodValue": 2
+    },
+    "Whale Oil": {
+        "goldValue": 2,
+        "foodValue": 1
+    },
+    "Pearls": {
+        "goldValue": 3,
+        "foodValue": 0
+    },
+    "Bog Iron": {
+        "goldValue": 1,
+        "foodValue": 0
+    },
+    "Lead": {
+        "goldValue": 1,
+        "foodValue": 0
+    },
+    "Bronze": {
+        "goldValue": 2,
+        "foodValue": 0
+    },
+    "Copper": {
+        "goldValue": 2,
+        "foodValue": 0
+    },
+    "Iron": {
+        "goldValue": 2,
+        "foodValue": 0
+    },
+    "Tin": {
+        "goldValue": 2,
+        "foodValue": 0
+    },
+    "Gold": {
+        "goldValue": 3,
+        "foodValue": 0
+    },
+    "Silver": {
+        "goldValue": 3,
+        "foodValue": 0
+    },
+    "Clay": {
+        "goldValue": 1,
+        "foodValue": 0
+    },
+    "Sandstone": {
+        "goldValue": 1,
+        "foodValue": 0
+    },
+    "Stone": {
+        "goldValue": 1,
+        "foodValue": 0
+    },
+    "Cut Stone": {
+        "goldValue": 2,
+        "foodValue": 0
+    },
+    "Granite": {
+        "goldValue": 2,
+        "foodValue": 0
+    },
+    "Ice": {
+        "goldValue": 2,
+        "foodValue": 0
+    },
+    "Salt": {
+        "goldValue": 2,
+        "foodValue": 0
+    },
+    "Sulfur": {
+        "goldValue": 2,
+        "foodValue": 0
+    },
+    "Amber": {
+        "goldValue": 3,
+        "foodValue": 0
+    },
+    "Jewels": {
+        "goldValue": 3,
+        "foodValue": 0
+    },
+    "Marble": {
+        "goldValue": 3,
+        "foodValue": 0
+    },
+    "Beech": {
+        "goldValue": 1,
+        "foodValue": 0
+    },
+    "Peat": {
+        "goldValue": 1,
+        "foodValue": 0
+    },
+    "Reeds": {
+        "goldValue": 1,
+        "foodValue": 0
+    },
+    "Ash": {
+        "goldValue": 2,
+        "foodValue": 0
+    },
+    "Oak": {
+        "goldValue": 2,
+        "foodValue": 0
+    },
+    "Ironwood": {
+        "goldValue": 3,
+        "foodValue": 0
+    },
+    "Candles": {
+        "goldValue": 1,
+        "foodValue": 0
+    },
+    "Fertilizer": {
+        "goldValue": 1,
+        "foodValue": 0
+    },
+    "Dyes": {
+        "goldValue": 2,
+        "foodValue": 0
+    },
+    "Glass": {
+        "goldValue": 2,
+        "foodValue": 0
+    },
+    "Goosefeather Arrows": {
+        "goldValue": 2,
+        "foodValue": 0
+    },
+    "Paper": {
+        "goldValue": 2,
+        "foodValue": 0
+    },
+    "Yew Bows": {
+        "goldValue": 2,
+        "foodValue": 0
+    },
+    "Obsidian Blades": {
+        "goldValue": 4,
+        "foodValue": 0
+    },
+    "Poison": {
+        "goldValue": 3,
+        "foodValue": 0
+    },
+    "Weirwood Bows": {
+        "goldValue": 4,
+        "foodValue": 0
+    },
+    "Ale": {
+        "goldValue": 1,
+        "foodValue": 1
+    },
+    "Cider": {
+        "goldValue": 1,
+        "foodValue": 1
+    },
+    "Whiskey": {
+        "goldValue": 2,
+        "foodValue": 1
+    },
+    "Wine": {
+        "goldValue": 2,
+        "foodValue": 1
+    },
+    "Dornish Red": {
+        "goldValue": 3,
+        "foodValue": 1
+    },
+    "Eyrie Purple (Wine)": {
+        "goldValue": 3,
+        "foodValue": 1
+    },
+    "Tradeports": {
+        "goldValue": 3,
+        "foodValue": 0
+    }
+};
 
   const TRADE_GOOD_CATEGORIES = Array.from(new Set(TRADE_GOODS.map(good => good.category)));
 
@@ -1041,7 +1606,7 @@
   const BUILDING_TREE_DEFINITIONS = {
     economy: {
       maxLevel: 3,
-      notes: "Trade goods provide natural tile income. Buildings provide flat income/unlocks and do not gain matching-export bonuses.",
+      notes: "Trade goods provide natural tile income. Market buildings multiply primary/secondary trade output and provide no flat income; other buildings retain their listed flat income/unlocks.",
       categories: TRADE_GOOD_CATEGORIES
     },
     road: { maxLevel: 1, movementModifierPerLevel: -0.5, notes: "Roads reduce movement cost by 0.5 and do not upgrade twice." },
@@ -1190,7 +1755,7 @@
   }
 
   function getBuildingTierCost(levelNumber, line = null, house = {}) {
-    const cost = normalizeResourceMap(BUILDING_TIER_COSTS[Number(levelNumber)] || { Gold: 4 });
+    const cost = normalizeResourceMap(BUILDING_TIER_COSTS[Number(levelNumber)] || { Gold: 5 });
     const discountApplies = Boolean(line && (line.group === "Infrastructure" || line.key === "watchtower"));
     const discount = discountApplies ? getStoneInfrastructureDiscount(house) : 0;
 
@@ -1349,6 +1914,293 @@
     return String(value ?? "").trim().toLowerCase().replace(/\s+/g, " ");
   }
 
+  function canonicalizeCultureLabel(value) {
+    const raw = String(value ?? "").trim();
+    const key = normalize(raw).replace(/[.]/g, "");
+    const aliases = {
+      "first man": "First Men",
+      "first men": "First Men",
+      "first andal": "First Andal",
+      "crannogmem": "Crannogmen",
+      "crannogman": "Crannogmen",
+      "crannogmen": "Crannogmen",
+      "wildling": "Wildling",
+      "free folk": "Wildling",
+      "iron man": "Ironborn",
+      "ironman": "Ironborn",
+      "ironborn": "Ironborn",
+      "valeman": "Valeman",
+      "riverlander": "Riverlander",
+      "westerman": "Westerman",
+      "reachman": "Reachman",
+      "reach marcher": "Reach Marcher",
+      "stormlander": "Stormlander",
+      "storm marcher": "Storm Marcher",
+      "salt dornish": "Salt Dornish",
+      "stone dornish": "Stone Dornish",
+      "ashenlander": "Ashenlander",
+      "high valyrian": "High Valyrian",
+      "sisterman": "Sisterman"
+    };
+    return aliases[key] || raw;
+  }
+
+  function canonicalizeReligionLabel(value) {
+    const raw = String(value ?? "").trim();
+    const key = normalize(raw).replace(/[.]/g, "");
+    const aliases = {
+      "fots": "Faith of the Seven",
+      "faith of seven": "Faith of the Seven",
+      "faith of the seven": "Faith of the Seven",
+      "dornish fots": "Dornish Faith of the Seven",
+      "dornish faith of seven": "Dornish Faith of the Seven",
+      "dornish faith of the seven": "Dornish Faith of the Seven",
+      "warriors sons": "Warrior's Sons",
+      "warrior's sons": "Warrior's Sons",
+      "poor fellows": "Poor Fellows",
+      "cult of mother": "Cult of the Mother",
+      "cult of the mother": "Cult of the Mother",
+      "cult of smith": "Cult of the Smith",
+      "cult of the smith": "Cult of the Smith",
+      "cult of crone": "Cult of the Crone",
+      "cult of the crone": "Cult of the Crone",
+      "cult of maiden": "Cult of the Maiden",
+      "cult of the maiden": "Cult of the Maiden",
+      "cult of father": "Cult of the Father",
+      "cult of the father": "Cult of the Father",
+      "cult of stranger": "Cult of the Stranger",
+      "cult of the stranger": "Cult of the Stranger"
+    };
+    return aliases[key] || raw;
+  }
+
+
+  const FOTS_SECT_RELIGIONS = [
+    "Warrior's Sons",
+    "Poor Fellows",
+    "Cult of the Mother",
+    "Cult of the Smith",
+    "Cult of the Crone",
+    "Cult of the Maiden",
+    "Cult of the Father",
+    "Cult of the Stranger"
+  ];
+
+  function isFaithOfSevenSect(value) {
+    const canonical = canonicalizeReligionLabel(value);
+    return FOTS_SECT_RELIGIONS.includes(canonical);
+  }
+  const INITIAL_CURSED_HOLDINGS = [
+    "Winterfell",
+    "Harrenhal",
+    "Casterly Rock",
+    "Starholdt",
+    "Coldwater",
+    "Hellholt",
+    "Pyke",
+    "The Arbor",
+    "Storm's End"
+  ];
+
+  const INITIAL_CURSED_HOLDING_KEYS = new Set(INITIAL_CURSED_HOLDINGS.map(name => normalize(name)));
+
+  function isHoldingCursed(worldTile = {}, house = {}) {
+    return house?.cursedHolding === true || worldTile?.cursedHolding === true;
+  }
+
+  function applyCursedIncomePenalty(map = {}, cursed = false) {
+    const normalized = normalizeResourceMap(map);
+    if (!cursed) return normalized;
+    const output = {};
+    for (const [key, raw] of Object.entries(normalized)) {
+      const value = Number(raw || 0);
+      output[key] = value > 0 ? cleanResourceNumber(value * 0.5) : value;
+    }
+    return output;
+  }
+
+
+  function stableStringHash(value) {
+    let hash = 2166136261;
+    for (const ch of String(value || "")) {
+      hash ^= ch.charCodeAt(0);
+      hash = Math.imul(hash, 16777619);
+    }
+    return hash >>> 0;
+  }
+
+  function stablePick(list, seed) {
+    const values = Array.isArray(list) ? list.filter(Boolean) : [];
+    if (!values.length) return "";
+    return values[stableStringHash(seed) % values.length];
+  }
+
+  function faithOfSevenForSeed(seed) {
+    // About 30% of otherwise-standard Faith of the Seven characters belong to
+    // one of the ordinary devotional sects, matching the province split.
+    const roll = stableStringHash(`${seed}:fots-family`) % 10;
+    if (roll < 7) return "Faith of the Seven";
+    return FOTS_SECT_RELIGIONS[stableStringHash(`${seed}:fots-sect`) % FOTS_SECT_RELIGIONS.length];
+  }
+
+  function regionalCulturePool(region, tileName = "") {
+    const r = normalize(region);
+    const t = normalize(tileName);
+    if (r === "the neck") return ["Crannogmen", "Crannogmen", "Crannogmen", "Crannogmen", "First Men"];
+    if (r === "the north") return ["First Men", "First Men", "First Men", "First Men", "First Men", "First Andal", "First Andal"];
+    if (r === "night's watch" || r === "nights watch") return ["First Men", "First Men", "First Andal", "Wildling"];
+    if (r === "the iron islands") return ["Ironborn"];
+    if (r === "the vale") {
+      if (t.includes("three sisters")) return ["Sisterman"];
+      return ["Valeman", "Valeman", "Valeman", "Valeman", "First Men"];
+    }
+    if (r === "the riverlands") return ["Riverlander", "Riverlander", "Riverlander", "Riverlander", "First Men"];
+    if (r === "the westerlands") return ["Westerman"];
+    if (r === "the reach") return ["Reachman", "Reachman", "Reachman", "Reach Marcher"];
+    if (r === "the stormlands") return ["Stormlander", "Stormlander", "Stormlander", "Storm Marcher"];
+    if (r === "dorne") return ["Salt Dornish", "Salt Dornish", "Stone Dornish", "Stone Dornish"];
+    if (r === "the ashenlands") return ["Ashenlander", "Ashenlander", "Ashenlander", "Ashenlander", "High Valyrian"];
+    return CULTURES.filter(value => value !== "Other");
+  }
+
+  function regionalReligionForSeed(region, culture, seed) {
+    const r = normalize(region);
+    const c = canonicalizeCultureLabel(culture);
+    const pick = (list, suffix = "faith") => stablePick(list, `${seed}:${suffix}`);
+
+    if (c === "Ironborn" || r === "the iron islands") {
+      return pick(["Drowned God", "Drowned God", "Drowned God", "Drowned God", "Drowned God", "Drowned God", "Drowned God", "Drowned God", "Drowned God", "Other"]);
+    }
+    if (c === "Salt Dornish" || c === "Stone Dornish" || r === "dorne") {
+      return pick(["Dornish Faith of the Seven", "Dornish Faith of the Seven", "Dornish Faith of the Seven", "Dornish Faith of the Seven", "Other"]);
+    }
+    if (["Crannogmen", "Wildling", "First Men"].includes(c) || r === "the neck" || r === "night's watch" || r === "nights watch") {
+      const faith = pick(["Old Gods", "Old Gods", "Old Gods", "Old Gods", "Old Gods", "Old Gods", "Old Gods", "Old Gods", "Old Gods", "Faith of the Seven"]);
+      return faith === "Faith of the Seven" ? faithOfSevenForSeed(seed) : faith;
+    }
+    if (c === "High Valyrian") {
+      const faith = pick(["Faith of the Seven", "Faith of the Seven", "Faith of the Seven", "Faith of the Seven", "Faith of the Seven", "R'hllor", "R'hllor", "Other", "Other", "Other"]);
+      return faith === "Faith of the Seven" ? faithOfSevenForSeed(seed) : faith;
+    }
+
+    // Andal-descended southern cultures and Ashenlanders predominantly follow
+    // the Faith of the Seven, with its normal sect distribution.
+    const southern = ["First Andal", "Valeman", "Riverlander", "Westerman", "Reachman", "Reach Marcher", "Stormlander", "Storm Marcher", "Ashenlander", "Sisterman"];
+    if (southern.includes(c) || ["the vale", "the riverlands", "the westerlands", "the reach", "the stormlands", "the ashenlands"].includes(r)) {
+      const faith = pick(["Faith of the Seven", "Faith of the Seven", "Faith of the Seven", "Faith of the Seven", "Faith of the Seven", "Faith of the Seven", "Faith of the Seven", "Faith of the Seven", "Old Gods", "Other"]);
+      return faith === "Faith of the Seven" ? faithOfSevenForSeed(seed) : faith;
+    }
+
+    return pick(["Faith of the Seven", "Old Gods", "Drowned God", "R'hllor", "Many-Faced God", "Other"]);
+  }
+
+  function inferMissingProvinceIdentity(worldTile = {}, house = {}) {
+    const region = String(house.region || worldTile.region || "").trim();
+    const tileName = String(worldTile.name || house.name || "").trim();
+    const seed = String(worldTile.id || worldTile.tileId || worldTile.name || house.house || `${region}:${tileName}` || "province");
+
+    let culture = canonicalizeCultureLabel(house.culture || worldTile.culture || "");
+    if (!culture) culture = stablePick(regionalCulturePool(region, tileName), `${seed}:province-culture`) || "Other";
+
+    let religion = canonicalizeReligionLabel(house.religion || worldTile.religion || "");
+    if (!religion) religion = regionalReligionForSeed(region, culture, `${seed}:province-religion`);
+
+    return { culture: canonicalizeCultureLabel(culture), religion: canonicalizeReligionLabel(religion), region, tileName };
+  }
+
+  function inferMissingCharacterIdentity(token, source = {}) {
+    const piece = getWorldPiece(token) || {};
+    const entry = getCurrentTileEntryForToken(token, piece);
+    const tile = entry?.tile || {};
+    const house = entry?.drawing ? (getHouseData(entry.drawing) || {}) : {};
+    const seed = String(source.characterId || piece.characterId || token?.document?.id || token?.document?.name || "character");
+    const region = String(source.currentRegion || piece.currentRegion || tile.region || house.region || "").trim();
+    const tileName = String(source.currentTileName || piece.currentTileName || tile.name || "").trim();
+    const traitsText = normalize([source.traits, source.quirks, piece.traits, piece.quirks].filter(Boolean).join(" "));
+
+    let culture = canonicalizeCultureLabel(source.culture || piece.culture || "");
+    let religion = canonicalizeReligionLabel(source.religion || piece.religion || "");
+
+    if (!culture) {
+      if (traitsText.includes("valyraboo")) culture = "High Valyrian";
+      else {
+        const provinceCulture = canonicalizeCultureLabel(house.culture || tile.culture || "");
+        const pool = regionalCulturePool(region, tileName);
+        // Province culture is the strongest regional signal, but retain a small
+        // chance of another culture that is still appropriate to the region.
+        if (provinceCulture && CULTURES.includes(provinceCulture)) {
+          culture = stablePick([provinceCulture, provinceCulture, provinceCulture, ...pool], `${seed}:culture`);
+        } else {
+          culture = stablePick(pool, `${seed}:culture`) || "Other";
+        }
+      }
+    }
+
+    if (!religion) {
+      const provinceReligion = canonicalizeReligionLabel(house.religion || tile.religion || "");
+      if (provinceReligion) {
+        // As with culture, strongly favor the local faith while still allowing a
+        // region-appropriate minority faith.
+        const regional = regionalReligionForSeed(region, culture, `${seed}:regional`);
+        religion = stablePick([provinceReligion, provinceReligion, provinceReligion, regional], `${seed}:religion`);
+      } else {
+        religion = regionalReligionForSeed(region, culture, `${seed}:religion`);
+      }
+    }
+
+    return { culture: canonicalizeCultureLabel(culture), religion: canonicalizeReligionLabel(religion), region, tileName };
+  }
+
+  async function ensureCharacterIdentityData(token) {
+    if (!token || !isCharacterToken(token)) return getCharacterDataFromToken(token) || {};
+    const existing = getCharacterDataFromToken(token) || {};
+    const currentCulture = canonicalizeCultureLabel(existing.culture || "");
+    const currentReligion = canonicalizeReligionLabel(existing.religion || "");
+    if (currentCulture && currentReligion) return existing;
+
+    const inferred = inferMissingCharacterIdentity(token, existing);
+    const now = new Date().toISOString();
+    const characterData = foundry.utils.deepClone(getWorldCharacter(token) || existing || {});
+    if (!currentCulture) characterData.culture = inferred.culture;
+    else characterData.culture = currentCulture;
+    if (!currentReligion) characterData.religion = inferred.religion;
+    else characterData.religion = currentReligion;
+    characterData.updatedAt = now;
+    characterData.updatedBy = game.user?.name || "System";
+    characterData.updatedSource = `Crown Overview Tools ${MODULE_VERSION} - Auto Identity Assignment`;
+
+    const piece = foundry.utils.deepClone(getWorldPiece(token) || {});
+    piece.culture = characterData.culture;
+    piece.religion = characterData.religion;
+    piece.characterData = foundry.utils.deepClone(characterData);
+    piece.version = `Crown Overview Tools ${MODULE_VERSION}`;
+    piece.updatedAt = now;
+    piece.updatedBy = game.user?.name || "System";
+
+    // Only the GM client writes world data. Player-triggered systems that need
+    // this call are resolved by the GM socket path before the comparison.
+    if (game.user?.isGM) {
+      await token.document.setFlag(FLAG_SCOPE, WORLD_CHARACTER_KEY, characterData);
+      await token.document.setFlag(FLAG_SCOPE, WORLD_PIECE_KEY, piece);
+      if (token.actor) {
+        await token.actor.setFlag(FLAG_SCOPE, WORLD_CHARACTER_KEY, foundry.utils.deepClone(characterData));
+        await token.actor.setFlag(FLAG_SCOPE, WORLD_PIECE_KEY, foundry.utils.deepClone(piece));
+      }
+    }
+    return { ...existing, culture: characterData.culture, religion: characterData.religion };
+  }
+
+  // Political House identity is deliberately more forgiving than ordinary text
+  // normalization. Campaign data may store the same realm as "Karstark" or
+  // "House Karstark" depending on which editor/import path created it.
+  function normalizeHouseIdentity(value) {
+    return normalize(value)
+      .replace(/^the\s+house\s+of\s+/, "")
+      .replace(/^house\s+of\s+/, "")
+      .replace(/^house\s+/, "")
+      .trim();
+  }
+
   function titleCase(value) {
     const text = String(value || "").trim();
     return text ? text.charAt(0).toUpperCase() + text.slice(1) : "";
@@ -1368,12 +2220,27 @@
     return false;
   }
 
-  function getWorldTile(drawing) {
-    return drawing?.document?.getFlag(FLAG_SCOPE, WORLD_TILE_KEY);
+  function isRealWorldTileData(raw) {
+    return Boolean(raw && typeof raw === "object" && String(raw.name || "").trim());
   }
 
-  function getHouseData(drawing) {
-    return drawing?.document?.getFlag(FLAG_SCOPE, HOUSE_KEY);
+  function getDrawingDocument(drawingOrDocument) {
+    return drawingOrDocument?.document || drawingOrDocument || null;
+  }
+
+  function getWorldTile(drawingOrDocument) {
+    const doc = getDrawingDocument(drawingOrDocument);
+    if (!doc?.getFlag) return null;
+    if (doc.getFlag(FLAG_SCOPE, WORLD_LABEL_KEY)) return null;
+    const raw = doc.getFlag(FLAG_SCOPE, WORLD_TILE_KEY);
+    return isRealWorldTileData(raw) ? raw : null;
+  }
+
+  function getHouseData(drawingOrDocument) {
+    const doc = getDrawingDocument(drawingOrDocument);
+    if (!doc?.getFlag) return null;
+    if (!getWorldTile(doc)) return null;
+    return doc.getFlag(FLAG_SCOPE, HOUSE_KEY);
   }
 
   function getWorldPiece(token) {
@@ -1446,28 +2313,88 @@
     return inside;
   }
 
-  function pointInsideDrawing(point, drawing) {
+  function buildDrawingGeometry(drawing) {
     const doc = drawing.document;
     const shape = doc.shape || {};
     const shapeType = normalizeShapeType(shape.type);
-    const localPoint = getDrawingLocalPoint(point, drawing);
-    if (shapeType === "rectangle") return pointInRectangle(localPoint, shape);
-    if (shapeType === "ellipse") return pointInEllipse(localPoint, shape);
-    if (shapeType === "polygon" || shapeType === "freehand") {
-      const points = normalizePoints(shape.points || doc.points || []);
-      return pointInPolygon(localPoint, points);
+    const x = Number(doc.x || 0);
+    const y = Number(doc.y || 0);
+    const width = Number(shape.width || 0);
+    const height = Number(shape.height || 0);
+    const points = (shapeType === "polygon" || shapeType === "freehand")
+      ? normalizePoints(shape.points || doc.points || [])
+      : [];
+    let minX = x, minY = y, maxX = x + width, maxY = y + height;
+    if (points.length) {
+      minX = x + Math.min(...points.map(p => p.x));
+      minY = y + Math.min(...points.map(p => p.y));
+      maxX = x + Math.max(...points.map(p => p.x));
+      maxY = y + Math.max(...points.map(p => p.y));
     }
-    return pointInRectangle(localPoint, shape);
+    return { shapeType, x, y, width, height, points, minX, minY, maxX, maxY };
+  }
+
+  function pointInsideGeometry(point, geometry) {
+    if (!point || !geometry) return false;
+    // Cheap bounding-box rejection first. Most pointer/token checks now avoid
+    // polygon math entirely, which matters on a ~100-province strategic map.
+    if (point.x < geometry.minX || point.x > geometry.maxX || point.y < geometry.minY || point.y > geometry.maxY) return false;
+    const localPoint = { x: point.x - geometry.x, y: point.y - geometry.y };
+    if (geometry.shapeType === "rectangle") return pointInRectangle(localPoint, { width: geometry.width, height: geometry.height });
+    if (geometry.shapeType === "ellipse") return pointInEllipse(localPoint, { width: geometry.width, height: geometry.height });
+    if (geometry.shapeType === "polygon" || geometry.shapeType === "freehand") return pointInPolygon(localPoint, geometry.points);
+    return pointInRectangle(localPoint, { width: geometry.width, height: geometry.height });
+  }
+
+  function pointInsideDrawing(point, drawing) {
+    return pointInsideGeometry(point, buildDrawingGeometry(drawing));
+  }
+
+  function invalidateWorldTileCache() {
+    globalThis[WORLD_TILE_CACHE_KEY] = null;
+  }
+
+  function getWorldTileCache() {
+    const sceneId = String(canvas?.scene?.id || "");
+    const existing = globalThis[WORLD_TILE_CACHE_KEY];
+    if (existing?.sceneId === sceneId) return existing;
+
+    const entries = [];
+    const labels = [];
+    const byId = new Map();
+    const byName = new Map();
+    for (const drawing of canvas?.drawings?.placeables || []) {
+      if (isWorldTileLabelDrawing(drawing)) { labels.push(drawing); continue; }
+      const tile = getWorldTile(drawing);
+      if (!tile) continue;
+      const entry = { drawing, tile, geometry: buildDrawingGeometry(drawing) };
+      entries.push(entry);
+      const drawingId = String(drawing.document.id || "");
+      const tileId = String(getTileId(entry) || "");
+      if (drawingId) byId.set(drawingId, entry);
+      if (tileId) byId.set(tileId, entry);
+      const nameKey = normalize(tile.name);
+      if (nameKey && !byName.has(nameKey)) byName.set(nameKey, entry);
+    }
+    // Preserve the old overlap behavior without sorting on every mouse move.
+    entries.sort((a, b) => {
+      const ap = Number(a.tile.priority || 0);
+      const bp = Number(b.tile.priority || 0);
+      if (bp !== ap) return bp - ap;
+      return Number(b.drawing.document.sort || 0) - Number(a.drawing.document.sort || 0);
+    });
+    const cache = { sceneId, entries, labels, byId, byName };
+    globalThis[WORLD_TILE_CACHE_KEY] = cache;
+    return cache;
   }
 
   function getWorldTileEntries() {
-    return canvas.drawings.placeables
-      .map(drawing => ({ drawing, tile: getWorldTile(drawing) }))
-      .filter(entry => Boolean(entry.tile));
+    return getWorldTileCache().entries;
   }
 
   function getEntryById(id) {
-    return getWorldTileEntries().find(entry => getTileId(entry) === id || entry.drawing.document.id === id) || null;
+    if (id === null || id === undefined) return null;
+    return getWorldTileCache().byId.get(String(id)) || null;
   }
 
   function getTileById(tileId) {
@@ -1487,15 +2414,13 @@
 
   function findTileAtPoint(point) {
     if (!point) return null;
-    const candidates = getWorldTileEntries()
-      .filter(entry => pointInsideDrawing(point, entry.drawing))
-      .sort((a, b) => {
-        const ap = Number(a.tile.priority || 0);
-        const bp = Number(b.tile.priority || 0);
-        if (bp !== ap) return bp - ap;
-        return Number(b.drawing.document.sort || 0) - Number(a.drawing.document.sort || 0);
-      });
-    return candidates[0] || null;
+    // Entries are cached and already priority-sorted, so return on the first hit.
+    // Bounding-box rejection in pointInsideGeometry makes this much cheaper than
+    // rebuilding/sorting the province list and normalizing polygons every call.
+    for (const entry of getWorldTileEntries()) {
+      if (pointInsideGeometry(point, entry.geometry)) return entry;
+    }
+    return null;
   }
 
   function getDrawingCenter(drawingOrEntry) {
@@ -1587,9 +2512,60 @@
     return isTileAllowedForPiece(piece, tile);
   }
 
-  function getTileMovementCost(tile) {
-    const cost = Number(tile?.movementCost ?? 1);
-    return Number.isFinite(cost) ? Math.max(0, cost) : 1;
+  function getMovementRealmKeyForPiece(piece = {}) {
+    return normalize(piece.allegiance || piece.house || piece.faction || "");
+  }
+
+  function getMovementRealmKeyForTile(tile = {}, house = {}) {
+    return normalize(house.allegiance || tile.allegiance || house.house || tile.house || tile.owner || "");
+  }
+
+  function isEnemyMovementTileForPiece(piece = {}, tile = {}, house = {}) {
+    const pieceOwnerId = getPieceOwnerId(piece);
+    const tileOwnerId = getTileOwnerUserId(tile, house);
+    if (pieceOwnerId && tileOwnerId) return String(pieceOwnerId) !== String(tileOwnerId);
+
+    const pieceOwnerName = getPieceOwnerName(piece);
+    const tileOwnerName = getTileOwnerUserName(tile, house);
+    if (pieceOwnerName && tileOwnerName) return normalize(pieceOwnerName) !== normalize(tileOwnerName);
+
+    const pieceRealm = getMovementRealmKeyForPiece(piece);
+    const tileRealm = getMovementRealmKeyForTile(tile, house);
+    if (pieceRealm && tileRealm) return pieceRealm !== tileRealm;
+
+    // If either side is too old/underspecified to establish political opposition,
+    // do not invent an enemy relationship merely because a fortification exists.
+    return false;
+  }
+
+  function getTileMovementCostDetails(tile, piece = {}, houseOverride = null) {
+    const rawBase = Number(tile?.movementCost ?? 1);
+    const base = Number.isFinite(rawBase) ? Math.max(0, rawBase) : 1;
+    const pieceType = normalize(piece?.pieceType || "army");
+
+    // Roads and hostile fortifications are land-movement infrastructure. Fleets do
+    // not benefit from roads when entering a Port, and dragons fly over both.
+    if (!["army", "character"].includes(pieceType)) {
+      return { base, roadModifier: 0, fortificationModifier: 0, total: base, roadActive: false, fortificationLevel: 0, enemyFortification: false };
+    }
+
+    const entry = houseOverride === null && tile?.id ? getTileById(tile.id) : null;
+    const house = houseOverride !== null ? (houseOverride || {}) : (entry?.drawing ? (getHouseData(entry.drawing) || {}) : {});
+    const clock = getClock();
+    const roadState = getActiveBuildingLineState(house, clock).get("road");
+    const roadActive = Boolean(roadState?.level);
+    const roadModifier = roadActive ? -0.5 : 0;
+
+    const fortificationLevel = getFortificationLevelForHouse(house, clock);
+    const enemyFortification = fortificationLevel > 0 && isEnemyMovementTileForPiece(piece, tile, house);
+    const fortificationModifier = enemyFortification ? fortificationLevel * 0.5 : 0;
+    const total = Math.max(0, base + roadModifier + fortificationModifier);
+
+    return { base, roadModifier, fortificationModifier, total, roadActive, fortificationLevel, enemyFortification };
+  }
+
+  function getTileMovementCost(tile, piece = {}, houseOverride = null) {
+    return getTileMovementCostDetails(tile, piece, houseOverride).total;
   }
 
   function findPath(startTile, endTile, piece, routeMode) {
@@ -1599,6 +2575,7 @@
 
     const entries = getWorldTileEntries();
     const byId = new Map(entries.map(entry => [entry.tile.id, entry.tile]));
+    const entryById = new Map(entries.map(entry => [entry.tile.id, entry]));
     const distances = new Map([[startTile.id, 0]]);
     const previous = new Map();
     const visited = new Set();
@@ -1623,7 +2600,9 @@
         const nextTile = byId.get(nextId);
         if (!nextTile) continue;
         if (!isTileAllowedForRoute(piece, nextTile, routeMode, startTile, endTile)) continue;
-        const candidateDistance = currentDistance + getTileMovementCost(nextTile);
+        const nextEntry = entryById.get(nextId);
+        const nextHouse = nextEntry?.drawing ? (getHouseData(nextEntry.drawing) || {}) : {};
+        const candidateDistance = currentDistance + getTileMovementCost(nextTile, piece, nextHouse);
         if (!distances.has(nextId) || candidateDistance < distances.get(nextId)) {
           distances.set(nextId, candidateDistance);
           previous.set(nextId, currentId);
@@ -1714,6 +2693,40 @@
       return "This army has already committed a raid this turn and cannot move until movement resets.";
     }
     return "";
+  }
+
+  function characterMainActionReason(piece = {}, character = {}) {
+    const roundKey = getCurrentActionRoundKey();
+    const key = character.mainActionRoundKey || piece.mainActionRoundKey || character.lastCharacterActionRoundKey || piece.lastCharacterActionRoundKey || "";
+    if (String(key) !== String(roundKey)) return "";
+    return character.mainActionReason || piece.mainActionReason || character.lastCharacterActionReason || piece.lastCharacterActionReason || "This character has already used their Main Action this round.";
+  }
+
+  function mainActionWarningHtml() {
+    return `<p style="margin:8px 0;padding:7px 9px;border:1px solid #a86;border-radius:6px;"><strong>This will take your Main Action.</strong></p>`;
+  }
+
+  async function markCharacterMainActionForRound(token, reason = "Main Action used this round.") {
+    if (!token) return;
+    const roundKey = getCurrentActionRoundKey();
+    const now = new Date().toISOString();
+    const piece = foundry.utils.deepClone(getWorldPiece(token) || {});
+    piece.mainActionRoundKey = roundKey;
+    piece.mainActionReason = reason;
+    piece.mainActionAt = now;
+    piece.mainActionBy = game.user.name;
+    piece.lastCharacterActionRoundKey = roundKey;
+    piece.lastCharacterActionReason = reason;
+    await saveWorldPiece(token, piece);
+    const character = foundry.utils.deepClone(getCharacterDataFromToken(token) || {});
+    character.mainActionRoundKey = roundKey;
+    character.mainActionReason = reason;
+    character.mainActionAt = now;
+    character.mainActionBy = game.user.name;
+    character.lastCharacterActionRoundKey = roundKey;
+    character.lastCharacterActionReason = reason;
+    await token.document.setFlag(FLAG_SCOPE, WORLD_CHARACTER_KEY, character);
+    if (token.actor) await token.actor.setFlag(FLAG_SCOPE, WORLD_CHARACTER_KEY, foundry.utils.deepClone(character));
   }
 
   function hasDiplomacyAttemptThisRound(character = {}, piece = {}) {
@@ -2057,12 +3070,14 @@ function renderPanel() {
       <button data-coa-action="processPendingBuilds">Process Pending Builds</button>
       <button data-coa-action="processArmyMusters">Process Muster Fallback</button>
       <button data-coa-action="collectEconomy">Collect Economy</button>
+      <button data-coa-action="chargeMilitaryUpkeep">Charge / Audit Military Upkeep</button>
       <button data-coa-action="resetMovement">Reset Movement</button>
     </div>
     <div class="coa-panel-section coa-panel-gm-section">
       <div class="coa-panel-section-title">GM: Characters & Pieces</div>
       <button data-coa-action="createCharacter">Create Character</button>
       <button data-coa-action="editSelectedCharacter">Edit / Assign Character</button>
+      <button data-coa-action="repairCharacterControl">Repair Assigned Character Control</button>
       <button data-coa-action="createPiece">Create World Piece</button>
       <button data-coa-action="editWorldPiece">Edit World Piece</button>
       <button data-coa-action="assignPieceOwner">Assign Piece Owner</button>
@@ -2072,10 +3087,14 @@ function renderPanel() {
     <div class="coa-panel-section coa-panel-gm-section">
       <div class="coa-panel-section-title">GM: Armies, Tiles & Economy</div>
       <button data-coa-action="editSelectedArmy">Edit Selected Army / Navy</button>
+      <button data-coa-action="cancelPendingArmyMuster">Cancel Pending Army Muster</button>
       <button data-coa-action="dismissSelectedArmy">Dismiss Selected Army / Navy</button>
       <button data-coa-action="assignHouse">Edit Tile Ownership / House Data</button>
+      <button data-coa-action="manageMarriageAlliances">Manage Marriage Alliances</button>
       <button data-coa-action="setSelectedTerritoryNeutral">Make Territory Neutral / Unaligned</button>
       <button data-coa-action="manageTileEconomy">Manage Tile Economy</button>
+      <button data-coa-action="toggleSelectedHoldingCurse">Curse / Uncurse Holding</button>
+      <button data-coa-action="adjustHouseGoldFood">Adjust House Gold / Food</button>
       <button data-coa-action="manageMarketForces">Manage Market Forces</button>
       <button data-coa-action="auditProvinceHouseData">Audit Province / House Data</button>
         <button data-coa-action="repairPlayerProvinceAllegiances">Repair Player Province Identity</button>
@@ -2094,6 +3113,9 @@ function renderPanel() {
       <button data-coa-action="repairBuildLocks">Repair Build Locks</button>
       <button data-coa-action="repairEconomyData">Repair Economy Data</button>
       <button data-coa-action="hideTileText">Hide Original Tile Text</button>
+      <button data-coa-action="toggleProvinceEditMode"><strong>${getProvinceEditMode() ? "Finish Editing Provinces" : "Edit Provinces"}</strong></button>
+      <button data-coa-action="toggleTileNameEditMode"><strong>${getTileNameEditMode() ? "Finish Moving Tile Names" : "Move Tile Names"}</strong></button>
+      <button data-coa-action="hideProvinceDrawingLines">Repair Stored Province Appearance</button>
     </div>
   ` : "";
   panel.innerHTML = `
@@ -2112,24 +3134,26 @@ function renderPanel() {
       <button data-coa-action="portCrossing">Port Crossing</button>
     </div>
     <div class="coa-panel-section coa-panel-player-section">
-      <div class="coa-panel-section-title">Player: Military & Realm</div>
-      <button data-coa-action="summonArmy">Summon Army</button>
-      <button data-coa-action="summonNavy">Summon Navy</button>
-      <button data-coa-action="embarkArmy">Embark Army</button>
-      <button data-coa-action="disembarkArmy">Disembark Army</button>
-      <button data-coa-action="siegeStorm">Siege / Storm</button>
-      <button data-coa-action="raidTerritory">Raid Territory</button>
-      <button data-coa-action="sendResources">Trade / Send Resources</button>
-      <button data-coa-action="bankLoan">Bank / Loan</button>
-      <button data-coa-action="demolishBuilding">Demolish Building</button>
-      <button data-coa-action="dismissSelectedArmy">Dismiss Army / Navy</button>
+      <div class="coa-panel-section-title">Player: Realm</div>
+      <button data-coa-action="showHoldings"><strong>My Holdings</strong></button>
       <button data-coa-action="diplomaticTakeover">Diplomatic Takeover</button>
+      <button data-coa-action="sendResources">Trade / Send Resources</button>
+      <button data-coa-action="bankLoan">Bank / Loan (Main Action)</button>
+      <button data-coa-action="buildOnCurrentTile">Build / Upgrade (Main Action)</button>
+      <button data-coa-action="demolishBuilding">Demolish Building</button>
+    </div>
+    <div class="coa-panel-section coa-panel-player-section">
+      <div class="coa-panel-section-title">Player: Military</div>
+      <button data-coa-action="summonMilitary"><strong>Summon Military</strong></button>
+      <button data-coa-action="embarkDisembark"><strong>Embark / Disembark</strong></button>
+      <button data-coa-action="siegeStorm">Siege / Storm (Main Action)</button>
+      <button data-coa-action="raidTerritory">Raid Territory</button>
+      <button data-coa-action="dismissSelectedArmy">Dismiss Army / Navy</button>
       <button data-coa-action="duel">Duel</button>
-      <button data-coa-action="buildOnCurrentTile">Build / Upgrade</button>
-      <button data-coa-action="showHoldings">My Holdings</button>
     </div>
     <div class="coa-panel-section coa-panel-player-section">
       <div class="coa-panel-section-title">Player: View Tools</div>
+      <button data-coa-action="toggleProvinceHighlights">Province Highlights: ${getProvinceHighlightsMode() === "on" ? "On" : "Off"}</button>
       <button data-coa-action="togglePoliticalOverlay">Political Overlay: ${getPoliticalOverlayMode() === "on" ? "On" : "Off"}</button>
       <button data-coa-action="toggleClickMove">Click Move: ${globalThis[CLICK_MOVE_KEY] ? "On" : "Off"}</button>
       <button data-coa-action="toggleRouteTooltip">Route Tooltip: ${globalThis[ROUTE_TOOLTIP_KEY] ? "On" : "Off"}</button>
@@ -2244,7 +3268,30 @@ function removePanel() {
   }
 
   function canCurrentUserSeeTileDetails(tile, house = null) {
-    return game.user.isGM || isTileOwnedByUser(tile, house, game.user);
+    return game.user.isGM || isTileControlledByUser(tile, house || {}, game.user);
+  }
+
+  function canCurrentUserSeeTilePolitics(entry, tile = null, house = null) {
+    if (game.user.isGM) return true;
+
+    const worldTile = tile || entry?.tile || {};
+    const houseData = house || (entry?.drawing ? getHouseData(entry.drawing) : null) || {};
+
+    // A player always knows the political identity of their own holdings.
+    if (isTileControlledByUser(worldTile, houseData, game.user)) return true;
+
+    // Foreign political information is LOS-gated.  Hovering a province must never
+    // become a way to query current ownership outside the player's reveal mask.
+    const manager = globalThis[VISIBILITY_KEY];
+    if (!manager?.revealedTileIds) return false;
+
+    const tileId = String(
+      getTileId(entry) ||
+      worldTile?.id ||
+      entry?.drawing?.document?.id ||
+      ""
+    );
+    return Boolean(tileId && manager.revealedTileIds.has(tileId));
   }
 
   function getTileDisplayHouseLabelForTooltip(tile = {}, house = {}) {
@@ -2266,9 +3313,13 @@ function removePanel() {
     const house = getHouseData(entry.drawing);
     const isSea = isSeaByTile(tile);
     const adjacentNames = Array.isArray(tile.adjacentTileNames) ? tile.adjacentTileNames.join(", ") : "";
-    const tileOwnerName = getTileOwnerUserName(tile, house);
+    const canSeePolitics = canCurrentUserSeeTilePolitics(entry, tile, house);
+    const tileOwnerName = canSeePolitics ? (getPlayerUserForTileOwnership(tile, house)?.name || getTileOwnerUserName(tile, house)) : "";
     const canSeeDetails = canCurrentUserSeeTileDetails(tile, house);
     const travelText = getSelectedTravelTextToTile(tile);
+    const inferredProvinceIdentity = inferMissingProvinceIdentity(tile, house);
+    const displayCulture = canonicalizeCultureLabel(house?.culture || tile.culture || inferredProvinceIdentity.culture || "");
+    const displayReligion = canonicalizeReligionLabel(house?.religion || tile.religion || inferredProvinceIdentity.religion || "");
 
     let html = `<div><strong style="font-size:17px;">${escapeHtml(tile.name || "Unnamed Tile")}</strong>
       <div style="margin-top:6px;">
@@ -2276,20 +3327,26 @@ function removePanel() {
         <strong>Type:</strong> ${escapeHtml(tile.tileType || "land")}<br>
         <strong>Terrain:</strong> ${escapeHtml(tile.terrainLabel || tile.terrainKey || "None")}<br>
         <strong>Move Cost:</strong> ${escapeHtml(tile.movementCost ?? 1)}${tileOwnerName ? `<br><strong>Player Owner:</strong> ${escapeHtml(tileOwnerName)}` : ""}${travelText ? `<br><strong>Travel:</strong> ${escapeHtml(travelText)}` : ""}
-        ${!isSea && (house?.culture || tile.culture) ? `<br><strong>Culture:</strong> ${escapeHtml(house?.culture || tile.culture)}` : ""}
-        ${!isSea && (house?.religion || tile.religion) ? `<br><strong>Religion:</strong> ${escapeHtml(house?.religion || tile.religion)}` : ""}
+        ${!isSea && displayCulture ? `<br><strong>Culture:</strong> ${escapeHtml(displayCulture)}` : ""}
+        ${!isSea && displayReligion ? `<br><strong>Religion:</strong> ${escapeHtml(displayReligion)}` : ""}
+        ${!isSea && isHoldingCursed(tile, house) ? `<div style="margin-top:8px;padding:5px 8px;border:1px solid rgba(180,40,80,0.8);border-radius:5px;text-align:center;font-family:serif;font-size:16px;font-weight:900;letter-spacing:2px;color:#e58aa8;text-shadow:0 0 4px #5a001e,0 0 9px #9d174d;">☠ 𝕮𝖀𝕽𝕾𝕰𝕯 ☠</div>` : ""}
       </div>`;
 
     if (house) {
-      html += `<div style="margin-top:10px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.30);">
-        <strong style="font-size:16px;">${escapeHtml(getTileDisplayHouseLabelForTooltip(tile, house))}</strong>
-        <div style="margin-top:6px;">`;
+      html += `<div style="margin-top:10px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.30);">`;
 
-      if (house.lord) html += `<strong>Ruler:</strong> ${escapeHtml(house.lord)}<br>`;
-
-      if (!canSeeDetails) {
-        html += `<span style="opacity:0.78;">Detailed economy, population, buildings, and internal stats are hidden because this is not your holding.</span>`;
+      if (!canSeePolitics) {
+        html += `<strong style="font-size:16px;">Political Control: Unknown</strong>
+          <div style="margin-top:6px;opacity:0.78;">Current ownership, ruler, allegiance, buildings, and economy are hidden outside your line of sight.</div>`;
       } else {
+        html += `<strong style="font-size:16px;">${escapeHtml(getTileDisplayHouseLabelForTooltip(tile, house))}</strong>
+          <div style="margin-top:6px;">`;
+
+        if (house.lord) html += `<strong>Ruler:</strong> ${escapeHtml(house.lord)}<br>`;
+
+        if (!canSeeDetails) {
+          html += `<span style="opacity:0.78;">Detailed economy, population, buildings, and internal stats are hidden because this is not your holding.</span>`;
+        } else {
         const buildings = !isSea && Array.isArray(house.builtBuildings) ? house.builtBuildings.join(", ") : "";
         if (!isSea && (house.developmentLabel || house.developmentLevel !== undefined)) {
           html += `<strong>Development:</strong> ${escapeHtml(house.developmentLabel || `Level ${house.developmentLevel}`)}`;
@@ -2312,7 +3369,10 @@ function removePanel() {
         if (house.secondaryExport) html += `<strong>Secondary Export:</strong> ${escapeHtml(house.secondaryExport)}<br>`;
         if (house.allegiance) html += `<strong>Allegiance:</strong> ${escapeHtml(house.allegiance)}<br>`;
         html += `</div>`;
-        if (!isSea && buildings) html += `<div style="margin-top:7px;padding-top:6px;border-top:1px solid rgba(255,255,255,0.15);"><strong>Buildings:</strong><br><span style="opacity:0.9;">${escapeHtml(buildings)}</span></div>`;
+          if (!isSea && buildings) html += `<div style="margin-top:7px;padding-top:6px;border-top:1px solid rgba(255,255,255,0.15);"><strong>Buildings:</strong><br><span style="opacity:0.9;">${escapeHtml(buildings)}</span></div>`;
+        }
+
+        html += `</div>`;
       }
 
       html += `</div>`;
@@ -2382,16 +3442,292 @@ function removePanel() {
   function startHover() {
     stopHover();
     const overlay = getOrCreateHoverOverlay();
-    globalThis[HOVER_KEY] = { version: MODULE_VERSION, overlay, interval: setInterval(updateHoverHighlight, 100), lastTileId: null };
+    const manager = { version: MODULE_VERSION, overlay, lastTileId: null, rafPending: false, pointerHandler: null, panHook: null };
+    manager.pointerHandler = () => {
+      if (manager.rafPending) return;
+      manager.rafPending = true;
+      requestAnimationFrame(() => { manager.rafPending = false; updateHoverHighlight(); });
+    };
+    document.addEventListener("pointermove", manager.pointerHandler, { passive: true });
+    manager.panHook = Hooks.on("canvasPan", manager.pointerHandler);
+    globalThis[HOVER_KEY] = manager;
     updateHoverHighlight();
   }
 
   function stopHover() {
     const manager = globalThis[HOVER_KEY];
-    if (manager?.interval) clearInterval(manager.interval);
+    if (manager?.pointerHandler) document.removeEventListener("pointermove", manager.pointerHandler);
+    if (manager?.panHook) Hooks.off("canvasPan", manager.panHook);
     if (manager?.overlay) { manager.overlay.clear(); manager.overlay.destroy(); }
     document.getElementById(HOVER_TOOLTIP_ID)?.remove();
     globalThis[HOVER_KEY] = null;
+  }
+
+  function getProvinceHighlightsMode() {
+    try { const value = String(localStorage.getItem(PROVINCE_HIGHLIGHTS_STATE_KEY) || "on").trim().toLowerCase(); return value === "off" ? "off" : "on"; }
+    catch (err) { const value = String(globalThis[PROVINCE_HIGHLIGHTS_STATE_KEY] || "on").trim().toLowerCase(); return value === "off" ? "off" : "on"; }
+  }
+  function setProvinceHighlightsMode(mode = "on") {
+    const value = String(mode || "on").trim().toLowerCase() === "off" ? "off" : "on";
+    try { localStorage.setItem(PROVINCE_HIGHLIGHTS_STATE_KEY, value); } catch (err) {}
+    globalThis[PROVINCE_HIGHLIGHTS_STATE_KEY] = value;
+  }
+  // v1.0.11: Crown province geometry must remain present as Drawing documents for
+  // movement, ownership, economy, adjacency, and other map math, but Foundry v14
+  // can visibly render even validation-safe near-transparent Drawing content.
+  // Suppress only the runtime placeables during normal play. Movable tile-name
+  // Drawings keep their text visible while their Foundry editing frames are hidden.
+  function isWorldTileLabelDrawing(drawing) {
+    return Boolean(drawing?.document?.getFlag?.(FLAG_SCOPE, WORLD_LABEL_KEY));
+  }
+
+  function isWorldProvinceDrawing(drawing) {
+    return Boolean(getWorldTile(drawing)) && !isWorldTileLabelDrawing(drawing);
+  }
+
+  function getTileNameEditMode() {
+    return Boolean(game.user?.isGM && globalThis[TILE_NAME_EDIT_MODE_KEY] === true);
+  }
+
+  function getProvinceEditMode() {
+    return Boolean(game.user?.isGM && globalThis[PROVINCE_EDIT_MODE_KEY] === true);
+  }
+
+  function setRuntimeDisplay(object, visible) {
+    if (!object) return;
+    try { object.visible = Boolean(visible); } catch (err) {}
+    try { object.renderable = Boolean(visible); } catch (err) {}
+    try { object.alpha = visible ? 1 : 0; } catch (err) {}
+  }
+
+  function suppressProvincePlaceable(drawing) {
+    if (!isWorldProvinceDrawing(drawing)) return;
+    try { drawing.release?.(); } catch (err) {}
+    // Hide both the placeable container and the rendered shape/stroke child.
+    // Foundry v14 can refresh a Drawing's internal shape independently while
+    // changing layers/selection state, which otherwise leaves stray province
+    // border fragments visible even though the parent placeable was suppressed.
+    setRuntimeDisplay(drawing, false);
+    setRuntimeDisplay(drawing.shape, false);
+    try { if (drawing.shape) { drawing.shape.eventMode = "none"; drawing.shape.interactive = false; } } catch (err) {}
+    try { drawing.eventMode = "none"; } catch (err) {}
+    try { drawing.interactive = false; } catch (err) {}
+    try { drawing.interactiveChildren = false; } catch (err) {}
+    setRuntimeDisplay(drawing.frame, false);
+    setRuntimeDisplay(drawing.controls, false);
+    setRuntimeDisplay(drawing.controlIcon, false);
+    setRuntimeDisplay(drawing.resizeHandle, false);
+  }
+
+  function enableProvincePlaceableEditing(drawing) {
+    if (!isWorldProvinceDrawing(drawing)) return;
+    setRuntimeDisplay(drawing, true);
+    setRuntimeDisplay(drawing.shape, true);
+    try { drawing.eventMode = "static"; } catch (err) {}
+    try { drawing.interactive = true; } catch (err) {}
+    try { drawing.interactiveChildren = true; } catch (err) {}
+    try { drawing.cursor = "pointer"; } catch (err) {}
+    setRuntimeDisplay(drawing.frame, true);
+    setRuntimeDisplay(drawing.controls, true);
+    setRuntimeDisplay(drawing.controlIcon, true);
+    setRuntimeDisplay(drawing.resizeHandle, true);
+    try { drawing.refresh?.(); } catch (err) {}
+  }
+
+  function applyLabelPlaceableMode(drawing) {
+    if (!isWorldTileLabelDrawing(drawing)) return;
+    const editing = getTileNameEditMode();
+    const provinceEditing = getProvinceEditMode();
+
+    // The Drawing itself and its text must stay alive. Do not suppress shape/text:
+    // in Foundry v14 those can participate in the label's rendered container.
+    try { drawing.visible = true; } catch (err) {}
+    try { drawing.renderable = true; } catch (err) {}
+    try { drawing.alpha = 1; } catch (err) {}
+
+    // Normal play and province-edit mode: labels stay visible but do not steal
+    // clicks from the province geometry beneath them. Tile-name edit mode is the
+    // only mode where label Drawings become interactive.
+    if (!editing) {
+      setRuntimeDisplay(drawing.frame, false);
+      setRuntimeDisplay(drawing.controls, false);
+      setRuntimeDisplay(drawing.controlIcon, false);
+      setRuntimeDisplay(drawing.resizeHandle, false);
+      if (provinceEditing) {
+        try { drawing.eventMode = "none"; } catch (err) {}
+        try { drawing.interactive = false; } catch (err) {}
+        try { drawing.interactiveChildren = false; } catch (err) {}
+      }
+    } else {
+      // Explicitly restore anything normal-play suppression hid. Activating the
+      // DrawingsLayer will then manage hover/selection state normally.
+      try { drawing.eventMode = "static"; } catch (err) {}
+      try { drawing.interactive = true; } catch (err) {}
+      try { drawing.interactiveChildren = true; } catch (err) {}
+      setRuntimeDisplay(drawing.frame, true);
+      setRuntimeDisplay(drawing.controls, true);
+      setRuntimeDisplay(drawing.controlIcon, true);
+      setRuntimeDisplay(drawing.resizeHandle, true);
+    }
+  }
+
+  function applyWorldMapVisualSuppression() {
+    if (!isOverviewScene() || !canvas?.ready || !canvas?.drawings?.placeables) return;
+    const provinceEditing = getProvinceEditMode();
+    const cache = getWorldTileCache();
+    for (const entry of cache.entries) {
+      const drawing = entry.drawing;
+      if (provinceEditing) enableProvincePlaceableEditing(drawing);
+      else suppressProvincePlaceable(drawing);
+    }
+    for (const drawing of cache.labels) applyLabelPlaceableMode(drawing);
+  }
+
+  function startWorldMapVisualSuppression() {
+    stopWorldMapVisualSuppression();
+    applyWorldMapVisualSuppression();
+
+    // Foundry can refresh Drawing child graphics without an updateDrawing event.
+    // Keep a slow safety pass on both GM and player clients: this is far cheaper
+    // than the old 100ms scan but prevents province strokes/frames from leaking
+    // back into normal play after layer or selection refreshes.
+    const interval = setInterval(() => {
+      if (!isOverviewScene() || !canvas?.ready) return;
+      applyWorldMapVisualSuppression();
+    }, game.user?.isGM ? 2000 : 5000);
+
+    const drawHook = Hooks.on("drawDrawing", drawing => {
+      if (!isOverviewScene()) return;
+      requestAnimationFrame(() => {
+        if (isWorldProvinceDrawing(drawing)) {
+          if (getProvinceEditMode()) enableProvincePlaceableEditing(drawing);
+          else suppressProvincePlaceable(drawing);
+        } else if (isWorldTileLabelDrawing(drawing)) applyLabelPlaceableMode(drawing);
+      });
+    });
+
+    const updateHook = Hooks.on("updateDrawing", document => {
+      if (!isOverviewScene()) return;
+      if (!document?.getFlag?.(FLAG_SCOPE, WORLD_TILE_KEY) && !document?.getFlag?.(FLAG_SCOPE, WORLD_LABEL_KEY)) return;
+      invalidateWorldTileCache();
+      requestAnimationFrame(() => {
+        const drawing = canvas.drawings?.get?.(document.id) || canvas.drawings?.placeables?.find(d => d.document.id === document.id);
+        if (!drawing) return;
+        if (isWorldProvinceDrawing(drawing)) {
+          if (getProvinceEditMode()) enableProvincePlaceableEditing(drawing);
+          else suppressProvincePlaceable(drawing);
+        } else if (isWorldTileLabelDrawing(drawing)) applyLabelPlaceableMode(drawing);
+      });
+    });
+
+    globalThis[MAP_VISUAL_MANAGER_KEY] = { interval, drawHook, updateHook };
+  }
+
+  function stopWorldMapVisualSuppression() {
+    const manager = globalThis[MAP_VISUAL_MANAGER_KEY];
+    if (!manager) return;
+    try { if (manager.interval) clearInterval(manager.interval); } catch (err) {}
+    try { if (manager.drawHook) Hooks.off("drawDrawing", manager.drawHook); } catch (err) {}
+    try { if (manager.updateHook) Hooks.off("updateDrawing", manager.updateHook); } catch (err) {}
+    globalThis[MAP_VISUAL_MANAGER_KEY] = null;
+  }
+
+  async function setProvinceDrawingEditAppearance() {
+    if (!game.user?.isGM || !isOverviewScene() || !canvas?.scene) return 0;
+    const drawings = (canvas.drawings?.placeables || []).filter(isWorldProvinceDrawing);
+    const updates = drawings.map(drawing => ({
+      _id: drawing.document.id,
+      fillAlpha: 0.08,
+      strokeAlpha: 0.85,
+      strokeWidth: 3,
+      hidden: false
+    }));
+    if (updates.length) {
+      await canvas.scene.updateEmbeddedDocuments("Drawing", updates, { crownProvinceEditMode: true });
+    }
+    return updates.length;
+  }
+
+  async function toggleProvinceEditMode() {
+    if (!game.user.isGM) { ui.notifications.warn("GM only."); return; }
+    if (!requireOverviewScene()) return;
+
+    const next = !getProvinceEditMode();
+
+    if (next) {
+      // Province and tile-name editing are intentionally exclusive so the separate
+      // label Drawings cannot intercept province selection.
+      globalThis[TILE_NAME_EDIT_MODE_KEY] = false;
+      globalThis[PROVINCE_EDIT_MODE_KEY] = true;
+      const count = await setProvinceDrawingEditAppearance();
+      applyWorldMapVisualSuppression();
+      try { canvas.drawings?.activate?.({ tool: "select" }); } catch (err) {
+        try { canvas.drawings?.activate?.(); } catch (innerErr) {}
+      }
+      applyWorldMapVisualSuppression();
+      ui.notifications.info(`Province Edit Mode enabled. ${count} province Drawing${count === 1 ? "" : "s"} available; edit as many as needed, then click Finish Editing Provinces.`);
+    } else {
+      globalThis[PROVINCE_EDIT_MODE_KEY] = false;
+      try { canvas.drawings?.releaseAll?.(); } catch (err) {}
+      await hideProvinceDrawingLines(false);
+      applyWorldMapVisualSuppression();
+      try { canvas.tokens?.activate?.({ tool: "select" }); } catch (err) {}
+      ui.notifications.info("Province editing finished. Clean map view restored.");
+    }
+
+    renderPanel();
+  }
+
+  async function toggleTileNameEditMode() {
+    if (!game.user.isGM) { ui.notifications.warn("GM only."); return; }
+    if (!requireOverviewScene()) return;
+
+    const next = !getTileNameEditMode();
+    if (next && getProvinceEditMode()) {
+      globalThis[PROVINCE_EDIT_MODE_KEY] = false;
+      try { canvas.drawings?.releaseAll?.(); } catch (err) {}
+      await hideProvinceDrawingLines(false);
+    }
+    globalThis[TILE_NAME_EDIT_MODE_KEY] = next;
+
+    if (next) {
+      // Province placeables remain suppressed. Only the separate worldTileLabel
+      // Drawings are available for editing.
+      applyWorldMapVisualSuppression();
+      try { canvas.drawings?.activate?.({ tool: "select" }); } catch (err) {
+        try { canvas.drawings?.activate?.(); } catch (innerErr) {}
+      }
+      ui.notifications.info("Move Tile Names enabled. Drag the tile-name labels; click Finish Moving Tile Names when done.");
+    } else {
+      try { canvas.drawings?.releaseAll?.(); } catch (err) {}
+      applyWorldMapVisualSuppression();
+      try { canvas.tokens?.activate?.({ tool: "select" }); } catch (err) {}
+      ui.notifications.info("Tile-name editing finished. Clean map view restored.");
+    }
+
+    renderPanel();
+  }
+
+  function applyProvinceDrawingInteraction() {
+    applyWorldMapVisualSuppression();
+  }
+  async function toggleProvinceHighlights() {
+    if (!requireOverviewScene()) return;
+    const next = getProvinceHighlightsMode() === "on" ? "off" : "on";
+    setProvinceHighlightsMode(next);
+    if (next === "off") {
+      stopHover();
+      // Use Foundry's own layer lifecycle. Activating TokenLayer deactivates
+      // DrawingsLayer and removes its editing/selection interaction state.
+      try { canvas.drawings?.releaseAll?.(); } catch (err) {}
+      try { canvas.tokens?.activate?.({ tool: "select" }); } catch (err) {}
+    } else {
+      startHover();
+    }
+    renderPanel();
+    ui.notifications.info(next === "on"
+      ? "Province highlights enabled."
+      : "Province highlights disabled. Token selection is active.");
   }
 
   function getOrCreateRouteTooltip() {
@@ -2509,7 +3845,19 @@ function removePanel() {
     const destinationEntry = findTileAtPoint(mousePoint);
     if (!destinationEntry) { hideRouteTooltip(); return; }
 
-    let startEntry = findTileAtPoint(getTokenCenter(token));
+    const manager = globalThis[ROUTE_TOOLTIP_KEY];
+    const routeSignature = [
+      token.document.id,
+      destinationEntry.tile?.id || destinationEntry.drawing?.document?.id || "",
+      piece.currentTileId || "",
+      Number(piece.movementUsed || 0),
+      Number(piece.movementMax || 0)
+    ].join("|");
+    if (manager?.lastSignature === routeSignature) return;
+    if (manager) manager.lastSignature = routeSignature;
+
+    let startEntry = piece.currentTileId ? getTileById(piece.currentTileId) : null;
+    if (!startEntry) startEntry = findTileAtPoint(getTokenCenter(token));
     if (!startEntry && piece.currentTileId) startEntry = getTileById(piece.currentTileId);
 
     if (!startEntry) {
@@ -2534,11 +3882,28 @@ function removePanel() {
 
   function startRouteTooltip() {
     stopRouteTooltip(false);
-    globalThis[ROUTE_TOOLTIP_KEY] = {
+    const manager = {
       version: MODULE_VERSION,
-      interval: setInterval(updateRouteTooltip, 150),
+      lastSignature: null,
+      rafPending: false,
+      pointerHandler: null,
+      panHook: null,
+      controlHook: null,
+      tokenHook: null,
       startedAt: new Date().toISOString()
     };
+    manager.pointerHandler = () => {
+      if (manager.rafPending) return;
+      manager.rafPending = true;
+      requestAnimationFrame(() => { manager.rafPending = false; updateRouteTooltip(); });
+    };
+    document.addEventListener("pointermove", manager.pointerHandler, { passive: true });
+    manager.panHook = Hooks.on("canvasPan", manager.pointerHandler);
+    manager.controlHook = Hooks.on("controlToken", manager.pointerHandler);
+    manager.tokenHook = Hooks.on("updateToken", (document, changes) => {
+      if (changes.x !== undefined || changes.y !== undefined || foundry.utils.hasProperty(changes || {}, `flags.${FLAG_SCOPE}.${WORLD_PIECE_KEY}`)) manager.pointerHandler();
+    });
+    globalThis[ROUTE_TOOLTIP_KEY] = manager;
     updateRouteTooltip();
     renderPanel();
     ui.notifications.info("World route tooltip enabled.");
@@ -2546,7 +3911,10 @@ function removePanel() {
 
   function stopRouteTooltip(showNotification = true) {
     const manager = globalThis[ROUTE_TOOLTIP_KEY];
-    if (manager?.interval) clearInterval(manager.interval);
+    if (manager?.pointerHandler) document.removeEventListener("pointermove", manager.pointerHandler);
+    if (manager?.panHook) Hooks.off("canvasPan", manager.panHook);
+    if (manager?.controlHook) Hooks.off("controlToken", manager.controlHook);
+    if (manager?.tokenHook) Hooks.off("updateToken", manager.tokenHook);
     removeRouteTooltipElement();
     globalThis[ROUTE_TOOLTIP_KEY] = null;
     renderPanel();
@@ -2799,12 +4167,22 @@ function removePanel() {
   }
 
   function getLinkedTiles(current) {
-    const allTiles = getWorldTileEntries();
+    const cache = getWorldTileCache();
+    const results = [];
+    const seen = new Set();
     const rawIds = Array.isArray(current.tile.adjacentTileIds) ? current.tile.adjacentTileIds : [];
     const rawNames = Array.isArray(current.tile.adjacentTileNames) ? current.tile.adjacentTileNames : [];
-    const idSet = new Set(rawIds.map(String));
-    const nameSet = new Set(rawNames.map(normalize));
-    return allTiles.filter(entry => idSet.has(String(entry.tile.id)) || idSet.has(String(entry.drawing.document.id)) || nameSet.has(normalize(entry.tile.name)));
+    for (const rawId of rawIds) {
+      const entry = cache.byId.get(String(rawId));
+      const key = String(entry?.drawing?.document?.id || "");
+      if (entry && key && !seen.has(key)) { seen.add(key); results.push(entry); }
+    }
+    for (const rawName of rawNames) {
+      const entry = cache.byName.get(normalize(rawName));
+      const key = String(entry?.drawing?.document?.id || "");
+      if (entry && key && !seen.has(key)) { seen.add(key); results.push(entry); }
+    }
+    return results;
   }
 
   function getRevealEntriesForTileEntry(entry) {
@@ -2826,7 +4204,7 @@ function removePanel() {
     const entries = [];
     for (const entry of getWorldTileEntries()) {
       const house = getHouseData(entry.drawing) || {};
-      if (!isTileOwnedByUser(entry.tile, house, user)) continue;
+      if (!isTileControlledByUser(entry.tile, house, user)) continue;
       entries.push(...getRevealEntriesForTileEntry(entry));
     }
     return entries;
@@ -2834,21 +4212,28 @@ function removePanel() {
 
   function isWorldPieceRevealed(token) {
     const manager = globalThis[VISIBILITY_KEY];
-    if (!manager || !getWorldPiece(token) || !manager.revealedEntries?.length) return false;
+    const piece = getWorldPiece(token);
+    if (!manager || !piece || !manager.revealedEntries?.length) return false;
+    // Strategic movement already records the province. Use that O(1) lookup first
+    // instead of doing polygon checks every time Foundry asks Token.isVisible.
+    const currentTileId = String(piece.currentTileId || "");
+    if (currentTileId && manager.revealedTileIds?.has(currentTileId)) return true;
     const point = getTokenCenter(token);
-    return manager.revealedEntries.some(entry => pointInsideDrawing(point, entry.drawing));
+    return manager.revealedEntries.some(entry => pointInsideGeometry(point, entry.geometry || buildDrawingGeometry(entry.drawing)));
   }
 
   function clearReveal() {
     const manager = globalThis[VISIBILITY_KEY];
     if (!manager) return;
     manager.revealedEntries = [];
+    manager.revealedTileIds = new Set();
+    manager.revealSignature = "";
     manager.graphics?.clear();
     if (manager.graphics) manager.graphics.visible = false;
     redrawVisibilityDimmer([]);
     canvas.visibility?.refreshVisibility?.();
     refreshTokenVisibility();
-    redrawPoliticalOverlay();
+    syncPoliticalOverlayVisibilityOnly();
   }
 
   function drawTileIntoVision(graphics, drawing) {
@@ -2872,8 +4257,14 @@ function removePanel() {
   }
 
   function getRevealEntriesForToken(token) {
-    if (!token || !getWorldPiece(token)) return [];
-    const current = findCurrentTileForToken(token) || getTileById(getWorldPiece(token)?.currentTileId);
+    if (!token) return [];
+    const piece = getWorldPiece(token);
+    if (!piece) return [];
+
+    // Prefer the strategic tile recorded by the movement system. Border positions
+    // can put the token center exactly on or microscopically outside polygon edges,
+    // which makes raw point-in-polygon resolution unstable for a frame.
+    const current = getTileById(piece.currentTileId) || findCurrentTileForToken(token);
     if (!current) return [];
     return [current, ...getLinkedTiles(current)];
   }
@@ -2906,14 +4297,25 @@ function removePanel() {
       }
     }
 
-    manager.revealedEntries = [...byTileId.values()];
+    const nextEntries = [...byTileId.values()];
+    const nextIds = new Set(byTileId.keys());
+    const nextSignature = [...nextIds].sort().join("|");
+    // Token movement inside the same province can fire many updateToken events.
+    // If the actual set of visible provinces did not change, there is no reason
+    // to rebuild PIXI masks or ask Foundry to refresh every token's visibility.
+    if (manager.revealSignature === nextSignature) return;
+    manager.revealSignature = nextSignature;
+    manager.revealedEntries = nextEntries;
+    manager.revealedTileIds = nextIds;
     manager.graphics.clear();
+    recordPoliticalMemoryForVisibleEntries(manager.revealedEntries);
 
     if (!manager.revealedEntries.length) {
       manager.graphics.visible = false;
       redrawVisibilityDimmer([]);
       canvas.visibility?.refreshVisibility?.();
       refreshTokenVisibility();
+      syncPoliticalOverlayVisibilityOnly();
       return;
     }
 
@@ -2922,6 +4324,7 @@ function removePanel() {
     redrawVisibilityDimmer(manager.revealedEntries);
     canvas.visibility?.refreshVisibility?.();
     refreshTokenVisibility();
+    syncPoliticalOverlayVisibilityOnly();
   }
 
   function revealForCurrentPlayerPieces() {
@@ -2934,7 +4337,26 @@ function removePanel() {
   }
 
   function startVisibility() {
-    if (globalThis[VISIBILITY_KEY]) return;
+    // The GM does not use player province-visibility masking. Running this manager
+    // on the GM client means merely selecting a world piece (including from My
+    // Characters / Move) rebuilds the reveal mask, dimmer, token visibility, and
+    // political-overlay visibility before the movement dialog can open. On a large
+    // strategic map that can make the GM client appear to freeze.
+    if (game.user?.isGM) {
+      if (globalThis[VISIBILITY_KEY]) stopVisibility();
+      return;
+    }
+
+    // Scene features can restart without the visibility manager being destroyed
+    // (for example after imports, scene-flag changes, or a canvas refresh). On
+    // player clients the old behavior returned immediately here, leaving
+    // revealedEntries stale/empty. The Political Overlay then existed but its
+    // live visibility mask contained no province geometry, so players saw
+    // nothing. Recalculate current player vision whenever the manager survives.
+    if (globalThis[VISIBILITY_KEY]) {
+      revealForCurrentPlayerPieces();
+      return;
+    }
     const TokenClass = foundry?.canvas?.placeables?.Token || CONFIG?.Token?.objectClass || globalThis.Token;
     if (!TokenClass) { console.warn("Crown Overview Tools: could not locate Token class."); return; }
     const originalIsVisibleDescriptor = Object.getOwnPropertyDescriptor(TokenClass.prototype, "isVisible");
@@ -2949,24 +4371,36 @@ function removePanel() {
 
     const originalIsVisibleGetter = originalIsVisibleDescriptor.get;
     const controlHook = Hooks.on("controlToken", (token, controlled) => {
-      if (!isOverviewScene()) return;
+      if (game.user?.isGM || !isOverviewScene()) return;
       if (canvas.tokens.controlled.length === 1 && getWorldPiece(canvas.tokens.controlled[0])) revealForToken(canvas.tokens.controlled[0]);
       else revealForCurrentPlayerPieces();
     });
     const updateHook = Hooks.on("updateToken", (document, changes) => {
-      if (!isOverviewScene()) return;
+      if (game.user?.isGM || !isOverviewScene()) return;
       if (changes.x === undefined && changes.y === undefined) return;
       if (canvas.tokens.controlled.length === 1 && getWorldPiece(canvas.tokens.controlled[0])) revealForToken(canvas.tokens.controlled[0]);
       else revealForCurrentPlayerPieces();
     });
+    const politicalMemoryHook = Hooks.on("updateDrawing", document => {
+      if (!isOverviewScene() || game.user.isGM) return;
+      if (!document?.getFlag?.(FLAG_SCOPE, WORLD_TILE_KEY)) return;
+      const current = globalThis[VISIBILITY_KEY];
+      const visibleEntry = current?.revealedEntries?.find(entry => String(entry?.drawing?.document?.id || "") === String(document.id || ""));
+      if (!visibleEntry) return;
+      requestAnimationFrame(() => recordPoliticalMemoryForVisibleEntries([visibleEntry]));
+    });
 
-    globalThis[VISIBILITY_KEY] = { TokenClass, originalIsVisibleDescriptor, graphics, visionContainer, revealedEntries: [], controlHook, updateHook };
+    globalThis[VISIBILITY_KEY] = { TokenClass, originalIsVisibleDescriptor, graphics, visionContainer, revealedEntries: [], revealedTileIds: new Set(), revealSignature: null, controlHook, updateHook, politicalMemoryHook };
 
     Object.defineProperty(TokenClass.prototype, "isVisible", {
       configurable: true,
       get: function () {
         const manager = globalThis[VISIBILITY_KEY];
-        if (manager && isOverviewScene() && !game.user.isGM && getWorldPiece(this)) {
+        const piece = getWorldPiece(this);
+        if (manager && isOverviewScene() && !game.user.isGM && piece) {
+          // A player must never lose sight of a world piece they control merely
+          // because its center is resting on a province boundary.
+          if (canUserControlWorldPiece(this, piece)) return true;
           return isWorldPieceRevealed(this);
         }
         if (manager && isOverviewScene() && isWorldPieceRevealed(this)) return true;
@@ -2986,6 +4420,7 @@ function removePanel() {
     }
     if (manager.controlHook) Hooks.off("controlToken", manager.controlHook);
     if (manager.updateHook) Hooks.off("updateToken", manager.updateHook);
+    if (manager.politicalMemoryHook) Hooks.off("updateDrawing", manager.politicalMemoryHook);
     manager.graphics?.parent?.removeChild(manager.graphics);
     manager.graphics?.destroy();
     globalThis[VISIBILITY_KEY] = null;
@@ -3037,42 +4472,176 @@ function removePanel() {
   }
 
 
+  function getProvinceControllerCandidates(worldTile = {}, house = {}) {
+    return [
+      { id: house?.ownerUserId, name: house?.ownerUserName },
+      { id: house?.playerOwnerUserId, name: house?.playerOwnerUserName },
+      { id: house?.controllerPlayerUserId, name: house?.controllerPlayerName },
+      { id: worldTile?.ownerUserId, name: worldTile?.ownerUserName },
+      { id: worldTile?.playerOwnerUserId, name: worldTile?.playerOwnerUserName },
+      { id: worldTile?.controllerPlayerUserId, name: worldTile?.controllerPlayerName }
+    ].map(row => ({ id: String(row.id || "").trim(), name: String(row.name || "").trim() }))
+      .filter(row => row.id || row.name);
+  }
+
+  function resolveCurrentPlayerFromCandidates(candidates = []) {
+    // A live Foundry user ID is strongest. If an old world stores a deleted user
+    // ID, do not let that stale ID defeat a still-correct player name.
+    for (const row of candidates) {
+      if (!row.id) continue;
+      const user = game.users.get(row.id);
+      if (user && !user.isGM) return user;
+    }
+    for (const row of candidates) {
+      if (!row.name) continue;
+      const user = game.users.contents.find(candidate => !candidate.isGM && normalize(candidate.name) === normalize(row.name));
+      if (user) return user;
+    }
+    return null;
+  }
+
   function getTileOwnerUserId(worldTile, house = null) {
-    return String(
-      house?.ownerUserId ||
-      house?.playerOwnerUserId ||
-      worldTile?.ownerUserId ||
-      worldTile?.playerOwnerUserId ||
-      ""
-    ).trim();
+    const candidates = getProvinceControllerCandidates(worldTile || {}, house || {});
+    const resolved = resolveCurrentPlayerFromCandidates(candidates);
+    return String(resolved?.id || candidates[0]?.id || "").trim();
   }
 
   function getTileOwnerUserName(worldTile, house = null) {
-    return String(
-      house?.ownerUserName ||
-      house?.playerOwnerUserName ||
-      worldTile?.ownerUserName ||
-      worldTile?.playerOwnerUserName ||
-      ""
-    ).trim();
+    const candidates = getProvinceControllerCandidates(worldTile || {}, house || {});
+    const resolved = resolveCurrentPlayerFromCandidates(candidates);
+    return String(resolved?.name || candidates[0]?.name || "").trim();
   }
 
-  function canUserBuildOnTile(worldTile, house = null) {
-    if (game.user.isGM) return true;
 
-    const ownerUserId = getTileOwnerUserId(worldTile, house);
-    if (ownerUserId) return String(ownerUserId) === String(game.user.id);
+  function getProvincePoliticalState(worldTile = {}, house = {}) {
+    const ownerId = String(getTileOwnerUserId(worldTile, house) || "").trim();
+    const ownerName = String(getTileOwnerUserName(worldTile, house) || "").trim();
+    const swornId = String(house?.swornToPlayerUserId || worldTile?.swornToPlayerUserId || "").trim();
+    const swornName = String(house?.swornToPlayerName || worldTile?.swornToPlayerName || "").trim();
+    const ownershipType = normalize(house?.ownershipType || house?.ownerType || worldTile?.ownershipType || worldTile?.ownerType || "");
+    const swornType = normalize(house?.swornToType || worldTile?.swornToType || "");
+    const allegiance = String(house?.allegiance || worldTile?.allegiance || "").trim();
+    const allegianceKey = normalize(allegiance);
 
-    const ownerUserName = getTileOwnerUserName(worldTile, house);
-    if (ownerUserName) return normalize(ownerUserName) === normalize(game.user.name);
+    // Political allegiance is authoritative over stale LOCAL ownership-type metadata.
+    // Old/imported provinces can legitimately retain ownershipType "Neutral"/"NPC"
+    // after they have become politically aligned to a player House. Treating that old
+    // local type as an absolute veto made the political overlay show the correct realm
+    // while tooltip permissions, Holdings, mustering, and upkeep all rejected the tile.
+    //
+    // A province is truly neutral only when its CURRENT allegiance says so, or when it
+    // has no political allegiance at all and the remaining ownership/sworn metadata is
+    // explicitly neutral. The GM Neutral Reset writes Allegiance = "Unaligned", so a
+    // deliberately neutralized province still leaves its former realm immediately.
+    const neutralAllegianceKeys = new Set(["neutral", "unaligned", "independent", "npc", "none"]);
+    const hasMeaningfulAllegiance = Boolean(allegianceKey && !neutralAllegianceKeys.has(allegianceKey));
+
+    // A CURRENT Neutral / Unaligned allegiance is an absolute political veto.
+    // Old owner/controller fields are bookkeeping residue and must never turn a
+    // neutral province into a realm holding or let its stockpile become part of
+    // a player's treasury.
+    const allegianceExplicitlyNeutral = Boolean(allegianceKey && neutralAllegianceKeys.has(allegianceKey));
+    const explicitlyNeutral = allegianceExplicitlyNeutral || (!ownerId && !ownerName && !swornId && !swornName && (
+      !hasMeaningfulAllegiance && !allegianceKey && (
+        ["neutral", "npc", "none"].includes(ownershipType) ||
+        ["neutral", "npc"].includes(swornType)
+      )
+    ));
+    return { ownerId, ownerName, swornId, swornName, ownershipType, swornType, allegiance, allegianceKey, hasMeaningfulAllegiance, explicitlyNeutral };
+  }
+
+  function getPlayerHouseIdentityKeys(user) {
+    const keys = new Set();
+    if (!user || user.isGM) return keys;
+    const add = value => {
+      const key = normalizeHouseIdentity(value);
+      if (key && !isGenericNeutralLocalHouse(key)) keys.add(key);
+    };
+
+    // Character assignments are the strongest House identity signal.
+    for (const token of getCharacterTokens()) {
+      const controller = getCharacterControllerIdentity(token);
+      if (String(controller.id || "") !== String(user.id || "") && normalize(controller.name || "") !== normalize(user.name || "")) continue;
+      const character = getCharacterDataFromToken(token) || {};
+      const piece = getWorldPiece(token) || {};
+      add(character.house);
+      add(piece.house);
+      add(piece.faction);
+      add(piece.allegiance);
+    }
+
+    // Explicitly controlled/sworn provinces are also authoritative realm evidence.
+    for (const entry of getWorldTileEntries()) {
+      const tile = entry.tile || {};
+      const rowHouse = getHouseData(entry.drawing) || {};
+      const explicit = resolveCurrentPlayerFromCandidates(getProvinceControllerCandidates(tile, rowHouse));
+      const sworn = getUserByIdOrName(
+        rowHouse.swornToPlayerUserId || tile.swornToPlayerUserId || "",
+        rowHouse.swornToPlayerName || tile.swornToPlayerName || ""
+      );
+      if (String(explicit?.id || "") === String(user.id || "") || String(sworn?.id || "") === String(user.id || "")) {
+        add(rowHouse.allegiance || tile.allegiance);
+        add(rowHouse.house || tile.house || tile.owner);
+      }
+    }
+
+    add(getCanonicalHouseNameForPlayer(user.id, user.name));
+    return keys;
+  }
+
+  function isTileControlledByUser(worldTile = {}, house = {}, user = game.user) {
+    if (!user) return false;
+    if (user.isGM) return true;
+
+    const state = getProvincePoliticalState(worldTile, house || {});
+    const wantedId = String(user.id || "").trim();
+    const wantedName = normalize(user.name || "");
+
+    // Neutral / Unaligned / NPC allegiance is authoritative over any stale
+    // controller fields left behind by an old import or previous conquest.
+    if (state.explicitlyNeutral) return false;
+
+    // Resolve all explicit-controller aliases against CURRENT Foundry users. A
+    // deleted/stale user ID may fall back to its matching stored player name.
+    const explicitCandidates = getProvinceControllerCandidates(worldTile, house || {});
+    if (explicitCandidates.length) {
+      const explicitUser = resolveCurrentPlayerFromCandidates(explicitCandidates);
+      if (explicitUser) return String(explicitUser.id) === wantedId;
+      // No candidate resolves to a current account: preserve a final name fallback.
+      if (explicitCandidates.some(row => row.name && normalize(row.name) === wantedName)) return true;
+      return false;
+    }
+
+    // Sworn-to-player is political control even when the local House is preserved.
+    if (state.swornId || state.swornName) {
+      const swornUser = getUserByIdOrName(state.swornId, state.swornName);
+      if (swornUser) return String(swornUser.id) === wantedId;
+      return Boolean(state.swornName && normalize(state.swornName) === wantedName);
+    }
+
+    const houseKeys = getPlayerHouseIdentityKeys(user);
+    if (state.allegianceKey && houseKeys.has(normalizeHouseIdentity(state.allegiance))) return true;
+
+    // Legacy fallback only for genuinely old records with no political allegiance.
+    if (!state.allegianceKey && !state.ownershipType) {
+      const localHouseKey = normalizeHouseIdentity(house?.house || worldTile?.house || worldTile?.owner || "");
+      if (localHouseKey && houseKeys.has(localHouseKey)) return true;
+    }
 
     return false;
   }
 
-  function getBuildBlockedReason(worldTile, house = null) {
+
+  function canUserBuildOnTile(worldTile, house = null) {
+    return isTileControlledByUser(worldTile, house || {}, game.user);
+  }
+
+  function getBuildBlockedReason(worldTile, house = null, user = game.user) {
     const ownerName = getTileOwnerUserName(worldTile, house);
-    if (ownerName) return `${worldTile?.name || "This tile"} is assigned to ${ownerName}. You are ${game.user.name}.`;
-    return `${worldTile?.name || "This tile"} is not assigned to any player yet. Ask the GM to use Assign Tile Owner.`;
+    if (ownerName) return `${worldTile?.name || "This tile"} is assigned to ${ownerName}. You are ${user?.name || game.user.name}.`;
+    const state = getProvincePoliticalState(worldTile, house || {});
+    if (state.explicitlyNeutral) return `${worldTile?.name || "This tile"} is Neutral / Unaligned and is not controlled by ${user?.name || game.user.name}.`;
+    return `${worldTile?.name || "This tile"} is not currently resolved as part of ${user?.name || game.user.name}'s realm.`;
   }
 
   function getPlayerUsers() {
@@ -3090,9 +4659,22 @@ function removePanel() {
   }
 
   function getPlayerUserForTileOwnership(worldTile = {}, house = {}) {
-    const user = getUserByIdOrName(getTileOwnerUserId(worldTile, house), getTileOwnerUserName(worldTile, house));
-    return user && !user.isGM ? user : null;
+    const explicit = resolveCurrentPlayerFromCandidates(getProvinceControllerCandidates(worldTile, house));
+    if (explicit && !explicit.isGM) return explicit;
+
+    const sworn = getUserByIdOrName(
+      house.swornToPlayerUserId || worldTile.swornToPlayerUserId || "",
+      house.swornToPlayerName || worldTile.swornToPlayerName || ""
+    );
+    if (sworn && !sworn.isGM) return sworn;
+
+    const state = getProvincePoliticalState(worldTile, house || {});
+    if (state.explicitlyNeutral) return null;
+
+    const matches = getPlayerUsers().filter(user => isTileControlledByUser(worldTile, house, user));
+    return matches.length === 1 ? matches[0] : null;
   }
+
 
   function ensureEconomyBucket(bucketMap, user) {
     if (!user || user.isGM) return null;
@@ -3175,6 +4757,14 @@ function removePanel() {
     return `<li><strong>${escapeHtml(label)}${isBest ? " ★ Best" : ""}:</strong> ${escapeHtml(status)}<br><span style="opacity:0.85;">${path.tileNames.map(escapeHtml).join(" → ")}</span></li>`;
   }
 
+  function getPrivateActionRecipients(actingUserId = game.user?.id) {
+    const ids = [
+      actingUserId,
+      ...game.users.contents.filter(user => user.isGM).map(user => user.id)
+    ].filter(Boolean).map(String);
+    return Array.from(new Set(ids));
+  }
+
   async function executeWorldPathMove(token, piece, startTile, destinationTile, path, pauseMs = 350, sourceLabel = "World Path Move") {
     if (!path) return null;
 
@@ -3199,7 +4789,8 @@ function removePanel() {
       }
 
       const position = getTokenTopLeftForTileSlot(token, entry);
-      const stepCost = getTileMovementCost(tile);
+      const stepHouse = getHouseData(entry.drawing) || {};
+      const stepCost = getTileMovementCost(tile, currentPiece, stepHouse);
 
       currentPiece.previousTileId = currentPiece.currentTileId || path.tileIds[i - 1];
       currentPiece.previousTileName = currentPiece.currentTileName || path.tileNames[i - 1];
@@ -3227,6 +4818,7 @@ function removePanel() {
 
     await ChatMessage.create({
       speaker: ChatMessage.getSpeaker({ alias: sourceLabel }),
+      whisper: getPrivateActionRecipients(game.user?.id),
       content: `<h2>${escapeHtml(sourceLabel)}</h2><p><strong>Piece:</strong> ${escapeHtml(currentPiece.name || token.document.name)}</p><p><strong>Type:</strong> ${escapeHtml(currentPiece.pieceType || "Unknown")}</p><p><strong>Route Mode:</strong> ${escapeHtml(routeModeLabel(path.mode))}</p><p><strong>From:</strong> ${escapeHtml(startTile.name)}</p><p><strong>To:</strong> ${escapeHtml(destinationTile.name)}</p><p><strong>Path:</strong> ${path.tileNames.map(escapeHtml).join(" → ")}</p><p><strong>Movement spent:</strong> ${escapeHtml(spentThisMove)}</p><p><strong>Total movement used:</strong> ${escapeHtml(currentPiece.movementUsed)} / ${escapeHtml(currentPiece.movementMax || 0)}</p>`
     });
 
@@ -3335,7 +4927,7 @@ function removePanel() {
       if (statecraft !== null) detailsHtml += `<strong>Statecraft:</strong> ${escapeHtml(statecraft)}<br>`;
       if (piece.pieceType === "army" && (piece.strengthCurrent !== undefined || piece.strengthMax !== undefined)) {
         detailsHtml += `<strong>Strength:</strong> ${escapeHtml(piece.strengthCurrent ?? "?")} / ${escapeHtml(piece.strengthMax ?? "?")}<br>`;
-        const armyUpkeep = piece.upkeep ? resourceMapToText(piece.upkeep) : resourceMapToText(calculateArmyUpkeep(getArmyComposition(piece), getSiegeEquipment(piece)));
+        const armyUpkeep = resourceMapToText(getMilitaryForceUpkeep(piece));
         if (armyUpkeep && armyUpkeep !== "None") detailsHtml += `<strong>Upkeep:</strong> ${escapeHtml(armyUpkeep)}<br>`;
       }
       if (piece.pieceType === "fleet") {
@@ -3344,7 +4936,7 @@ function removePanel() {
         detailsHtml += `<strong>Ships:</strong> ${escapeHtml(shipsCurrent)} / ${escapeHtml(shipsMax)}<br>`;
         const navyText = navyCompositionText(getNavyComposition(piece));
         if (navyText && navyText !== "None") detailsHtml += `<strong>Composition:</strong> ${escapeHtml(navyText)}<br>`;
-        const navyUpkeep = piece.upkeep ? resourceMapToText(piece.upkeep) : resourceMapToText(calculateNavyUpkeep(getNavyComposition(piece)));
+        const navyUpkeep = resourceMapToText(getMilitaryForceUpkeep(piece));
         if (navyUpkeep && navyUpkeep !== "None") detailsHtml += `<strong>Upkeep:</strong> ${escapeHtml(navyUpkeep)}<br>`;
         if (piece.linkedCharacterName) detailsHtml += `<strong>Carrying:</strong> ${escapeHtml(piece.linkedCharacterName)}<br>`;
       }
@@ -3405,12 +4997,29 @@ function removePanel() {
 
   function startPieceTooltip() {
     stopPieceTooltip(false);
-    globalThis[PIECE_TOOLTIP_KEY] = {
+    const manager = {
       version: MODULE_VERSION,
-      interval: setInterval(updatePieceTooltip, 120),
       lastTokenId: null,
+      rafPending: false,
+      pointerHandler: null,
+      panHook: null,
+      tokenHook: null,
       startedAt: new Date().toISOString()
     };
+    manager.pointerHandler = () => {
+      if (manager.rafPending) return;
+      manager.rafPending = true;
+      requestAnimationFrame(() => { manager.rafPending = false; updatePieceTooltip(); });
+    };
+    document.addEventListener("pointermove", manager.pointerHandler, { passive: true });
+    manager.panHook = Hooks.on("canvasPan", manager.pointerHandler);
+    manager.tokenHook = Hooks.on("updateToken", (document, changes) => {
+      if (changes.x !== undefined || changes.y !== undefined || foundry.utils.hasProperty(changes || {}, `flags.${FLAG_SCOPE}.${WORLD_PIECE_KEY}`)) {
+        manager.lastTokenId = null;
+        manager.pointerHandler();
+      }
+    });
+    globalThis[PIECE_TOOLTIP_KEY] = manager;
     updatePieceTooltip();
     ui.notifications.info("World piece hover tooltip enabled.");
     renderPanel();
@@ -3418,7 +5027,9 @@ function removePanel() {
 
   function stopPieceTooltip(notify = true) {
     const manager = globalThis[PIECE_TOOLTIP_KEY];
-    if (manager?.interval) clearInterval(manager.interval);
+    if (manager?.pointerHandler) document.removeEventListener("pointermove", manager.pointerHandler);
+    if (manager?.panHook) Hooks.off("canvasPan", manager.panHook);
+    if (manager?.tokenHook) Hooks.off("updateToken", manager.tokenHook);
     document.getElementById(PIECE_TOOLTIP_ID)?.remove();
     globalThis[PIECE_TOOLTIP_KEY] = null;
     if (notify) ui.notifications.info("World piece hover tooltip disabled.");
@@ -3452,6 +5063,21 @@ function removePanel() {
 
     await saveWorldPiece(token, updatedPiece);
 
+    if (normalize(updatedPiece.pieceType) === "character") {
+      const characterData = foundry.utils.deepClone(getWorldCharacter(token) || updatedPiece.characterData || {});
+      if (ownerUser) {
+        characterData.playerUserId = ownerUser.id; characterData.playerName = ownerUser.name;
+        characterData.ownerUserId = ownerUser.id; characterData.ownerUserName = ownerUser.name; characterData.ownerType = "Player";
+      } else {
+        characterData.playerUserId = ""; characterData.playerName = ""; characterData.ownerUserId = ""; characterData.ownerUserName = "";
+        if (normalize(characterData.ownerType) === "player") characterData.ownerType = "NPC";
+      }
+      updatedPiece.characterData = foundry.utils.deepClone(characterData);
+      await token.document.setFlag(FLAG_SCOPE, WORLD_CHARACTER_KEY, characterData);
+      if (token.actor) await token.actor.setFlag(FLAG_SCOPE, WORLD_CHARACTER_KEY, foundry.utils.deepClone(characterData));
+      await saveWorldPiece(token, updatedPiece);
+    }
+
     if (token.actor) {
       const ownership = foundry.utils.deepClone(token.actor.ownership || {});
       if (clearOtherPlayers) {
@@ -3464,6 +5090,23 @@ function removePanel() {
     }
 
     return updatedPiece;
+  }
+
+
+  async function repairCharacterControl(showNotification = true) {
+    if (!game.user.isGM) { if (showNotification) ui.notifications.warn("Only the GM can repair character control."); return { repaired: 0, unresolved: 0 }; }
+    let repaired = 0, unresolved = 0;
+    for (const token of canvas?.tokens?.placeables || []) {
+      const piece = getWorldPiece(token);
+      if (normalize(piece?.pieceType) !== "character") continue;
+      const character = getWorldCharacter(token) || piece.characterData || {};
+      const ownerUser = getUserByIdOrName(character.playerUserId || character.ownerUserId || piece.ownerUserId || piece.playerOwnerUserId || "", character.playerName || character.ownerUserName || piece.ownerUserName || piece.playerOwnerUserName || "");
+      const saysPlayer = normalize(character.ownerType || piece.ownerType) === "player" || Boolean(character.playerUserId || character.playerName || piece.ownerUserId || piece.ownerUserName);
+      if (!ownerUser) { if (saysPlayer) unresolved++; continue; }
+      await applyWorldPieceOwner(token, piece, ownerUser, true); repaired++;
+    }
+    if (showNotification) ui.notifications.info(`Repaired player control for ${repaired} assigned character(s).${unresolved ? ` ${unresolved} assigned character(s) could not be matched to a current Foundry user.` : ""}`);
+    revealForCurrentPlayerPieces(); return { repaired, unresolved };
   }
 
 
@@ -3537,6 +5180,8 @@ function removePanel() {
       characterRole: stored.characterRole || piece.characterRole || "",
       characterName: stored.characterName || piece.characterName || piece.name || token.document.name,
       house: stored.house || piece.house || piece.faction || "",
+      culture: canonicalizeCultureLabel(stored.culture || piece.culture || ""),
+      religion: canonicalizeReligionLabel(stored.religion || piece.religion || ""),
       age: stored.age || piece.age || "",
       heightWeight: stored.heightWeight || piece.heightWeight || "",
       preferredWeapons: stored.preferredWeapons || piece.preferredWeapons || "",
@@ -3730,7 +5375,7 @@ function removePanel() {
       characterName: get("characterName"),
       house: get("house"),
       culture: get("culture"),
-      religion: get("religion"),
+      religion: canonicalizeReligionLabel(get("religion")),
       age: get("age"),
       heightWeight: get("heightWeight"),
       preferredWeapons: get("preferredWeapons"),
@@ -3748,6 +5393,178 @@ function removePanel() {
     for (const key of CHARACTER_STAT_KEYS) details[key] = get(key);
     for (const key of CHARACTER_SECONDARY_STAT_KEYS) details[key] = get(key);
     return normalizeCharacterDetails(details, fallback);
+  }
+
+  function buildPlayerCharacterDetailsForm(details = {}) {
+    return `<form>
+      <div style="padding:8px;margin-bottom:10px;border:1px solid #777;border-radius:6px;">
+        <strong>${escapeHtml(details.characterName || "Character")}</strong><br>
+        <span class="notes">Edit roleplay/identity details used by Crown systems. Mechanical stats, House, traits/quirks, ownership, location, and GM notes remain GM-controlled.</span>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div class="form-group"><label>Culture</label><input type="text" name="culture" value="${escapeHtml(details.culture || "")}" placeholder="First Men, Andal, Ironborn, Rhoynar..." style="width:100%;" /></div>
+        <div class="form-group"><label>Religion / Faith</label><input type="text" name="religion" value="${escapeHtml(details.religion || "")}" placeholder="Old Gods, Faith of the Seven..." style="width:100%;" /></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div class="form-group"><label>Age</label><input type="text" name="age" value="${escapeHtml(details.age || "")}" style="width:100%;" /></div>
+        <div class="form-group"><label>Height / Weight</label><input type="text" name="heightWeight" value="${escapeHtml(details.heightWeight || "")}" style="width:100%;" /></div>
+      </div>
+      <div class="form-group"><label>Preferred Weapons</label><input type="text" name="preferredWeapons" value="${escapeHtml(details.preferredWeapons || "")}" style="width:100%;" /></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div class="form-group"><label>Marriage / Spouse</label><input type="text" name="marriage" value="${escapeHtml(details.marriage || "")}" style="width:100%;" /></div>
+        <div class="form-group"><label>Issue / Children</label><input type="text" name="issueChildren" value="${escapeHtml(details.issueChildren || "")}" style="width:100%;" /></div>
+      </div>
+      <div class="form-group"><label>Public Notes</label><textarea name="publicNotes" style="width:100%;height:80px;">${escapeHtml(details.publicNotes || "")}</textarea></div>
+    </form>`;
+  }
+
+  function canEditCharacterDetails(token) {
+    if (!token || !isCharacterToken(token)) return false;
+    if (game.user.isGM) return true;
+    const controller = getCharacterControllerIdentity(token);
+    if (controller.id) return String(controller.id) === String(game.user.id);
+    if (controller.name) return normalize(controller.name) === normalize(game.user.name);
+    return canUserControlWorldPiece(token, getWorldPiece(token));
+  }
+
+  function normalizePlayerEditableCharacterDetails(raw = {}) {
+    return {
+      culture: canonicalizeCultureLabel(raw.culture || ""),
+      religion: canonicalizeReligionLabel(raw.religion || ""),
+      age: String(raw.age || "").trim(),
+      heightWeight: String(raw.heightWeight || "").trim(),
+      preferredWeapons: String(raw.preferredWeapons || "").trim(),
+      marriage: String(raw.marriage || "").trim(),
+      issueChildren: String(raw.issueChildren || "").trim(),
+      publicNotes: String(raw.publicNotes || "").trim()
+    };
+  }
+
+  function canUserEditCharacterDetailsForUser(token, user) {
+    if (!token || !isCharacterToken(token) || !user) return false;
+    if (user.isGM) return true;
+    const controller = getCharacterControllerIdentity(token);
+    if (controller.id) return String(controller.id) === String(user.id);
+    if (controller.name) return normalize(controller.name) === normalize(user.name);
+    return canUserControlWorldPieceForUser(token, getWorldPiece(token), user);
+  }
+
+  async function applyPlayerCharacterDetailsUpdate({ token, requesterUserId, requesterUserName, details }) {
+    if (!token || !isCharacterToken(token)) throw new Error("That token is not a Crown character.");
+    const requester = game.users.get(String(requesterUserId || "")) || { id: requesterUserId, name: requesterUserName, isGM: false };
+    if (!canUserEditCharacterDetailsForUser(token, requester)) throw new Error("That player does not control this character.");
+
+    let result = normalizePlayerEditableCharacterDetails(details);
+    const existing = getCharacterDataFromToken(token) || {};
+    if (!result.culture || !result.religion) {
+      const inferred = inferMissingCharacterIdentity(token, { ...existing, ...result });
+      result = { ...result, culture: result.culture || inferred.culture, religion: result.religion || inferred.religion };
+    }
+    const now = new Date().toISOString();
+    const characterData = foundry.utils.deepClone(getWorldCharacter(token) || existing || {});
+    Object.assign(characterData, result, {
+      updatedAt: now,
+      updatedBy: requester.name || requesterUserName || game.user.name,
+      updatedSource: `Crown Overview Tools ${MODULE_VERSION} - Player Character Details`
+    });
+
+    const piece = foundry.utils.deepClone(getWorldPiece(token) || {});
+    piece.culture = result.culture;
+    piece.religion = result.religion;
+    piece.characterData = foundry.utils.deepClone(characterData);
+    piece.version = `Crown Overview Tools ${MODULE_VERSION}`;
+    piece.updatedAt = now;
+    piece.updatedBy = requester.name || requesterUserName || game.user.name;
+
+    await token.document.setFlag(FLAG_SCOPE, WORLD_CHARACTER_KEY, characterData);
+    await token.document.setFlag(FLAG_SCOPE, WORLD_PIECE_KEY, piece);
+
+    if (token.actor) {
+      await token.actor.setFlag(FLAG_SCOPE, WORLD_CHARACTER_KEY, foundry.utils.deepClone(characterData));
+      await token.actor.setFlag(FLAG_SCOPE, WORLD_PIECE_KEY, foundry.utils.deepClone(piece));
+    }
+
+    return characterData;
+  }
+
+  async function editPlayerCharacterDetails(token) {
+    if (!requireOverviewScene()) return;
+    if (!token || !isCharacterToken(token)) {
+      ui.notifications.warn("That token is not a Crown character.");
+      return;
+    }
+    if (!canEditCharacterDetails(token)) {
+      ui.notifications.warn("You can only edit details for characters assigned to you.");
+      return;
+    }
+
+    const existing = getCharacterDataFromToken(token) || {};
+    const result = await new Promise(resolve => {
+      new Dialog({
+        title: `Edit Character Details — ${existing.characterName || token.document.name}`,
+        content: buildPlayerCharacterDetailsForm(existing),
+        buttons: {
+          save: {
+            label: "Save Details",
+            callback: html => {
+              const form = html[0].querySelector("form");
+              const get = name => String(form?.[name]?.value ?? "").trim();
+              resolve(normalizePlayerEditableCharacterDetails({
+                culture: get("culture"),
+                religion: get("religion"),
+                age: get("age"),
+                heightWeight: get("heightWeight"),
+                preferredWeapons: get("preferredWeapons"),
+                marriage: get("marriage"),
+                issueChildren: get("issueChildren"),
+                publicNotes: get("publicNotes")
+              }));
+            }
+          },
+          cancel: { label: "Cancel", callback: () => resolve(null) }
+        },
+        close: () => resolve(null)
+      }, { width: 620, height: "auto", resizable: true }).render(true);
+    });
+    if (!result) return;
+
+    if (!canEditCharacterDetails(token)) {
+      ui.notifications.warn("Character assignment changed; details were not saved.");
+      return;
+    }
+
+    if (game.user.isGM) {
+      try {
+        const saved = await applyPlayerCharacterDetailsUpdate({
+          token,
+          requesterUserId: game.user.id,
+          requesterUserName: game.user.name,
+          details: result
+        });
+        ui.notifications.info(`${saved.characterName || token.document.name} details updated.`);
+      } catch (error) {
+        console.error("Crown Overview character detail save failed:", error);
+        ui.notifications.error(`Character details were not saved: ${error.message || error}`);
+      }
+      return;
+    }
+
+    const gm = findActiveGmForScene(canvas.scene?.id);
+    if (!gm) {
+      ui.notifications.warn("No active GM is online to save character details.");
+      return;
+    }
+
+    game.socket.emit(SOCKET_NAME, {
+      type: "characterDetailsUpdateRequest",
+      targetGmId: gm.id,
+      sceneId: canvas.scene?.id,
+      requesterUserId: game.user.id,
+      requesterUserName: game.user.name,
+      characterTokenId: token.document.id,
+      details: result
+    });
+    ui.notifications.info("Character detail update sent to the GM.");
   }
 
   async function saveCharacterFlags(token, details, entry, ownerUser = null) {
@@ -4135,14 +5952,6 @@ function removePanel() {
     return characterCsvValue(row, headers, ...names);
   }
 
-  function getUserByIdOrName(id, name) {
-    const userId = String(id || "").trim();
-    if (userId && game.users.get(userId)) return game.users.get(userId);
-    const userName = normalize(name || "");
-    if (!userName) return null;
-    return game.users.contents.find(user => normalize(user.name) === userName) || null;
-  }
-
   function inferOwnershipType(worldTile = {}, house = {}) {
     const explicit = String(house.ownershipType || worldTile.ownershipType || "").trim();
     if (explicit) return explicit;
@@ -4459,14 +6268,16 @@ function removePanel() {
     // collection directly. This prevents stale imported character-owner fields from
     // making the muster dialog see a different realm than the Holdings button.
     if (!game.user.isGM && canUserControlWorldPieceForUser(characterToken, piece, game.user)) {
-      return getHoldingsForUser(game.user).filter(entry => !isSeaByTile(entry.tile));
+      return getRealmLandEntriesForUser(game.user);
     }
 
     // GM / server-side processing uses the character's explicit assigned controller.
     const realmUser = controller.id ? game.users.get(String(controller.id)) : null;
     if (realmUser && !realmUser.isGM) {
-      const controlled = getHoldingsForUser(realmUser).filter(entry => !isSeaByTile(entry.tile));
-      if (controlled.length) return controlled;
+      // An assigned player realm is authoritative even when it currently owns zero
+      // provinces. Do not fall back to the character/local House name, because that
+      // would resurrect provinces that were deliberately made Neutral / Unaligned.
+      return getRealmLandEntriesForUser(realmUser);
     }
 
     // Political fallback: conquered/sworn provinces keep their original House, so
@@ -4477,7 +6288,9 @@ function removePanel() {
       const sworn = getWorldTileEntries().filter(entry => {
         if (isSeaByTile(entry.tile)) return false;
         const house = getHouseData(entry.drawing) || {};
-        return normalize(house.allegiance || entry.tile?.allegiance || "") === allegianceKey;
+        const state = getProvincePoliticalState(entry.tile || {}, house);
+        if (state.explicitlyNeutral) return false;
+        return state.allegianceKey === allegianceKey;
       });
       if (sworn.length) return sworn;
     }
@@ -4488,6 +6301,8 @@ function removePanel() {
     return getWorldTileEntries().filter(entry => {
       if (isSeaByTile(entry.tile)) return false;
       const house = getHouseData(entry.drawing) || {};
+      const state = getProvincePoliticalState(entry.tile || {}, house);
+      if (state.explicitlyNeutral || state.ownerId || state.ownerName || state.swornId || state.swornName || state.allegianceKey) return false;
       return normalize(house.house || entry.tile?.house || entry.tile?.owner || "") === houseKey;
     });
   }
@@ -4588,16 +6403,35 @@ function removePanel() {
   function getTrainingCapacityForEntries(entries = []) {
     const capacity = {};
     for (const troop of ARMY_TROOP_TYPES) capacity[troop.key] = troop.key === "Mob" ? Infinity : 0;
+
+    const addSupport = support => {
+      for (const troop of ARMY_TROOP_TYPES) {
+        if (troop.key === "Mob") continue;
+        capacity[troop.key] += Math.max(0, Number(support?.[troop.key] || 0));
+      }
+    };
+
     for (const entry of entries) {
       const house = getHouseData(entry.drawing) || {};
-      const built = getActiveBuiltBuildings(house);
-      for (const building of built) {
-        const meta = getBuildingMetaByName(building);
-        if (!meta || !["barracks", "archery", "stable"].includes(meta.line.key)) continue;
-        const support = meta.level.trainingCapacity || {};
-        for (const troop of ARMY_TROOP_TYPES) {
-          if (troop.key === "Mob") continue;
-          capacity[troop.key] += Math.max(0, Number(support[troop.key] || 0));
+      const state = getActiveBuildingLineState(house);
+
+      // v0.6.24 rule: ordinary building-line effects use only the highest completed
+      // active tier. Physical lower-tier pieces consume Development but do not stack
+      // their Barracks/Archery/Stable capacity with the upgraded tier.
+      for (const lineKey of ["barracks", "archery", "stable"]) {
+        const item = state.get(lineKey);
+        if (item?.level) addSupport(item.level.trainingCapacity || {});
+      }
+
+      // v1.0.3 exception restored in v1.0.13: the Foundry specialist bonuses are
+      // explicitly cumulative across its physical pieces. Resolve them by highest
+      // active tier so legacy saves containing only "Armorer" still receive all
+      // three physical-piece bonuses.
+      const foundry = state.get("foundry");
+      if (foundry?.level) {
+        const maxLevel = Math.max(0, Number(foundry.level.level || 0));
+        for (const level of foundry.line.levels || []) {
+          if (Number(level.level || 0) <= maxLevel) addSupport(level.trainingCapacityBonus || {});
         }
       }
     }
@@ -4847,7 +6681,7 @@ function removePanel() {
   }
 
   function getArmyTokens() {
-    return canvas.tokens.placeables.filter(token => normalize(getWorldPiece(token)?.pieceType) === "army");
+    return canvas.tokens.placeables.filter(token => normalize(getWorldPiece(token)?.pieceType || getWorldPiece(token)?.forceType) === "army");
   }
 
   function getArmyComposition(piece = {}) {
@@ -4959,12 +6793,73 @@ function removePanel() {
     });
   }
 
+  async function summonMilitary() {
+    if (!requireOverviewScene()) return;
+    const choice = await new Promise(resolve => {
+      new Dialog({
+        title: "Summon Military",
+        content: `<p>What kind of force do you want to muster?</p><p class="notes">Army uses land manpower and training capacity. Navy uses Port and ship capacity.</p>`,
+        buttons: {
+          army: { label: "Summon Army (Main Action)", callback: () => resolve("army") },
+          navy: { label: "Summon Navy", callback: () => resolve("navy") },
+          cancel: { label: "Cancel", callback: () => resolve("") }
+        },
+        default: "army",
+        close: () => resolve("")
+      }, { width: 480, height: "auto", resizable: true }).render(true);
+    });
+    if (choice === "army") return summonArmy();
+    if (choice === "navy") return summonNavy();
+  }
+
+  async function embarkDisembark() {
+    if (!requireOverviewScene()) return;
+    const choice = await new Promise(resolve => {
+      new Dialog({
+        title: "Embark / Disembark",
+        content: `<p>Choose the transport action you want to perform.</p>`,
+        buttons: {
+          embark: { label: "Embark Army", callback: () => resolve("embark") },
+          disembark: { label: "Disembark Army", callback: () => resolve("disembark") },
+          cancel: { label: "Cancel", callback: () => resolve("") }
+        },
+        default: "embark",
+        close: () => resolve("")
+      }, { width: 480, height: "auto", resizable: true }).render(true);
+    });
+    if (choice === "embark") return embarkArmy();
+    if (choice === "disembark") return disembarkArmy();
+  }
+
   function getFleetTokens() {
-    return canvas.tokens.placeables.filter(token => normalize(getWorldPiece(token)?.pieceType) === "fleet");
+    return canvas.tokens.placeables.filter(token => ["fleet", "navy"].includes(normalize(getWorldPiece(token)?.pieceType || getWorldPiece(token)?.forceType)));
   }
 
   function getMilitaryForceTokens() {
-    return canvas.tokens.placeables.filter(token => ["army", "fleet"].includes(normalize(getWorldPiece(token)?.pieceType)));
+    return canvas.tokens.placeables.filter(token => ["army", "fleet", "navy"].includes(normalize(getWorldPiece(token)?.pieceType || getWorldPiece(token)?.forceType)));
+  }
+
+  function getMilitaryForceTokensForUpkeep() {
+    const byId = new Map();
+    for (const token of canvas.tokens?.placeables || []) {
+      const id = String(token.document?.id || "");
+      if (id) byId.set(id, token);
+    }
+
+    // Round Advance can create a freshly mustered TokenDocument and reach upkeep
+    // before Foundry has finished constructing its canvas placeable. Include those
+    // scene documents through a tiny token-like wrapper so the new army cannot skip
+    // its first upkeep merely because rendering is one tick behind the world data.
+    for (const doc of canvas.scene?.tokens?.contents || []) {
+      const id = String(doc?.id || "");
+      if (!id || byId.has(id)) continue;
+      byId.set(id, { document: doc, actor: doc.actor || null, isOwner: doc.isOwner === true });
+    }
+
+    return [...byId.values()].filter(token => {
+      const piece = getWorldPiece(token) || {};
+      return ["army", "fleet", "navy"].includes(normalize(piece.pieceType || piece.forceType));
+    });
   }
 
   function getNavyComposition(piece = {}) {
@@ -5064,6 +6959,16 @@ function removePanel() {
     character.pendingArmyMuster = muster;
     piece.pendingArmyMuster = muster;
     if (muster?.status === "pending") {
+      const roundKey = getCurrentActionRoundKey();
+      const reason = "Summoned an army this turn.";
+      piece.mainActionRoundKey = roundKey;
+      piece.mainActionReason = reason;
+      piece.lastCharacterActionRoundKey = roundKey;
+      piece.lastCharacterActionReason = reason;
+      character.mainActionRoundKey = roundKey;
+      character.mainActionReason = reason;
+      character.lastCharacterActionRoundKey = roundKey;
+      character.lastCharacterActionReason = reason;
       piece.movementUsed = Math.max(Number(piece.movementUsed || 0), Number(piece.movementMax || 0));
       piece.movementLockedRoundKey = getCurrentActionRoundKey();
       piece.movementLockedReason = "Summoned an army this turn.";
@@ -5073,6 +6978,64 @@ function removePanel() {
     await characterToken.document.setFlag(FLAG_SCOPE, WORLD_CHARACTER_KEY, character);
     if (characterToken.actor) await characterToken.actor.setFlag(FLAG_SCOPE, WORLD_CHARACTER_KEY, foundry.utils.deepClone(character));
     await saveWorldPiece(characterToken, piece);
+  }
+
+  function isArmyMusterMovementLock(piece = {}) {
+    return normalize(piece.movementLockedReason || "") === normalize("Summoned an army this turn.");
+  }
+
+  async function repairStaleArmyMusterLocks147({ silent = true } = {}) {
+    if (!game.user?.isGM) return { repaired: 0, names: [] };
+    let repaired = 0;
+    const names = [];
+
+    for (const token of getCharacterTokens()) {
+      const character = foundry.utils.deepClone(getCharacterDataFromToken(token) || {});
+      const piece = foundry.utils.deepClone(getWorldPiece(token) || {});
+      if (!isArmyMusterMovementLock(piece)) continue;
+
+      const muster = character.pendingArmyMuster || piece.pendingArmyMuster || null;
+      const hasPending = muster?.status === "pending";
+      const hasActiveArmy = Boolean(character.characterId && getExistingArmyForCharacter(character.characterId));
+      const explicitlyCancelled = muster?.status === "cancelled";
+      const missingMusterRecord = !muster;
+
+      // A live pending muster legitimately grounds the commander. A spawned army
+      // may also reflect a real action taken this round. We only repair the
+      // unambiguous orphan cases: no muster record at all, or a cancelled muster,
+      // with no active linked army.
+      if (hasPending || hasActiveArmy || (!explicitlyCancelled && !missingMusterRecord)) continue;
+
+      const restoredMovement = Math.min(Math.max(0, Number(piece.movementUsed || 0)), Math.max(0, Number(muster?.movementUsedBeforeMuster ?? 0)));
+      const tokenUpdate = {
+        [`flags.${FLAG_SCOPE}.${WORLD_PIECE_KEY}.-=movementLockedRoundKey`]: null,
+        [`flags.${FLAG_SCOPE}.${WORLD_PIECE_KEY}.-=movementLockedReason`]: null,
+        [`flags.${FLAG_SCOPE}.${WORLD_PIECE_KEY}.-=movementLockedAt`]: null,
+        [`flags.${FLAG_SCOPE}.${WORLD_PIECE_KEY}.-=movementLockedBy`]: null,
+        [`flags.${FLAG_SCOPE}.${WORLD_PIECE_KEY}.movementUsed`]: restoredMovement,
+        [`flags.${FLAG_SCOPE}.${WORLD_PIECE_KEY}.updatedAt`]: new Date().toISOString(),
+        [`flags.${FLAG_SCOPE}.${WORLD_PIECE_KEY}.updatedBy`]: game.user.name,
+        [`flags.${FLAG_SCOPE}.${WORLD_PIECE_KEY}.updatedSource`]: `Crown Overview Tools ${MODULE_VERSION} - Stale Muster Lock Repair`,
+        [`flags.${FLAG_SCOPE}.${WORLD_PIECE_KEY}.characterData.-=movementLockedRoundKey`]: null,
+        [`flags.${FLAG_SCOPE}.${WORLD_PIECE_KEY}.characterData.-=movementLockedReason`]: null,
+        [`flags.${FLAG_SCOPE}.${WORLD_PIECE_KEY}.characterData.-=movementLockedAt`]: null,
+        [`flags.${FLAG_SCOPE}.${WORLD_PIECE_KEY}.characterData.-=movementLockedBy`]: null,
+        [`flags.${FLAG_SCOPE}.${WORLD_CHARACTER_KEY}.-=movementLockedRoundKey`]: null,
+        [`flags.${FLAG_SCOPE}.${WORLD_CHARACTER_KEY}.-=movementLockedReason`]: null,
+        [`flags.${FLAG_SCOPE}.${WORLD_CHARACTER_KEY}.-=movementLockedAt`]: null,
+        [`flags.${FLAG_SCOPE}.${WORLD_CHARACTER_KEY}.-=movementLockedBy`]: null
+      };
+      await token.document.update(tokenUpdate);
+      if (token.actor) await token.actor.update(foundry.utils.deepClone(tokenUpdate));
+      repaired += 1;
+      names.push(character.characterName || piece.name || token.document.name);
+    }
+
+    if (repaired) {
+      console.info(`Crown Overview Tools ${MODULE_VERSION}: repaired ${repaired} stale army-muster movement lock(s).`, names);
+      if (!silent) ui.notifications.info(`Repaired ${repaired} stale army-muster lock(s): ${names.join(", ")}.`);
+    }
+    return { repaired, names };
   }
 
   async function savePendingNavyMuster(characterToken, muster) {
@@ -5144,7 +7107,7 @@ function removePanel() {
             <strong>House Siege Capacity:</strong> ${escapeHtml(siege.available.toLocaleString())} available / ${escapeHtml(siege.total.toLocaleString())} total (${escapeHtml(siege.used.toLocaleString())} committed)<br>
             <strong>Siege Infrastructure:</strong> Level ${escapeHtml(siege.tier)} — ${escapeHtml(getSiegeInfrastructureSummary(siege.tier))}<br>
             <strong>Location:</strong> ${escapeHtml(getTileName(entry))}<br>
-            <span class="notes">Raising this army takes 1 round. Manpower, training capacity, and siege capacity are reserved when the muster begins. The army will automatically appear when the Round Clock reaches its Ready date.</span>
+            <span class="notes">Raising this army takes 1 round. <strong>This will take your Main Action.</strong> Manpower, training capacity, and siege capacity are reserved when the muster begins. The army will automatically appear when the Round Clock reaches its Ready date.</span>
           </div>
           <div class="form-group"><label>Army Name</label><input type="text" name="armyName" value="${escapeHtml(character.characterName || piece.name)}'s Host" style="width:100%;" /></div>
           <div style="display:grid;grid-template-columns:repeat(2, 1fr);gap:8px;">${buildArmyCompositionInputs(maxMen, training.available)}</div>
@@ -5211,6 +7174,11 @@ function removePanel() {
       currentRegion: entry.tile?.region || "",
       requestedRoundKey: getRoundKey(getClock()),
       requestedRoundSort: roundSortValue(getClock()),
+      movementUsedBeforeMuster: Math.max(0, Number(piece.movementUsed || 0)),
+      movementLockedRoundKeyBeforeMuster: String(piece.movementLockedRoundKey || ""),
+      movementLockedReasonBeforeMuster: String(piece.movementLockedReason || ""),
+      movementLockedAtBeforeMuster: String(piece.movementLockedAt || ""),
+      movementLockedByBeforeMuster: String(piece.movementLockedBy || ""),
       requestedDateLabel: getDateLabel(getClock()),
       readyRoundKey: getRoundKey(getNextClockData(getClock())),
       readyRoundSort: roundSortValue(getNextClockData(getClock())),
@@ -5244,6 +7212,9 @@ function removePanel() {
     const token = selected[0];
     const piece = getWorldPiece(token);
     if (!canUserControlWorldPiece(token, piece)) { ui.notifications.warn("You can only summon armies from characters you control."); return; }
+    const musterCharacter = getCharacterDataFromToken(token) || {};
+    const musterActionLock = characterMainActionReason(piece, musterCharacter);
+    if (musterActionLock) { ui.notifications.warn(musterActionLock); return; }
     const muster = await createArmyMusterRequestForCharacter(token);
     if (!muster) return;
     if (!game.user.isGM) {
@@ -5817,9 +7788,12 @@ function removePanel() {
         }
       }
       const navyMuster = getPendingNavyMuster(characterToken);
-      if (!onlyReady && navyMuster && navyMuster.status === "pending") {
-        if (getExistingNavyForCharacter(navyMuster.linkedCharacterId || character.characterId)) skipped++;
-        else {
+      if (navyMuster && navyMuster.status === "pending") {
+        if (onlyReady && !isArmyMusterReady(navyMuster, clock)) {
+          waiting++;
+        } else if (getExistingNavyForCharacter(navyMuster.linkedCharacterId || character.characterId)) {
+          skipped++;
+        } else {
           try {
             const spawned = await spawnNavyTokenFromMuster(characterToken, navyMuster);
             const done = { ...navyMuster, status: "spawned", spawnedAt: new Date().toISOString(), spawnedBy: game.user.name, navyTokenId: spawned.tokenDocument?.id || "" };
@@ -6698,10 +8672,140 @@ function removePanel() {
     const token = canvas.tokens.placeables.find(token => token.document.id === message.tokenId);
     if (!token) { ui.notifications.warn(`Dismiss request failed: ${message.tokenName || message.tokenId} not found.`); return; }
     const piece = getWorldPiece(token) || {};
-    const ownerId = String(piece.ownerUserId || piece.playerOwnerUserId || "");
+    const controller = getMilitaryForceController(token, piece);
+    const ownerId = String(controller?.id || piece.ownerUserId || piece.playerOwnerUserId || "").trim();
     if (ownerId && String(ownerId) !== String(message.requesterUserId || "")) { ui.notifications.warn(`${message.requesterUserName || "Player"} cannot dismiss ${piece.name || token.document.name}; they do not own it.`); return; }
     await dismissForceToken(token, piece);
     await ChatMessage.create({ speaker: ChatMessage.getSpeaker({ alias: "Crown Forces" }), content: `<h2>Force Dismissed</h2><p><strong>Player:</strong> ${escapeHtml(message.requesterUserName || "Unknown")}</p><p><strong>Force:</strong> ${escapeHtml(piece.name || token.document.name)}</p>` });
+  }
+
+  async function cancelPendingArmyMuster() {
+    if (!requireOverviewScene()) return;
+    if (!game.user.isGM) {
+      ui.notifications.warn("Only a GM can cancel a pending army muster.");
+      return;
+    }
+
+    const pending = getCharacterTokens()
+      .map(token => ({ token, character: getCharacterDataFromToken(token) || {}, muster: getPendingArmyMuster(token) }))
+      .filter(row => row.muster?.status === "pending");
+
+    if (!pending.length) {
+      ui.notifications.info("There are no pending army musters to cancel.");
+      return;
+    }
+
+    const options = pending.map((row, index) => {
+      const commander = row.muster.linkedCharacterName || row.character.characterName || row.token.document.name || "Unknown Commander";
+      const army = row.muster.armyName || `${commander}'s Host`;
+      const strength = Math.max(0, Number(row.muster.totalStrength || row.muster.manpowerReserved || 0));
+      const ready = row.muster.readyDateLabel || "next round";
+      const owner = row.muster.ownerUserName || row.muster.requesterUserName || "Unknown Player";
+      return `<option value="${index}">${escapeHtml(army)} — ${escapeHtml(commander)} — ${escapeHtml(owner)} — ${escapeHtml(strength.toLocaleString())} men — ready ${escapeHtml(ready)}</option>`;
+    }).join("");
+
+    const selectedIndex = await new Promise(resolve => {
+      new Dialog({
+        title: "Cancel Pending Army Muster",
+        content: `
+          <form>
+            <div class="form-group">
+              <label>Pending Muster</label>
+              <select name="pendingMuster" style="width:100%;">${options}</select>
+            </div>
+            <p class="notes">Cancelling returns reserved manpower, releases training/siege capacity, and restores the commander's action/movement state from immediately before the muster was called.</p>
+          </form>`,
+        buttons: {
+          cancelMuster: {
+            label: "Cancel Muster",
+            callback: html => resolve(Number(html[0].querySelector('[name="pendingMuster"]')?.value ?? -1))
+          },
+          close: { label: "Close", callback: () => resolve(-1) }
+        },
+        default: "close",
+        close: () => resolve(-1)
+      }, { width: 720, height: "auto", resizable: true }).render(true);
+    });
+
+    if (!Number.isInteger(selectedIndex) || selectedIndex < 0 || selectedIndex >= pending.length) return;
+    const row = pending[selectedIndex];
+    const commander = row.muster.linkedCharacterName || row.character.characterName || row.token.document.name || "Unknown Commander";
+    const army = row.muster.armyName || `${commander}'s Host`;
+    const reserved = Math.max(0, Math.floor(Number(row.muster.manpowerReserved ?? row.muster.totalStrength ?? 0)));
+
+    const confirmed = await Dialog.confirm({
+      title: "Cancel Army Muster?",
+      content: `<p>Cancel <strong>${escapeHtml(army)}</strong> under ${escapeHtml(commander)}?</p><p><strong>${escapeHtml(reserved.toLocaleString())}</strong> reserved manpower will be returned to the realm.</p><p class="notes">Training and siege capacity reservations are released. The commander's action/movement is restored to its pre-muster state.</p>`,
+      yes: () => true,
+      no: () => false,
+      defaultYes: false
+    });
+    if (!confirmed) return;
+
+    let returned = 0;
+    if (reserved > 0) returned = await changeHouseManpower(row.token, reserved);
+
+    const cancelled = {
+      ...row.muster,
+      status: "cancelled",
+      cancelledAt: new Date().toISOString(),
+      cancelledBy: game.user.name,
+      manpowerReturned: returned
+    };
+    await savePendingArmyMuster(row.token, cancelled);
+
+    // Restore the commander's exact action/movement state from immediately before
+    // the muster was called. Older pending musters did not store a snapshot, so if
+    // their only lock is the muster lock we safely restore them to fully available.
+    const restoredPiece = foundry.utils.deepClone(getWorldPiece(row.token) || {});
+    const musterLock = normalize(restoredPiece.movementLockedReason || "") === normalize("Summoned an army this turn.");
+    const sameRound = !row.muster.requestedRoundKey || !restoredPiece.movementLockedRoundKey || String(restoredPiece.movementLockedRoundKey) === String(row.muster.requestedRoundKey);
+    if (musterLock && sameRound) {
+      restoredPiece.movementUsed = Math.max(0, Number(row.muster.movementUsedBeforeMuster ?? 0));
+      const priorRound = String(row.muster.movementLockedRoundKeyBeforeMuster || "");
+      const priorReason = String(row.muster.movementLockedReasonBeforeMuster || "");
+      const priorAt = String(row.muster.movementLockedAtBeforeMuster || "");
+      const priorBy = String(row.muster.movementLockedByBeforeMuster || "");
+      if (priorRound) restoredPiece.movementLockedRoundKey = priorRound; else delete restoredPiece.movementLockedRoundKey;
+      if (priorReason) restoredPiece.movementLockedReason = priorReason; else delete restoredPiece.movementLockedReason;
+      if (priorAt) restoredPiece.movementLockedAt = priorAt; else delete restoredPiece.movementLockedAt;
+      if (priorBy) restoredPiece.movementLockedBy = priorBy; else delete restoredPiece.movementLockedBy;
+      restoredPiece.updatedAt = new Date().toISOString();
+      restoredPiece.updatedBy = game.user.name;
+      await saveWorldPiece(row.token, restoredPiece);
+
+      const restoredCharacter = foundry.utils.deepClone(getCharacterDataFromToken(row.token) || {});
+      if (normalize(restoredCharacter.movementLockedReason || "") === normalize("Summoned an army this turn.")) {
+        delete restoredCharacter.movementLockedRoundKey;
+        delete restoredCharacter.movementLockedReason;
+        delete restoredCharacter.movementLockedAt;
+        delete restoredCharacter.movementLockedBy;
+        await row.token.document.setFlag(FLAG_SCOPE, WORLD_CHARACTER_KEY, restoredCharacter);
+        if (row.token.actor) await row.token.actor.setFlag(FLAG_SCOPE, WORLD_CHARACTER_KEY, foundry.utils.deepClone(restoredCharacter));
+      }
+    }
+
+    const ownerUser = getUserByIdOrName(row.muster.ownerUserId || row.muster.requesterUserId, row.muster.ownerUserName || row.muster.requesterUserName);
+    if (ownerUser && game.socket) {
+      game.socket.emit(SOCKET_NAME, {
+        type: "playerNotification",
+        targetUserId: ownerUser.id,
+        level: "info",
+        message: `${army} muster was cancelled by the GM. ${returned.toLocaleString()} manpower returned.`
+      });
+    }
+
+    await ChatMessage.create({
+      speaker: ChatMessage.getSpeaker({ alias: "Crown Musters" }),
+      whisper: getPrivateActionRecipients(ownerUser?.id || row.muster.ownerUserId || row.muster.requesterUserId),
+      content: `<h2>Army Muster Cancelled</h2><p><strong>Commander:</strong> ${escapeHtml(commander)}</p><p><strong>Army:</strong> ${escapeHtml(army)}</p><p><strong>Manpower returned:</strong> ${escapeHtml(returned.toLocaleString())}${returned !== reserved ? ` of ${escapeHtml(reserved.toLocaleString())} reserved` : ""}</p><p>The commander's action/movement has been restored to its pre-muster state.</p>`
+    });
+
+    if (returned !== reserved) {
+      ui.notifications.warn(`Cancelled ${army}, but only ${returned.toLocaleString()} of ${reserved.toLocaleString()} reserved manpower could be returned because the realm is at its current manpower cap.`);
+    } else {
+      ui.notifications.info(`Cancelled ${army}. Returned ${returned.toLocaleString()} manpower.`);
+    }
   }
 
   async function dismissSelectedArmy() {
@@ -6786,14 +8890,19 @@ function removePanel() {
     return Math.min(20, Math.floor(Math.max(0, Number(strength || 0)) / 500));
   }
 
-  function getDefendingArmiesOnTile(entry, attackingOwnerId) {
+  function getDefendingArmiesOnTile(entry, attackingOwnerId, attackerHouseKey = "") {
     const tileId = String(getTileId(entry) || "");
     return getArmyTokens().filter(token => {
       const army = getWorldPiece(token) || {};
       const sameTile = String(army.currentTileId || "") === tileId || getCurrentTileEntryForToken(token, army)?.tile?.id === tileId;
       if (!sameTile) return false;
-      const ownerId = String(army.ownerUserId || army.playerOwnerUserId || "");
-      return ownerId && String(ownerId) !== String(attackingOwnerId || "");
+      const controller = getMilitaryForceController(token, army);
+      const ownerId = String(controller?.id || army.ownerUserId || army.playerOwnerUserId || "").trim();
+      if (ownerId && attackingOwnerId) return ownerId !== String(attackingOwnerId);
+      const armyHouse = normalize(army.allegiance || army.house || army.faction || "");
+      if (attackerHouseKey && armyHouse) return armyHouse !== normalize(attackerHouseKey);
+      // Unknown ownership should never make a physically present army disappear from siege defense.
+      return true;
     });
   }
 
@@ -6805,7 +8914,8 @@ function removePanel() {
       if (token.document.id === attackerPiece.tokenId || army.id === attackerPiece.id) return false;
       const sameTile = String(army.currentTileId || "") === tileId || getCurrentTileEntryForToken(token, army)?.tile?.id === tileId;
       if (!sameTile) return false;
-      const ownerId = String(army.ownerUserId || army.playerOwnerUserId || "");
+      const controller = getMilitaryForceController(token, army);
+      const ownerId = String(controller?.id || army.ownerUserId || army.playerOwnerUserId || "").trim();
       if (ownerId && String(ownerId) === String(attackingOwnerId || "")) return false;
       const armyHouse = normalize(army.allegiance || army.house || army.faction || "");
       if (attackerHouse && armyHouse && attackerHouse === armyHouse) return false;
@@ -6866,6 +8976,37 @@ function removePanel() {
     const genericLocalHouse = isGenericNeutralLocalHouse(currentLocalHouse) || !currentLocalHouse;
     const now = new Date().toISOString();
 
+    // v1.1.63: NPC/neutral cash does not become player treasury merely because
+    // political control changes. Preserve the old local balance for audit/lore,
+    // then start the newly controlled province's spendable stockpile at zero.
+    // Existing player-to-player transfers keep their spendable balance because
+    // it was already realm money rather than NPC bookkeeping.
+    const previousController = resolveCurrentPlayerFromCandidates(getProvinceControllerCandidates(nextWorld, nextHouse));
+    const previousPoliticalState = getProvincePoliticalState(nextWorld, nextHouse);
+    const incomingControllerId = String(actingUserId || "").trim();
+    const changingFromNonPlayer = !previousController || previousPoliticalState.explicitlyNeutral;
+    const changingPlayers = Boolean(previousController && incomingControllerId && String(previousController.id) !== incomingControllerId);
+    if (changingFromNonPlayer && !changingPlayers) {
+      const oldStockpile = getHouseResourceStockpile(nextHouse);
+      if (hasAnyResources(oldStockpile)) {
+        nextHouse.preTransferNpcStockpile = normalizeResourceMap(oldStockpile);
+        nextHouse.preTransferNpcStockpileQuarantinedAt = now;
+        nextHouse.preTransferNpcStockpileQuarantinedBy = game.user?.name || "GM";
+        nextHouse.preTransferNpcStockpileReason = `${source}: local NPC/neutral reserves do not transfer into player realm treasury`;
+      }
+      nextHouse.resourceStockpile = {};
+      nextHouse.resources = {};
+      nextHouse.stockpile = {};
+      delete nextHouse.treasury;
+    }
+
+    // v0.5.11 safeguard: on the first political transfer, remember a meaningful
+    // historical/local House name even though political allegiance/controller changes.
+    if (!genericLocalHouse && currentLocalHouse) {
+      if (!String(nextWorld.originalHouseName || "").trim()) nextWorld.originalHouseName = currentLocalHouse;
+      if (!String(nextHouse.originalHouseName || "").trim()) nextHouse.originalHouseName = currentLocalHouse;
+    }
+
     nextWorld.ownerUserId = actingUserId || "";
     nextWorld.ownerUserName = actingUserName || "";
     nextWorld.playerOwnerUserId = actingUserId || "";
@@ -6890,7 +9031,7 @@ function removePanel() {
     nextHouse.publicOwnerLabel = allegiance;
     if (genericLocalHouse) nextHouse.house = allegiance;
 
-    const audit = { at: now, by: game.user.name, source, actorName, actingUserId, actingUserName, allegiance, ...metadata };
+    const audit = { at: now, by: game.user.name, source, actorName, actingUserId, actingUserName, allegiance, roundKey: getCurrentActionRoundKey(), dateLabel: getClock() ? getDateLabel(getClock()) : "", ...metadata };
     nextWorld.lastOwnershipChange = audit;
     nextWorld.updatedAt = now;
     nextWorld.updatedBy = game.user.name;
@@ -6982,18 +9123,20 @@ function removePanel() {
     const house = getHouseData(entry.drawing) || {};
     const ownerId = getTileOwnerUserId(entry.tile, house);
     const ownerName = getTileOwnerUserName(entry.tile, house);
-    const attackerOwnerId = piece.ownerUserId || piece.playerOwnerUserId || actingUserId || game.user.id;
-    const attackerHouseKey = normalize(getConqueringHouseName(piece, actingUserId, actingUserName));
-    const defenderHouseKey = normalize(house.house || entry.tile?.house || entry.tile?.owner || "");
+    const attackerController = getMilitaryForceController(token, piece) || getUserByIdOrName(actingUserId, actingUserName);
+    const attackerOwnerId = attackerController?.id || piece.ownerUserId || piece.playerOwnerUserId || actingUserId || game.user.id;
+    const attackerOwnerName = attackerController?.name || actingUserName || piece.ownerUserName || piece.playerOwnerUserName || "";
+    const attackerHouseKey = normalize(getConqueringHouseName(piece, attackerOwnerId, attackerOwnerName));
+    const defenderHouseKey = normalize(house.allegiance || entry.tile?.allegiance || house.house || entry.tile?.house || entry.tile?.owner || "");
     const siegeRoundKey = getCurrentActionRoundKey();
     if (piece.lastSiegeRoundKey && String(piece.lastSiegeRoundKey) === String(siegeRoundKey)) throw new Error("This army has already attempted a siege this turn.");
     if (attackerHouseKey && defenderHouseKey && attackerHouseKey === defenderHouseKey) throw new Error(`${getTileName(entry)} already belongs to this army's House.`);
     if (ownerId && String(ownerId) === String(attackerOwnerId)) throw new Error(`${getTileName(entry)} is already controlled by this army's owner.`);
 
-    const defendingArmies = getDefendingArmiesOnTile(entry, attackerOwnerId);
-    if (ownerId && defendingArmies.length) {
+    const defendingArmies = getDefendingArmiesOnTile(entry, attackerOwnerId, attackerHouseKey);
+    if (defendingArmies.length) {
       const gmUsers = game.users.contents.filter(user => user.isGM).map(user => user.id);
-      const content = `<h2>Pitched Battle Declared</h2><p><strong>Location:</strong> ${escapeHtml(getTileName(entry))}</p><p><strong>Attacker:</strong> ${escapeHtml(piece.name || token.document.name)} — ${escapeHtml(Number(piece.strengthCurrent || piece.totalStrength || 0).toLocaleString())} men</p><p><strong>Defender:</strong> ${defendingArmies.map(t => `${escapeHtml(t.document.name)} — ${escapeHtml(Number(getWorldPiece(t)?.strengthCurrent || getWorldPiece(t)?.totalStrength || 0).toLocaleString())} men`).join("<br>")}</p><p>Resolve manually, simulate, or move to the battle minigame. Quick Siege is not rolled while a defending player army is present.</p>`;
+      const content = `<h2>Pitched Battle Declared</h2><p><strong>Location:</strong> ${escapeHtml(getTileName(entry))}</p><p><strong>Attacker:</strong> ${escapeHtml(piece.name || token.document.name)} — ${escapeHtml(Number(piece.strengthCurrent || piece.totalStrength || 0).toLocaleString())} men</p><p><strong>Defender:</strong> ${defendingArmies.map(t => `${escapeHtml(t.document.name)} — ${escapeHtml(Number(getWorldPiece(t)?.strengthCurrent || getWorldPiece(t)?.totalStrength || 0).toLocaleString())} men`).join("<br>")}</p><p>Resolve manually, simulate, or move to the battle minigame. Quick Siege is not rolled while a defending army is present.</p>`;
       await ChatMessage.create({ speaker: ChatMessage.getSpeaker({ alias: "Crown Siege" }), whisper: gmUsers.length ? gmUsers : undefined, content });
       ui.notifications.info("Defending army present: pitched battle card sent to GM.");
       return null;
@@ -7001,6 +9144,12 @@ function removePanel() {
 
     const result = options || { siegeTurns: Math.max(1, Number(piece.siegeTurns || 1)) };
     const linkedCommander = getCharacterTokenById(piece.linkedCharacterId || piece.commanderCharacterId);
+    if (linkedCommander) {
+      const commanderPiece = getWorldPiece(linkedCommander) || {};
+      const commanderCharacter = getCharacterDataFromToken(linkedCommander) || {};
+      const commanderActionLock = characterMainActionReason(commanderPiece, commanderCharacter);
+      if (commanderActionLock) throw new Error(commanderActionLock);
+    }
     const martial = Number(piece.commanderMartial || (linkedCommander ? getCharacterMartialValue(linkedCommander) : 0) || 0);
     const strength = Number(piece.strengthCurrent || piece.totalStrength || 0);
     const dc = getSiegeDcDetails(house);
@@ -7036,6 +9185,7 @@ function removePanel() {
     updatedPiece.movementLockedRoundKey = siegeRoundKey;
     updatedPiece.movementLockedReason = "This army committed a siege this turn.";
     await saveWorldPiece(token, updatedPiece);
+    if (linkedCommander) await markCharacterMainActionForRound(linkedCommander, `Siege of ${getTileName(entry)} this round.`);
 
     let siegeTransfer = null;
     if (outcome.success) siegeTransfer = await transferProvinceToHouse(
@@ -7060,7 +9210,7 @@ function removePanel() {
         <p><strong>Siege Equipment:</strong> ${escapeHtml(siegeEquipmentText(equipment))}<br><span style="opacity:0.8;">${escapeHtml(engineDetailText)}${engineEffects.rawBonus > engineEffects.bonus ? `; capped at +${MAX_SIEGE_ENGINE_BONUS}%` : ""}</span></p>
         <p>${escapeHtml(outcome.text)}</p>
         <p><strong>Attacker Casualties:</strong> ${escapeHtml(casualties.percent)}%${casualties.reduction ? ` (${escapeHtml(casualties.basePercent)}% base, -${escapeHtml(casualties.reduction)}% from Ballistae)` : ""} — ${escapeHtml(casualties.lost.toLocaleString())} lost. <strong>Strength Remaining:</strong> ${escapeHtml(casualties.after.toLocaleString())} / ${escapeHtml(Number(updatedPiece.strengthMax || updatedPiece.totalStrength || casualties.before).toLocaleString())}</p>
-        <p><strong>Movement:</strong> Siege committed; this army cannot move again until movement resets.</p>
+        <p><strong>Main Action:</strong> This will take the commander's Main Action.</p><p><strong>Movement:</strong> Siege committed; this army cannot move again until movement resets.</p>
         ${outcome.success ? `<p><strong>Control:</strong> ${escapeHtml(getTileName(entry))} now changes allegiance to ${escapeHtml(siegeTransfer?.houseName || actingUserName || updatedPiece.ownerUserName || updatedPiece.playerOwnerUserName || game.user.name)}. The local ruler is not automatically replaced.</p>` : `<p><strong>Next Attempt:</strong> Siege turns will count as ${escapeHtml(updatedPiece.siegeTurns)}.${outcome.foothold ? " Foothold +10% has been stored." : ""}</p>`}`
     });
     revealForCurrentPlayerPieces();
@@ -7110,8 +9260,10 @@ function removePanel() {
     if (piece.lastRaidRoundKey && String(piece.lastRaidRoundKey) === String(roundKey)) throw new Error("This army has already raided this turn.");
     const house = foundry.utils.deepClone(getHouseData(entry.drawing) || {});
     if (String(house.lastRaidedRoundKey || "") === String(roundKey)) throw new Error(`${getTileName(entry)} has already been raided this round.`);
-    const attackerOwnerId = piece.ownerUserId || piece.playerOwnerUserId || actingUserId;
-    const attackerHouseKey = normalize(getConqueringHouseName(piece, actingUserId, actingUserName));
+    const attackerController = getMilitaryForceController(token, piece) || getUserByIdOrName(actingUserId, actingUserName);
+    const attackerOwnerId = attackerController?.id || piece.ownerUserId || piece.playerOwnerUserId || actingUserId;
+    const attackerOwnerName = attackerController?.name || actingUserName || piece.ownerUserName || piece.playerOwnerUserName || "";
+    const attackerHouseKey = normalize(getConqueringHouseName(piece, attackerOwnerId, attackerOwnerName));
     const defenderHouseKey = normalize(house.allegiance || entry.tile?.allegiance || house.house || entry.tile?.house || entry.tile?.owner || "");
     if (attackerHouseKey && defenderHouseKey && attackerHouseKey === defenderHouseKey) throw new Error(`${getTileName(entry)} belongs to this army's realm and cannot be raided.`);
     const ownerId = getTileOwnerUserId(entry.tile, house);
@@ -7156,7 +9308,7 @@ function removePanel() {
     if (defendersAtCommit.length) throw new Error(`Raid aborted: an opposing army is now present in ${getTileName(entry)}.`);
 
     const receiverUser = game.users.get(String(attackerOwnerId || ""));
-    const receiverEntries = linkedCommander ? getManpowerEntriesForCharacter(linkedCommander) : (receiverUser ? getHoldingsForUser(receiverUser).filter(e => !isSeaByTile(e.tile)) : []);
+    const receiverEntries = linkedCommander ? getManpowerEntriesForCharacter(linkedCommander) : (receiverUser ? getRealmLandEntriesForUser(receiverUser) : []);
     if (hasAnyResources(loot) && !receiverEntries.length) throw new Error("Raid succeeded, but no controlled realm holdings were found to receive the loot; no resources were changed.");
 
     const updatedHouse = foundry.utils.deepClone(getHouseData(entry.drawing) || {});
@@ -7186,6 +9338,7 @@ function removePanel() {
     updatedPiece.movementLockedRoundKey = roundKey;
     updatedPiece.movementLockedReason = "This army committed a raid this turn.";
     await saveWorldPiece(token, updatedPiece);
+    if (linkedCommander) await markCharacterMainActionForRound(linkedCommander, `Raid of ${getTileName(entry)} this round.`);
 
     const resultLabel = percent <= 0 ? "Raid Failed" : roll === 100 ? "Perfect Raid" : `${Math.round(percent * 100)}% Raid Success`;
     await ChatMessage.create({ speaker: ChatMessage.getSpeaker({ alias: "Crown Raid" }), content: `<h2>${escapeHtml(resultLabel)}</h2><p><strong>Army:</strong> ${escapeHtml(updatedPiece.name || token.document.name)} (${escapeHtml(strength.toLocaleString())} troops)</p><p><strong>Target:</strong> ${escapeHtml(getTileName(entry))}</p><p><strong>Roll:</strong> ${escapeHtml(roll)} + Martial ${escapeHtml(martial)} = ${escapeHtml(adjusted)} vs Raid Defense ${escapeHtml(defense.total)}</p><p><strong>Defense:</strong> 50 base + ${escapeHtml(defense.fortBonus)} fortifications + ${escapeHtml(defense.barracksBonus)} barracks</p><p><strong>Target Income:</strong> ${escapeHtml(resourceMapToText({ Gold: income.Gold || 0, Food: income.Food || 0 }))}</p><p><strong>Carry Capacity:</strong> ${escapeHtml(resourceMapToText(capacity))}</p><p><strong>Stolen:</strong> ${escapeHtml(resourceMapToText(loot, "Nothing"))}</p><p>${percent > 0 ? `${escapeHtml(getTileName(entry))} is marked <strong>RAIDED</strong> for ${escapeHtml(roundKey)} and cannot be raided again this round.` : `The raid failed, so ${escapeHtml(getTileName(entry))} is not marked raided.`} The army's movement/action is spent.</p>` });
@@ -7213,13 +9366,14 @@ function removePanel() {
     if (Math.max(0, Number(piece.strengthCurrent || piece.totalStrength || 0)) < 500) { ui.notifications.warn("A raid requires at least 500 troops."); return; }
     const entry = getCurrentTileEntryForToken(token, piece);
     if (!entry || isSeaByTile(entry.tile)) { ui.notifications.warn("The army must be inside a land territory to raid it."); return; }
-    const attackerOwnerId = piece.ownerUserId || piece.playerOwnerUserId || game.user.id;
+    const attackerController = getMilitaryForceController(token, piece);
+    const attackerOwnerId = attackerController?.id || piece.ownerUserId || piece.playerOwnerUserId || game.user.id;
     const defenders = getOpposingArmiesOnTileForRaid(entry, piece, attackerOwnerId);
     if (defenders.length) { ui.notifications.warn(`Cannot raid ${getTileName(entry)} while an opposing army is present.`); return; }
     const house = getHouseData(entry.drawing) || {};
     const roundKey = getCurrentActionRoundKey();
     if (String(house.lastRaidedRoundKey || "") === String(roundKey)) { ui.notifications.warn(`${getTileName(entry)} has already been raided this round.`); return; }
-    const confirmed = await Dialog.confirm({ title: `Raid ${getTileName(entry)}?`, content: `<p><strong>Army:</strong> ${escapeHtml(piece.name || token.document.name)}</p><p><strong>Strength:</strong> ${escapeHtml(Number(piece.strengthCurrent || piece.totalStrength || 0).toLocaleString())}</p><p>A raid spends this army's strategic action and all remaining movement. It cannot resolve while an opposing army is present.</p>`, yes: () => true, no: () => false, defaultYes: false });
+    const confirmed = await Dialog.confirm({ title: `Raid ${getTileName(entry)}?`, content: `<p><strong>Army:</strong> ${escapeHtml(piece.name || token.document.name)}</p><p><strong>Strength:</strong> ${escapeHtml(Number(piece.strengthCurrent || piece.totalStrength || 0).toLocaleString())}</p><p><strong>This will take your Main Action.</strong> A raid also spends this army's action and all remaining movement. It cannot resolve while an opposing army is present.</p>`, yes: () => true, no: () => false, defaultYes: false });
     if (!confirmed) return;
     if (!game.user.isGM) { await requestGmRaidTerritory({ token, piece, entry }); return; }
     await resolveRaidTerritory({ token, piece, entry });
@@ -7276,8 +9430,14 @@ function removePanel() {
     const house = getHouseData(entry.drawing) || {};
     const ownerId = getTileOwnerUserId(entry.tile, house);
     const ownerName = getTileOwnerUserName(entry.tile, house);
-    const attackerOwnerId = piece.ownerUserId || piece.playerOwnerUserId || game.user.id;
+    const attackerController = getMilitaryForceController(token, piece);
+    const attackerOwnerId = attackerController?.id || piece.ownerUserId || piece.playerOwnerUserId || game.user.id;
     if (ownerId && String(ownerId) === String(attackerOwnerId)) { ui.notifications.warn(`${getTileName(entry)} is already controlled by this army's owner.`); return; }
+    const linkedCommander = getCharacterTokenById(piece.linkedCharacterId || piece.commanderCharacterId);
+    if (linkedCommander) {
+      const commanderActionLock = characterMainActionReason(getWorldPiece(linkedCommander) || {}, getCharacterDataFromToken(linkedCommander) || {});
+      if (commanderActionLock) { ui.notifications.warn(`Siege is unavailable: ${commanderActionLock}`); return; }
+    }
 
     const defaultTurns = Math.max(1, Number(piece.siegeTurns || 1));
     const equipment = getSiegeEquipment(piece);
@@ -7303,6 +9463,7 @@ function removePanel() {
             <strong>Casualty Reduction:</strong> ${escapeHtml(engineEffects.casualtyReduction)} percentage point(s)
           </div>
           <div class="form-group"><label>Turns Under Siege</label><input type="number" name="siegeTurns" value="${escapeHtml(defaultTurns)}" min="1" step="1" style="width:100%;" /></div>
+          ${mainActionWarningHtml()}
           <p class="notes">Siege equipment is fixed when the army is mustered or edited; it cannot be invented at the moment of assault. If a player-owned tile has a defending army present, the GM gets a pitched battle alert instead.</p>
         </form>`,
         buttons: { roll: { label: "Roll Storm", callback: html => { const form = html[0].querySelector("form"); resolve({ siegeTurns: Math.max(1, Number(form.siegeTurns.value || 1)) }); }}, cancel: { label: "Cancel", callback: () => resolve(null) } },
@@ -7339,6 +9500,234 @@ function removePanel() {
   function getDiplomacyValue(piece = {}, character = {}) {
     const value = numberOrBlank(character.diplomacy ?? character.stats?.diplomacy ?? piece.diplomacy ?? piece.stats?.diplomacy);
     return value === "" ? 0 : Number(value);
+  }
+
+  function getMarriageDiplomacyValue(piece = {}, character = {}) {
+    const value = numberOrBlank(character.marriageDiplomacy ?? character.stats?.marriageDiplomacy ?? piece.marriageDiplomacy ?? piece.stats?.marriageDiplomacy);
+    return value === "" ? 0 : Number(value);
+  }
+
+  function characterHasDiplomacyLabel(character = {}, ...labels) {
+    const haystack = normalize([character.traits, character.quirks].filter(Boolean).join(" ; "));
+    if (!haystack) return false;
+    return labels.flat().filter(Boolean).some(label => haystack.includes(normalize(label)));
+  }
+
+  function isValyrianCulture(value) {
+    const culture = normalize(canonicalizeCultureLabel(value));
+    return culture === "high valyrian" || culture === "valyrian";
+  }
+
+  function getCharacterDiplomacySituationalModifier(character = {}, {
+    ownCulture = "",
+    otherCulture = "",
+    ownReligion = "",
+    otherReligion = ""
+  } = {}) {
+    const lines = [];
+    let modifier = 0;
+    const ownC = canonicalizeCultureLabel(ownCulture);
+    const otherC = canonicalizeCultureLabel(otherCulture);
+    const ownR = canonicalizeReligionLabel(ownReligion);
+    const otherR = canonicalizeReligionLabel(otherReligion);
+    const sameCulture = Boolean(normalize(ownC) && normalize(otherC) && normalize(ownC) === normalize(otherC));
+    const differentCulture = Boolean(normalize(ownC) && normalize(otherC) && !sameCulture);
+    const sameReligion = Boolean(normalize(ownR) && normalize(otherR) && normalize(ownR) === normalize(otherR));
+
+    // These modifiers are intentionally NOT baked into the stored Diplomacy stat.
+    // Stored Diplomacy remains Statecraft / 4 plus permanent trait/quirk effects.
+    if (characterHasDiplomacyLabel(character, "Dishonorable")) {
+      modifier -= 1;
+      lines.push({ label: "Dishonorable", modifier: -1 });
+    }
+    if (characterHasDiplomacyLabel(character, "Patriot") && sameCulture) {
+      modifier += 3;
+      lines.push({ label: "Patriot (same culture)", modifier: 3 });
+    }
+    if (characterHasDiplomacyLabel(character, "Synchronist")) {
+      if (sameCulture) { modifier -= 1; lines.push({ label: "Synchronist (same culture)", modifier: -1 }); }
+      else if (differentCulture) { modifier += 3; lines.push({ label: "Synchronist (other culture)", modifier: 3 }); }
+    }
+    if (characterHasDiplomacyLabel(character, "Cultural Supremicist", "Cultural Supremacist")) {
+      if (sameCulture) { modifier += 1; lines.push({ label: "Cultural Supremicist (same culture)", modifier: 1 }); }
+      else if (differentCulture) { modifier -= 3; lines.push({ label: "Cultural Supremicist (other culture)", modifier: -3 }); }
+    }
+    if (characterHasDiplomacyLabel(character, "Valyraboo") && otherC && !isValyrianCulture(otherC)) {
+      modifier -= 3;
+      lines.push({ label: "Valyraboo (non-Valyrian target)", modifier: -3 });
+    }
+    if (characterHasDiplomacyLabel(character, "Blasphemer") && sameReligion) {
+      modifier -= 2;
+      lines.push({ label: "Blasphemer (shared faith)", modifier: -2 });
+    }
+
+    return { modifier, lines, sameCulture, differentCulture, sameReligion };
+  }
+
+  function getDefenderVulnerabilityDiplomacyModifier(defenderCharacter = {}, attackerCulture = "", defenderCulture = "") {
+    const lines = [];
+    let modifier = 0;
+    const sameCulture = Boolean(normalize(canonicalizeCultureLabel(attackerCulture)) && normalize(canonicalizeCultureLabel(attackerCulture)) === normalize(canonicalizeCultureLabel(defenderCulture)));
+    if (characterHasDiplomacyLabel(defenderCharacter, "Kinslayer")) {
+      modifier += 2;
+      lines.push({ label: "Defender is a Kinslayer", modifier: 2 });
+    }
+    if (sameCulture && characterHasDiplomacyLabel(defenderCharacter, "Bastard")) {
+      modifier += 2;
+      lines.push({ label: "Defender is a Bastard (same culture)", modifier: 2 });
+    }
+    return { modifier, lines };
+  }
+
+  function getMarriageLedger() {
+    return foundry.utils.deepClone(canvas.scene?.getFlag(FLAG_SCOPE, MARRIAGE_LEDGER_KEY) || {});
+  }
+
+  async function saveMarriageLedger(ledger = {}) {
+    if (!canvas.scene || !game.user.isGM) return;
+    await canvas.scene.setFlag(FLAG_SCOPE, MARRIAGE_LEDGER_KEY, foundry.utils.deepClone(ledger || {}));
+  }
+
+  function getMarriageRecordsForUser(userOrId, userName = "") {
+    const user = typeof userOrId === "object" && userOrId ? userOrId : game.users.get(String(userOrId || ""));
+    const userId = String(user?.id || userOrId || "").trim();
+    const wantedName = normalize(user?.name || userName || "");
+    const ledger = getMarriageLedger();
+    const rows = [];
+    for (const record of Object.values(ledger || {})) {
+      if (!record || normalize(record.status || "active") === "ended") continue;
+      const idMatch = userId && String(record.controllerUserId || "") === userId;
+      const nameMatch = wantedName && normalize(record.controllerUserName || "") === wantedName;
+      if (idMatch || nameMatch) rows.push(record);
+    }
+    return rows.sort((a, b) => String(a.createdAt || "").localeCompare(String(b.createdAt || "")));
+  }
+
+  function getMarriageCountForUser(userOrId, userName = "") {
+    return getMarriageRecordsForUser(userOrId, userName).length;
+  }
+
+  async function recordMarriageAlliance({ controllerUserId = "", controllerUserName = "", character = {}, piece = {}, entry = null, targetHouse = "" } = {}) {
+    if (!game.user.isGM) throw new Error("Only the GM can record a marriage alliance.");
+    const current = getMarriageCountForUser(controllerUserId, controllerUserName);
+    if (current >= MARRIAGE_SLOT_LIMIT) throw new Error(`${controllerUserName || "This realm"} already has ${MARRIAGE_SLOT_LIMIT} active marriages.`);
+    const ledger = getMarriageLedger();
+    const id = foundry.utils.randomID?.() || `marriage-${Date.now()}-${Math.floor(Math.random() * 100000)}`;
+    ledger[id] = {
+      id,
+      status: "active",
+      controllerUserId: String(controllerUserId || ""),
+      controllerUserName: String(controllerUserName || ""),
+      characterId: String(character.characterId || piece.characterId || piece.linkedCharacterId || ""),
+      characterName: String(character.characterName || piece.name || ""),
+      tileId: String(getTileId(entry) || ""),
+      tileName: String(getTileName(entry) || ""),
+      targetHouse: String(targetHouse || ""),
+      createdAt: new Date().toISOString(),
+      createdRoundKey: getCurrentActionRoundKey()
+    };
+    await saveMarriageLedger(ledger);
+    return ledger[id];
+  }
+
+  async function manageMarriageAlliances() {
+    if (!requireOverviewScene()) return;
+    if (!game.user.isGM) {
+      ui.notifications.warn("Only a GM can manage marriage alliances.");
+      return;
+    }
+
+    const ledger = getMarriageLedger();
+    const active = Object.values(ledger || {})
+      .filter(record => record && normalize(record.status || "active") !== "ended")
+      .sort((a, b) => {
+        const realm = String(a.controllerUserName || "").localeCompare(String(b.controllerUserName || ""));
+        return realm || String(a.createdAt || "").localeCompare(String(b.createdAt || ""));
+      });
+
+    if (!active.length) {
+      ui.notifications.info("There are no active marriage alliances to end.");
+      return;
+    }
+
+    const options = active.map(record => {
+      const realm = record.controllerUserName || game.users.get(String(record.controllerUserId || ""))?.name || "Unknown Realm";
+      const character = record.characterName || "Unknown Character";
+      const target = record.targetHouse || record.tileName || "Unknown House";
+      return `<option value="${escapeHtml(record.id)}">${escapeHtml(realm)} — ${escapeHtml(character)} × ${escapeHtml(target)}</option>`;
+    }).join("");
+
+    const details = active.map(record => {
+      const realm = record.controllerUserName || game.users.get(String(record.controllerUserId || ""))?.name || "Unknown Realm";
+      const target = record.targetHouse || record.tileName || "Unknown House";
+      return `<tr data-marriage-detail="${escapeHtml(record.id)}" style="display:none;">
+        <td style="padding:5px 7px;border:1px solid #777;">${escapeHtml(realm)}</td>
+        <td style="padding:5px 7px;border:1px solid #777;">${escapeHtml(record.characterName || "Unknown Character")}</td>
+        <td style="padding:5px 7px;border:1px solid #777;">${escapeHtml(target)}</td>
+        <td style="padding:5px 7px;border:1px solid #777;">${escapeHtml(record.tileName || "Unknown Province")}</td>
+        <td style="padding:5px 7px;border:1px solid #777;">${escapeHtml(record.createdRoundKey || "Unknown")}</td>
+      </tr>`;
+    }).join("");
+
+    new Dialog({
+      title: "Manage Marriage Alliances",
+      content: `<div style="min-width:650px;">
+        <p>Select an active marriage alliance to end. Ending the alliance immediately frees one marriage slot. It does <strong>not</strong> reverse any province transfer created by the original Marriage Diplomacy success.</p>
+        <div class="form-group"><label>Active Marriage</label><select name="marriageId" style="width:100%;">${options}</select></div>
+        <table style="border-collapse:collapse;width:100%;font-size:12px;margin-top:8px;">
+          <thead><tr><th style="padding:5px 7px;border:1px solid #777;text-align:left;">Realm</th><th style="padding:5px 7px;border:1px solid #777;text-align:left;">Character</th><th style="padding:5px 7px;border:1px solid #777;text-align:left;">Alliance</th><th style="padding:5px 7px;border:1px solid #777;text-align:left;">Province</th><th style="padding:5px 7px;border:1px solid #777;text-align:left;">Created</th></tr></thead>
+          <tbody>${details}</tbody>
+        </table>
+      </div>`,
+      buttons: {
+        end: {
+          icon: '<i class="fas fa-heart-broken"></i>',
+          label: "End Marriage",
+          callback: async html => {
+            const marriageId = String(html[0].querySelector('[name="marriageId"]')?.value || "").trim();
+            const record = ledger[marriageId];
+            if (!record || normalize(record.status || "active") === "ended") {
+              ui.notifications.warn("That marriage alliance is no longer active.");
+              return;
+            }
+            const realm = record.controllerUserName || game.users.get(String(record.controllerUserId || ""))?.name || "Unknown Realm";
+            const target = record.targetHouse || record.tileName || "Unknown House";
+            const confirmed = await Dialog.confirm({
+              title: "End Marriage Alliance?",
+              content: `<p>End the marriage alliance between <strong>${escapeHtml(record.characterName || "Unknown Character")}</strong> of <strong>${escapeHtml(realm)}</strong> and <strong>${escapeHtml(target)}</strong>?</p><p>This frees the marriage slot but does not reverse territorial control.</p>`,
+              yes: () => true, no: () => false, defaultYes: false
+            });
+            if (!confirmed) return;
+            const fresh = getMarriageLedger();
+            if (!fresh[marriageId]) throw new Error("Marriage record could not be found in the current ledger.");
+            fresh[marriageId].status = "ended";
+            fresh[marriageId].endedAt = new Date().toISOString();
+            fresh[marriageId].endedRoundKey = getCurrentActionRoundKey();
+            fresh[marriageId].endedByUserId = game.user.id;
+            fresh[marriageId].endedByUserName = game.user.name;
+            await saveMarriageLedger(fresh);
+            const remaining = getMarriageCountForUser(record.controllerUserId || "", record.controllerUserName || "");
+            await ChatMessage.create({
+              speaker: ChatMessage.getSpeaker({ alias: "Crown Marriage GM" }),
+              whisper: game.users.contents.filter(user => user.isGM).map(user => user.id),
+              content: `<h2>Marriage Alliance Ended</h2><p><strong>${escapeHtml(record.characterName || "Unknown Character")}</strong> — <strong>${escapeHtml(target)}</strong></p><p><strong>${escapeHtml(realm)}</strong> now has ${escapeHtml(remaining)} / ${escapeHtml(MARRIAGE_SLOT_LIMIT)} active marriage slots.</p>`
+            });
+            ui.notifications.info(`Ended marriage alliance for ${record.characterName || realm}.`);
+          }
+        },
+        close: { label: "Close" }
+      },
+      default: "close",
+      render: html => {
+        const select = html[0].querySelector('[name="marriageId"]');
+        const refresh = () => {
+          const id = String(select?.value || "");
+          for (const row of html[0].querySelectorAll('[data-marriage-detail]')) row.style.display = row.dataset.marriageDetail === id ? "" : "none";
+        };
+        select?.addEventListener("change", refresh);
+        refresh();
+      }
+    }, { width: 760, height: "auto", resizable: true }).render(true);
   }
 
   function getFirstNumberOrBlank(...values) {
@@ -7415,7 +9804,13 @@ function removePanel() {
     ].map(value => String(value || "").trim()).filter(Boolean);
 
     if (explicitDefenderIds.length) {
-      const explicitMatches = sameTileCharacters.filter(token => explicitDefenderIds.some(id => characterTokenMatchesId(token, id)));
+      // An explicitly assigned ruler/defender represents the province politically
+      // even when their token is elsewhere on the strategic map. Resolve by ID
+      // across all characters, not only characters physically standing on the tile.
+      const explicitMatches = getCharacterTokens().filter(token => {
+        if (token.document.id === attackerToken.document.id) return false;
+        return explicitDefenderIds.some(id => characterTokenMatchesId(token, id));
+      });
       if (explicitMatches.length) return sortDefenderCandidatesByDiplomacy(explicitMatches)[0] || null;
     }
 
@@ -7439,7 +9834,31 @@ function removePanel() {
     const d = normalize(defenderValue);
     if (!a || !d) return { modifier: 0, label: "", kind: "unknown" };
     if (a === d) return { modifier: -2, label: sameLabel, kind: "same" };
-    return { modifier: 2, label: differentLabel, kind: "different" };
+    return { modifier: 3, label: differentLabel, kind: "different" };
+  }
+
+  function isStandardFaithOfSevenFamily(value) {
+    const canonical = canonicalizeReligionLabel(value);
+    return canonical === "Faith of the Seven" || isFaithOfSevenSect(canonical);
+  }
+
+  function getReligionComparisonModifier(attackerValue, defenderValue) {
+    const attacker = canonicalizeReligionLabel(attackerValue);
+    const defender = canonicalizeReligionLabel(defenderValue);
+    const a = normalize(attacker);
+    const d = normalize(defender);
+    if (!a || !d) return { modifier: 0, label: "", kind: "unknown" };
+    if (a === d) return { modifier: -2, label: "Same Religion", kind: "same" };
+
+    // Ordinary Faith of the Seven sects remain doctrinal kin.  They get a
+    // smaller familiarity bonus than an exact religious match.  Dornish
+    // Faith of the Seven is intentionally excluded and is treated as its
+    // own religion for diplomacy.
+    if (isStandardFaithOfSevenFamily(attacker) && isStandardFaithOfSevenFamily(defender)) {
+      return { modifier: -1, label: "Related Faith of the Seven Traditions", kind: "related" };
+    }
+
+    return { modifier: 2, label: "Different Religion", kind: "different" };
   }
 
   function getDefenderDiplomacyValue(house = {}, worldTile = {}, defenderToken = null) {
@@ -7501,7 +9920,7 @@ async function normalizeCharacterEmbarkState(token, piece = getWorldPiece(token)
   return { piece, character, embarkedAtSea: Boolean(actualEntry?.tile ? isSeaTile(actualEntry.tile) : flagged), repaired: false };
 }
 
-  async function applyDiplomaticTakeover({ token, piece, entry, actingUserId, actingUserName }) {
+  async function applyDiplomaticTakeover({ token, piece, entry, actingUserId, actingUserName, useMarriageDiplomacy = false }) {
     if (!token || !piece || !entry) throw new Error("Diplomatic takeover needs one character token on a world tile.");
     const actingUser = game.users.get(actingUserId) || { id: actingUserId, name: actingUserName, isGM: false };
     if (!canUserControlWorldPieceForUser(token, piece, actingUser)) throw new Error(`${actingUserName} does not control ${piece.name || token.document.name}.`);
@@ -7510,7 +9929,7 @@ async function normalizeCharacterEmbarkState(token, piece = getWorldPiece(token)
     const embarkState = await normalizeCharacterEmbarkState(token, piece, character);
     piece = embarkState.piece;
     character = embarkState.character;
-    const characterRoundLock = String(character.movementLockedRoundKey || "") === String(getCurrentActionRoundKey()) ? (character.movementLockedReason || "This character has already committed a strategic action this turn.") : "";
+    const characterRoundLock = characterMainActionReason(piece, character) || (String(character.movementLockedRoundKey || "") === String(getCurrentActionRoundKey()) ? (character.movementLockedReason || "This character has already committed a strategic action this turn.") : "");
     const diplomacyLockReason = strategicMovementLockReason(piece) || characterRoundLock;
     if (diplomacyLockReason) throw new Error(`Diplomacy is unavailable: ${diplomacyLockReason}`);
     if (embarkState.embarkedAtSea) throw new Error("Diplomacy is unavailable while this character is embarked at sea.");
@@ -7520,6 +9939,12 @@ async function normalizeCharacterEmbarkState(token, piece = getWorldPiece(token)
     const currentOwnerId = getTileOwnerUserId(worldTile, house);
     const tileName = getTileName(entry);
     const diplomacyRoundKey = getCurrentActionRoundKey();
+    const controller = getCharacterControllerIdentity(token, actingUserId, actingUserName);
+    const marriageControllerId = controller.id || actingUserId;
+    const marriageControllerName = controller.name || actingUserName;
+    if (useMarriageDiplomacy && getMarriageCountForUser(marriageControllerId, marriageControllerName) >= MARRIAGE_SLOT_LIMIT) {
+      throw new Error(`${marriageControllerName || "This realm"} already has ${MARRIAGE_SLOT_LIMIT} active marriages.`);
+    }
     if (hasDiplomacyAttemptThisRound(character, piece)) throw new Error(`${character.characterName || piece.name} has already attempted diplomacy this turn.`);
     if (currentOwnerId && String(currentOwnerId) === String(actingUserId)) throw new Error(`${tileName} is already controlled by ${actingUserName}.`);
     if (csvBoolean(house.diplomaticTakeoverAllowed ?? worldTile.diplomaticTakeoverAllowed, getTileType(worldTile) !== "sea") === false) throw new Error(`${tileName} cannot be taken by diplomacy.`);
@@ -7533,26 +9958,70 @@ async function normalizeCharacterEmbarkState(token, piece = getWorldPiece(token)
     const defenderCharacter = defenderToken ? getCharacterDataFromToken(defenderToken) : null;
     const defenderName = defenderCharacter?.characterName || house.npcDefenderName || house.lord || `${tileName} NPC Defender`;
     const attackerDiplomacy = getDiplomacyValue(piece, character);
+    const marriageDiplomacy = useMarriageDiplomacy ? getMarriageDiplomacyValue(piece, character) : 0;
     const defenderDiplomacy = getDefenderDiplomacyValue(house, worldTile, defenderToken);
-    const attackerCulture = character.culture || piece.culture || "";
-    const defenderCulture = defenderCharacter?.culture || defenderPiece?.culture || house.culture || worldTile.culture || "";
-    const attackerReligion = character.religion || piece.religion || "";
-    const defenderReligion = defenderCharacter?.religion || defenderPiece?.religion || house.religion || worldTile.religion || "";
-    const cultureMod = getTextComparisonModifier(attackerCulture, defenderCulture, "Same Culture", "Different Culture");
-    const religionMod = getTextComparisonModifier(attackerReligion, defenderReligion, "Same Religion", "Different Religion");
+    // Blank culture/faith cannot bypass diplomacy modifiers. The GM resolves
+    // and permanently stores a region-appropriate identity before comparison.
+    character = await ensureCharacterIdentityData(token);
+    piece = getWorldPiece(token) || piece;
+    if (defenderToken) await ensureCharacterIdentityData(defenderToken);
+    const refreshedDefenderCharacter = defenderToken ? (getCharacterDataFromToken(defenderToken) || defenderCharacter) : defenderCharacter;
+    const refreshedDefenderPiece = defenderToken ? (getWorldPiece(defenderToken) || defenderPiece) : defenderPiece;
+
+    const attackerCulture = canonicalizeCultureLabel(character.culture || piece.culture || "");
+    const defenderCulture = canonicalizeCultureLabel(refreshedDefenderCharacter?.culture || refreshedDefenderPiece?.culture || house.culture || worldTile.culture || "");
+    const attackerReligion = canonicalizeReligionLabel(character.religion || piece.religion || "");
+    const defenderReligion = canonicalizeReligionLabel(refreshedDefenderCharacter?.religion || refreshedDefenderPiece?.religion || house.religion || worldTile.religion || "");
+    let cultureMod = getTextComparisonModifier(attackerCulture, defenderCulture, "Same Culture", "Different Culture");
+    const religionMod = getReligionComparisonModifier(attackerReligion, defenderReligion);
+
+    // Unorthodox ignores the ordinary DIFFERENT-culture diplomacy penalty, but
+    // keeps the normal same-culture familiarity benefit.
+    const attackerUnorthodox = characterHasDiplomacyLabel(character, "Unorthodox", "Unorthadox");
+    if (attackerUnorthodox && cultureMod.kind === "different" && cultureMod.modifier > 0) {
+      cultureMod = { modifier: 0, label: "Different Culture — ignored by Unorthodox", kind: "different-ignored" };
+    }
+
+    // Resolve physical defender presence before any trait logic references it.
+    // v1.1.73 evaluated defenderPresent before its declaration, which threw a
+    // ReferenceError and surfaced as a misleading "Diplomatic Takeover Blocked" card.
+    const defenderPresent = Boolean(defenderToken && isCharacterTokenOnTile(defenderToken, getTileId(entry)));
+
+    const attackerTraitMod = getCharacterDiplomacySituationalModifier(character, {
+      ownCulture: attackerCulture, otherCulture: defenderCulture, ownReligion: attackerReligion, otherReligion: defenderReligion
+    });
+    const defenderTraitMod = defenderPresent || defenderToken
+      ? getCharacterDiplomacySituationalModifier(refreshedDefenderCharacter || {}, {
+          ownCulture: defenderCulture, otherCulture: attackerCulture, ownReligion: defenderReligion, otherReligion: attackerReligion
+        })
+      : { modifier: 0, lines: [] };
+    const defenderVulnerabilityMod = defenderToken
+      ? getDefenderVulnerabilityDiplomacyModifier(refreshedDefenderCharacter || {}, attackerCulture, defenderCulture)
+      : { modifier: 0, lines: [] };
+    const attackerSituationalModifier = Number(attackerTraitMod.modifier || 0) + Number(defenderVulnerabilityMod.modifier || 0);
+    const defenderSituationalModifier = Number(defenderTraitMod.modifier || 0);
+
     const swornToPlayerId = String(house.swornToPlayerUserId || worldTile.swornToPlayerUserId || currentOwnerId || "").trim();
     const swornToType = normalize(house.swornToType || worldTile.swornToType || (currentOwnerId ? "Player" : ""));
     const swornModifier = swornToType === "player" && swornToPlayerId && String(swornToPlayerId) !== String(actingUserId) ? 4 : 0;
     const baseDc = 10;
-    const finalDc = baseDc + defenderDiplomacy + cultureMod.modifier + religionMod.modifier + swornModifier;
+    const finalDc = baseDc + defenderDiplomacy + defenderSituationalModifier + cultureMod.modifier + religionMod.modifier + swornModifier;
     const d20 = await rollDieTotal("1d20");
-    const finalRoll = d20 + attackerDiplomacy;
-    const success = finalRoll >= finalDc;
-    const controller = getCharacterControllerIdentity(token, actingUserId, actingUserName);
+    const finalRoll = d20 + attackerDiplomacy + marriageDiplomacy + attackerSituationalModifier;
+
+    // If the controlling side has a character physically present in the province,
+    // diplomacy becomes an opposed check instead of a static province DC. The
+    // defender's reactive roll does not consume their strategic action. Ties go
+    // to the defender: the attacker must actually beat the defensive total.
+    const defenderD20 = defenderPresent ? await rollDieTotal("1d20") : null;
+    const defenderFinalRoll = defenderPresent
+      ? Number(defenderD20 || 0) + defenderDiplomacy + defenderSituationalModifier + cultureMod.modifier + religionMod.modifier + swornModifier
+      : null;
+    const success = defenderPresent ? finalRoll > defenderFinalRoll : finalRoll >= finalDc;
     const ownerUser = game.users.get(controller.id) || null;
     const now = new Date().toISOString();
     const conqueringHouse = getCanonicalHouseNameForCharacter(token, controller.id || actingUserId, controller.name || actingUserName);
-    const math = { d20, attackerDiplomacy, finalRoll, baseDc, defenderDiplomacy, cultureModifier: cultureMod.modifier, religionModifier: religionMod.modifier, swornModifier, finalDc, attackerCulture, defenderCulture, attackerReligion, defenderReligion };
+    const math = { d20, attackerDiplomacy, marriageDiplomacy, attackerSituationalModifier, attackerTraitModifiers: attackerTraitMod.lines, defenderVulnerabilityModifiers: defenderVulnerabilityMod.lines, useMarriageDiplomacy: Boolean(useMarriageDiplomacy), finalRoll, baseDc, defenderDiplomacy, defenderSituationalModifier, defenderTraitModifiers: defenderTraitMod.lines, cultureModifier: cultureMod.modifier, cultureModifierLabel: cultureMod.label, religionModifier: religionMod.modifier, swornModifier, finalDc, attackerCulture, defenderCulture, attackerReligion, defenderReligion, defenderPresent, defenderD20, defenderFinalRoll, resolution: defenderPresent ? "contested" : "static-dc" };
 
     if (success) {
       if (!conqueringHouse) throw new Error(`Could not determine ${character.characterName || piece.name || actingUserName}'s House. Assign a House to the character or one of ${actingUserName}'s existing holdings and try again.`);
@@ -7570,11 +10039,11 @@ async function normalizeCharacterEmbarkState(token, piece = getWorldPiece(token)
       house = transfer.house;
       house.lord = house.lord || defenderName;
       house.npcDefenderName = defenderName;
-      house.lastDiplomaticTakeover = { success: true, attackerCharacterId: character.characterId, attackerName: character.characterName, defenderName, requesterUserId: actingUserId, requesterUserName: actingUserName, controllerUserId: transfer.controllerId, controllerUserName: transfer.controllerName, house: transfer.houseName, at: now, math };
+      house.lastDiplomaticTakeover = { success: true, marriageDiplomacy: Boolean(useMarriageDiplomacy), attackerCharacterId: character.characterId, attackerName: character.characterName, defenderName, requesterUserId: actingUserId, requesterUserName: actingUserName, controllerUserId: transfer.controllerId, controllerUserName: transfer.controllerName, house: transfer.houseName, at: now, math };
     } else {
       house.npcDefenderName = defenderName;
       house.lord = house.lord || defenderName;
-      house.lastDiplomaticTakeover = { success: false, attackerCharacterId: character.characterId, attackerName: character.characterName, defenderName, userId: actingUserId, userName: actingUserName, at: now, math };
+      house.lastDiplomaticTakeover = { success: false, marriageDiplomacy: Boolean(useMarriageDiplomacy), attackerCharacterId: character.characterId, attackerName: character.characterName, defenderName, userId: actingUserId, userName: actingUserName, at: now, math };
       worldTile.ownershipType = worldTile.ownershipType || house.ownershipType || inferOwnershipType(worldTile, house);
     }
     const updatedCharacter = foundry.utils.deepClone(character || {});
@@ -7585,6 +10054,15 @@ async function normalizeCharacterEmbarkState(token, piece = getWorldPiece(token)
     updatedPiece.lastDiplomacyRoundKey = diplomacyRoundKey;
     updatedPiece.lastDiplomacyAttemptAt = now;
     updatedPiece.lastDiplomacyOutcome = success ? "success" : "failure";
+    const mainActionReason = `${useMarriageDiplomacy ? "Marriage Diplomacy" : "Diplomacy"} attempt this round.`;
+    updatedCharacter.mainActionRoundKey = diplomacyRoundKey;
+    updatedCharacter.mainActionReason = mainActionReason;
+    updatedCharacter.lastCharacterActionRoundKey = diplomacyRoundKey;
+    updatedCharacter.lastCharacterActionReason = mainActionReason;
+    updatedPiece.mainActionRoundKey = diplomacyRoundKey;
+    updatedPiece.mainActionReason = mainActionReason;
+    updatedPiece.lastCharacterActionRoundKey = diplomacyRoundKey;
+    updatedPiece.lastCharacterActionReason = mainActionReason;
     if (!success) {
       updatedPiece.movementUsed = Math.max(Number(updatedPiece.movementUsed || 0), Number(updatedPiece.movementMax || 0));
       updatedPiece.movementLockedRoundKey = diplomacyRoundKey;
@@ -7611,26 +10089,60 @@ async function normalizeCharacterEmbarkState(token, piece = getWorldPiece(token)
         controller.id || actingUserId,
         controller.name || actingUserName
       );
+      if (useMarriageDiplomacy) {
+        await recordMarriageAlliance({
+          controllerUserId: controller.id || actingUserId,
+          controllerUserName: controller.name || actingUserName,
+          character,
+          piece,
+          entry,
+          targetHouse: house.house || worldTile.house || defenderName
+        });
+      }
     }
 
+    const contestedSummary = defenderPresent
+      ? `<p><strong>Contested Diplomacy:</strong> ${escapeHtml(character.characterName || piece.name)} ${escapeHtml(finalRoll)} vs ${escapeHtml(defenderName)} ${escapeHtml(defenderFinalRoll)}. ${success ? "Attacker wins." : "Defender holds."}</p>`
+      : "";
     const publicContent = success
-      ? `<h2>Diplomatic Takeover</h2><p><strong>${escapeHtml(character.characterName || piece.name)}</strong> has won over <strong>${escapeHtml(tileName)}</strong>.</p><p><strong>Local House:</strong> ${escapeHtml(house.house || worldTile.house || worldTile.owner || "Unknown")}</p><p><strong>New allegiance:</strong> ${escapeHtml(house.allegiance || worldTile.allegiance || conqueringHouse || ownerUser?.name || actingUserName || "Player")}</p><p>Generic Neutral / NPC local House identity adopts the conquering House. Existing named local Houses remain in place. The current ruler is not automatically replaced.</p>`
-      : `<h2>Diplomatic Takeover Failed</h2><p><strong>${escapeHtml(character.characterName || piece.name)}</strong> failed to win over <strong>${escapeHtml(tileName)}</strong>.</p><p>The tile remains under <strong>${escapeHtml(getTileOwnerUserName(worldTile, house) || house.house || worldTile.owner || "NPC")}</strong> control.</p>`;
-    await ChatMessage.create({ speaker: ChatMessage.getSpeaker({ alias: "Crown Diplomacy" }), content: publicContent });
+      ? `<h2>${useMarriageDiplomacy ? "Marriage Diplomacy" : "Diplomatic Takeover"}</h2><p><strong>${escapeHtml(character.characterName || piece.name)}</strong> has won over <strong>${escapeHtml(tileName)}</strong>${useMarriageDiplomacy ? " through marriage diplomacy" : ""}.</p>${contestedSummary}<p><strong>Local House:</strong> ${escapeHtml(house.house || worldTile.house || worldTile.owner || "Unknown")}</p><p><strong>New allegiance:</strong> ${escapeHtml(house.allegiance || worldTile.allegiance || conqueringHouse || ownerUser?.name || actingUserName || "Player")}</p>${useMarriageDiplomacy ? `<p><strong>Realm Marriages:</strong> ${escapeHtml(getMarriageCountForUser(controller.id || actingUserId, controller.name || actingUserName))} / ${escapeHtml(MARRIAGE_SLOT_LIMIT)}</p>` : ""}<p>Generic Neutral / NPC local House identity adopts the conquering House. Existing named local Houses remain in place. The current ruler is not automatically replaced.</p>`
+      : `<h2>Diplomatic Takeover Failed</h2><p><strong>${escapeHtml(character.characterName || piece.name)}</strong> failed to win over <strong>${escapeHtml(tileName)}</strong>.</p>${contestedSummary}<p>The tile remains under <strong>${escapeHtml(getTileOwnerUserName(worldTile, house) || house.house || worldTile.owner || "NPC")}</strong> control.</p>`;
+    const diplomacyRecipients = getPrivateActionRecipients(actingUserId);
+    if (defenderPresent && defenderToken) {
+      const defenderController = getCharacterControllerIdentity(defenderToken);
+      if (defenderController?.id) diplomacyRecipients.push(String(defenderController.id));
+    }
+    await ChatMessage.create({
+      speaker: ChatMessage.getSpeaker({ alias: "Crown Diplomacy" }),
+      whisper: Array.from(new Set(diplomacyRecipients.filter(Boolean).map(String))),
+      content: publicContent
+    });
     const gmUsers = game.users.contents.filter(user => user.isGM).map(user => user.id);
     if (gmUsers.length) {
+      const signed = value => `${Number(value || 0) >= 0 ? "+" : ""}${Number(value || 0)}`;
+      const situationalLines = [
+        ...attackerTraitMod.lines.map(row => `Attacker ${row.label}: ${signed(row.modifier)}`),
+        ...defenderVulnerabilityMod.lines.map(row => `Attacker ${row.label}: ${signed(row.modifier)}`),
+        ...defenderTraitMod.lines.map(row => `Defender ${row.label}: ${signed(row.modifier)}`)
+      ];
       const modifierLines = [
-        cultureMod.label ? `${cultureMod.label}: ${cultureMod.modifier >= 0 ? "+" : ""}${cultureMod.modifier}` : "Culture: no modifier",
-        religionMod.label ? `${religionMod.label}: ${religionMod.modifier >= 0 ? "+" : ""}${religionMod.modifier}` : "Religion: no modifier",
-        swornModifier ? `Sworn to another player: +${swornModifier}` : "Sworn to another player: 0"
+        cultureMod.label ? `${cultureMod.label}: ${signed(cultureMod.modifier)}` : "Culture: no modifier",
+        religionMod.label ? `${religionMod.label}: ${signed(religionMod.modifier)}` : "Religion: no modifier",
+        swornModifier ? `Sworn to another player: +${swornModifier}` : "Sworn to another player: 0",
+        ...situationalLines
       ].join("<br>");
-      await ChatMessage.create({ speaker: ChatMessage.getSpeaker({ alias: "Crown Diplomacy GM" }), whisper: gmUsers, content: `<h2>Diplomacy Check — GM Details</h2><p><strong>Attacker:</strong> ${escapeHtml(character.characterName || piece.name)} — Diplomacy ${escapeHtml(attackerDiplomacy)}</p><p><strong>Defender:</strong> ${escapeHtml(defenderName)} — Diplomacy ${escapeHtml(defenderDiplomacy)}</p><p><strong>Roll:</strong> d20 ${escapeHtml(d20)} + Diplomacy ${escapeHtml(attackerDiplomacy)} = <strong>${escapeHtml(finalRoll)}</strong></p><p><strong>DC:</strong> 10 + Defender ${escapeHtml(defenderDiplomacy)} + modifiers = <strong>${escapeHtml(finalDc)}</strong></p><p>${modifierLines}</p><p><strong>Result:</strong> ${success ? "Success" : "Failure"}</p>` });
+      const attackerSituationalText = attackerSituationalModifier ? ` ${signed(attackerSituationalModifier)} situational` : "";
+      const defenderSituationalText = defenderSituationalModifier ? ` ${signed(defenderSituationalModifier)} situational` : "";
+      const resolutionDetails = defenderPresent
+        ? `<p><strong>Resolution:</strong> Contested diplomacy (defending character present)</p><p><strong>Attacker Roll:</strong> d20 ${escapeHtml(d20)} + Diplomacy ${escapeHtml(attackerDiplomacy)}${useMarriageDiplomacy ? ` + Marriage Diplomacy ${escapeHtml(marriageDiplomacy)}` : ""}${escapeHtml(attackerSituationalText)} = <strong>${escapeHtml(finalRoll)}</strong></p><p><strong>Defender Roll:</strong> d20 ${escapeHtml(defenderD20)} + Diplomacy ${escapeHtml(defenderDiplomacy)}${escapeHtml(defenderSituationalText)} + ${escapeHtml(cultureMod.modifier || 0)} culture + ${escapeHtml(religionMod.modifier || 0)} religion + ${escapeHtml(swornModifier || 0)} sworn loyalty = <strong>${escapeHtml(defenderFinalRoll)}</strong></p><p><em>Ties favor the defender.</em></p>`
+        : `<p><strong>Resolution:</strong> Static province DC</p><p><strong>Attacker Roll:</strong> d20 ${escapeHtml(d20)} + Diplomacy ${escapeHtml(attackerDiplomacy)}${useMarriageDiplomacy ? ` + Marriage Diplomacy ${escapeHtml(marriageDiplomacy)}` : ""}${escapeHtml(attackerSituationalText)} = <strong>${escapeHtml(finalRoll)}</strong></p><p><strong>Final DC:</strong> <strong>${escapeHtml(finalDc)}</strong></p><p><strong>DC Breakdown:</strong> 10 base + ${escapeHtml(defenderDiplomacy)} defender Diplomacy${escapeHtml(defenderSituationalText)} + ${escapeHtml(cultureMod.modifier || 0)} culture + ${escapeHtml(religionMod.modifier || 0)} religion + ${escapeHtml(swornModifier || 0)} sworn loyalty = <strong>${escapeHtml(finalDc)}</strong></p>`;
+      await ChatMessage.create({ speaker: ChatMessage.getSpeaker({ alias: "Crown Diplomacy GM" }), whisper: gmUsers, content: `<h2>Diplomacy Check — GM Details</h2><p><strong>Attacker:</strong> ${escapeHtml(character.characterName || piece.name)} — Diplomacy ${escapeHtml(attackerDiplomacy)}${useMarriageDiplomacy ? ` + Marriage Diplomacy ${escapeHtml(marriageDiplomacy)}` : ""}${attackerSituationalModifier ? ` ${escapeHtml(signed(attackerSituationalModifier))} situational` : ""}</p><p><strong>Defender:</strong> ${escapeHtml(defenderName)} — Diplomacy ${escapeHtml(defenderDiplomacy)}${defenderSituationalModifier ? ` ${escapeHtml(signed(defenderSituationalModifier))} situational` : ""}${defenderPresent ? " — physically present" : ""}</p>${resolutionDetails}<p><strong>Culture:</strong> ${escapeHtml(attackerCulture || "Unknown")} vs ${escapeHtml(defenderCulture || "Unknown")}<br><strong>Faith:</strong> ${escapeHtml(attackerReligion || "Unknown")} vs ${escapeHtml(defenderReligion || "Unknown")}</p><p>${modifierLines}</p><p><strong>Result:</strong> ${success ? "Success" : "Failure"}</p>` });
     }
     revealForCurrentPlayerPieces();
     return success;
   }
 
-  async function requestGmDiplomacy({ token, piece, entry }) {
+  async function requestGmDiplomacy({ token, piece, entry, useMarriageDiplomacy = false }) {
     const gm = findActiveGmForScene(canvas.scene?.id);
     if (!gm) { ui.notifications.warn("No active GM online to resolve the diplomatic takeover."); return false; }
     game.socket.emit(SOCKET_NAME, {
@@ -7643,7 +10155,8 @@ async function normalizeCharacterEmbarkState(token, piece = getWorldPiece(token)
       tokenName: token.document.name,
       drawingId: entry.drawing.document.id,
       tileId: getTileId(entry),
-      tileName: getTileName(entry)
+      tileName: getTileName(entry),
+      useMarriageDiplomacy: Boolean(useMarriageDiplomacy)
     });
     ui.notifications.info(`Diplomatic takeover request sent to GM ${gm.name}.`);
     return true;
@@ -7661,18 +10174,43 @@ async function normalizeCharacterEmbarkState(token, piece = getWorldPiece(token)
     const embarkState = await normalizeCharacterEmbarkState(token, piece, character);
     piece = embarkState.piece;
     character = embarkState.character;
-    const characterRoundLock = String(character.movementLockedRoundKey || "") === String(getCurrentActionRoundKey()) ? (character.movementLockedReason || "This character has already committed a strategic action this turn.") : "";
+    const characterRoundLock = characterMainActionReason(piece, character) || (String(character.movementLockedRoundKey || "") === String(getCurrentActionRoundKey()) ? (character.movementLockedReason || "This character has already committed a strategic action this turn.") : "");
     const diplomacyLockReason = strategicMovementLockReason(piece) || characterRoundLock;
     if (diplomacyLockReason) { ui.notifications.warn(`Diplomacy is unavailable: ${diplomacyLockReason}`); return; }
     if (embarkState.embarkedAtSea) { ui.notifications.warn("Diplomacy is unavailable while this character is embarked at sea."); return; }
     if (hasDiplomacyAttemptThisRound(character, piece)) { ui.notifications.warn(`${character.characterName || piece.name || token.document.name} has already attempted diplomacy this turn.`); return; }
     const entry = getCurrentTileEntryForToken(token, piece);
     if (!entry) { ui.notifications.warn("The selected character is not currently inside a world tile."); return; }
-    const confirmed = await Dialog.confirm({ title: "Diplomatic Takeover", content: `<p>Attempt to diplomatically take over <strong>${escapeHtml(getTileName(entry))}</strong> using <strong>${escapeHtml(piece.name || token.document.name)}</strong>?</p><p class="notes">Players will not see hidden NPC stats. The GM receives the exact comparison.</p>`, yes: () => true, no: () => false, defaultYes: true });
-    if (!confirmed) return;
-    if (!game.user.isGM) { await requestGmDiplomacy({ token, piece, entry }); return; }
+    const controller = getCharacterControllerIdentity(token, game.user.id, game.user.name);
+    const marriageCount = getMarriageCountForUser(controller.id || game.user.id, controller.name || game.user.name);
+    const marriageDiplomacy = getMarriageDiplomacyValue(piece, character);
+    const choice = await new Promise(resolve => {
+      new Dialog({
+        title: "Diplomatic Takeover",
+        content: `<form>
+          <p>Attempt to diplomatically take over <strong>${escapeHtml(getTileName(entry))}</strong> using <strong>${escapeHtml(piece.name || token.document.name)}</strong>?</p>
+          ${mainActionWarningHtml()}
+          <div style="padding:8px;border:1px solid #777;border-radius:6px;margin:8px 0;">
+            <label style="display:flex;gap:8px;align-items:flex-start;">
+              <input type="checkbox" name="useMarriageDiplomacy" ${marriageCount >= MARRIAGE_SLOT_LIMIT ? "disabled" : ""} />
+              <span><strong>Use Marriage Diplomacy</strong><br><span class="notes">Adds Marriage Diplomacy +${escapeHtml(marriageDiplomacy)} to this takeover. A successful attempt records one marriage slot.</span></span>
+            </label>
+            <div style="margin-top:6px;"><strong>Realm Marriages:</strong> ${escapeHtml(marriageCount)} / ${escapeHtml(MARRIAGE_SLOT_LIMIT)}${marriageCount >= MARRIAGE_SLOT_LIMIT ? " — all marriage slots are occupied" : ""}</div>
+          </div>
+          <p class="notes">Players will not see hidden NPC stats. The GM receives the exact comparison.</p>
+        </form>`,
+        buttons: {
+          attempt: { label: "Attempt Takeover", callback: html => resolve({ useMarriageDiplomacy: Boolean(html[0].querySelector('[name="useMarriageDiplomacy"]')?.checked) }) },
+          cancel: { label: "Cancel", callback: () => resolve(null) }
+        },
+        default: "attempt",
+        close: () => resolve(null)
+      }, { width: 560, height: "auto", resizable: true }).render(true);
+    });
+    if (!choice) return;
+    if (!game.user.isGM) { await requestGmDiplomacy({ token, piece, entry, useMarriageDiplomacy: choice.useMarriageDiplomacy }); return; }
     try {
-      await applyDiplomaticTakeover({ token, piece, entry, actingUserId: game.user.id, actingUserName: game.user.name });
+      await applyDiplomaticTakeover({ token, piece, entry, actingUserId: game.user.id, actingUserName: game.user.name, useMarriageDiplomacy: choice.useMarriageDiplomacy });
     } catch (err) {
       ui.notifications.error(err.message || "Diplomatic takeover failed.");
       console.error(err);
@@ -7688,7 +10226,7 @@ async function normalizeCharacterEmbarkState(token, piece = getWorldPiece(token)
     const piece = getWorldPiece(token);
     const entry = getCurrentTileEntryForToken(token, piece);
     try {
-      await applyDiplomaticTakeover({ token, piece, entry, actingUserId: message.requesterUserId, actingUserName: message.requesterUserName });
+      await applyDiplomaticTakeover({ token, piece, entry, actingUserId: message.requesterUserId, actingUserName: message.requesterUserName, useMarriageDiplomacy: Boolean(message.useMarriageDiplomacy) });
       ui.notifications.info(`Resolved diplomacy request from ${message.requesterUserName}.`);
     } catch (err) {
       const reason = err.message || "Diplomacy request failed.";
@@ -8229,7 +10767,8 @@ async function normalizeCharacterEmbarkState(token, piece = getWorldPiece(token)
     ].join("");
 
     const details = await new Promise(resolve => {
-      new Dialog({
+      let buildDialog = null;
+      buildDialog = new Dialog({
         title: "Create World Piece",
         content: `<form>
           <div style="padding:8px;margin-bottom:12px;border:1px solid #777;border-radius:6px;">
@@ -8367,6 +10906,14 @@ async function normalizeCharacterEmbarkState(token, piece = getWorldPiece(token)
       delete updated.lastSiegeRoundKey;
       delete updated.lastRaidRoundKey;
       delete updated.lastDiplomacyRoundKey;
+      delete updated.lastIntrigueActionRoundKey;
+      delete updated.lastOutOfMapActionRoundKey;
+      delete updated.mainActionRoundKey;
+      delete updated.mainActionReason;
+      delete updated.mainActionAt;
+      delete updated.mainActionBy;
+      delete updated.lastCharacterActionRoundKey;
+      delete updated.lastCharacterActionReason;
       updated.lastMovementResetAt = new Date().toISOString();
       updated.lastMovementResetBy = game.user.name;
       updated.lastMovementResetSource = `Crown Overview Tools ${MODULE_VERSION}`;
@@ -8378,41 +10925,246 @@ async function normalizeCharacterEmbarkState(token, piece = getWorldPiece(token)
   }
 
 
+  function standardizeTraitText(value = "") {
+    return String(value || "")
+      .replace(/\beunich\b/gi, "Eunuch")
+      .replace(/\bintruige\b/gi, "Intrigue");
+  }
+
+  function canonicalizeTraitName(value = "") {
+    const key = normalize(standardizeTraitText(value)).replace(/[^a-z0-9]+/g, " ").trim();
+    const aliases = {
+      diligent: "diligent",
+      dilligent: "diligent",
+      eunich: "eunuch",
+      eunuch: "eunuch"
+    };
+    return aliases[key] || key;
+  }
+
   function characterHasTrait(character = {}, traitName = "") {
-    const haystack = normalize(String(character.traits || ""));
-    const needle = normalize(traitName);
-    return Boolean(needle && haystack.split(/[,;\n|]+/).map(v => v.trim()).some(v => v === needle || v.includes(needle)));
+    const needle = canonicalizeTraitName(traitName);
+    if (!needle) return false;
+    return String(character.traits || "")
+      .split(/[,;\n|]+/)
+      .map(v => canonicalizeTraitName(v))
+      .some(v => v === needle || v.includes(needle));
+  }
+
+  function getDiligentBuildPrepLedger() {
+    return foundry.utils.deepClone(game.settings.get(MODULE_ID, "diligentBuildPrep") || []);
+  }
+
+  async function saveDiligentBuildPrepLedger(rows = []) {
+    await game.settings.set(MODULE_ID, "diligentBuildPrep", Array.isArray(rows) ? rows : []);
+  }
+
+  function getActiveDiligentBuildPrep({ userId = "", region = "" } = {}) {
+    const uid = String(userId || "");
+    const regionKey = normalize(region || "");
+    if (!uid || !regionKey) return null;
+    // Diligent preparation persists until the next successful construction
+    // project in that region consumes it. It does not expire at round end.
+    return getDiligentBuildPrepLedger().find(row => row && row.status === "active" && String(row.userId || "") === uid && normalize(row.region || "") === regionKey) || null;
+  }
+
+  function applyPercentDiscountToResourceMap(map = {}, percent = 0) {
+    const p = Math.max(0, Math.min(0.95, Number(percent || 0)));
+    const out = {};
+    for (const [key, value] of Object.entries(normalizeResourceMap(map))) {
+      const amount = Number(value || 0);
+      if (amount > 0 && p > 0) out[key] = Math.round(amount * (1 - p) * 100) / 100;
+      else out[key] = amount;
+    }
+    return normalizeResourceMap(out);
+  }
+
+  async function consumeDiligentBuildPrep(prepId, { building = "", tileName = "", builderName = "" } = {}) {
+    if (!prepId) return;
+    const rows = getDiligentBuildPrepLedger();
+    const index = rows.findIndex(row => String(row?.id || "") === String(prepId));
+    if (index < 0 || rows[index]?.status !== "active") return;
+    rows[index] = { ...rows[index], status: "consumed", consumedAt: new Date().toISOString(), consumedByBuilding: building, consumedAtTile: tileName, consumedByBuilder: builderName };
+    await saveDiligentBuildPrepLedger(rows);
+  }
+
+  async function applyDiligentBuildAction({ token, requesterUserId, requesterUserName }) {
+    if (!token) throw new Error("Could not find that character token.");
+    const actingUser = game.users.get(String(requesterUserId || "")) || { id: requesterUserId, name: requesterUserName, isGM: false };
+    const piece = getWorldPiece(token) || {};
+    if (!canUserControlWorldPieceForUser(token, piece, actingUser)) throw new Error(`${requesterUserName || "Player"} does not control ${piece.name || token.document.name}.`);
+    const character = getCharacterDataFromToken(token) || {};
+    if (!characterHasTrait(character, "Diligent")) throw new Error(`${character.characterName || piece.name || token.document.name} does not have the Diligent trait.`);
+    const roundKey = getCurrentActionRoundKey();
+    const existingLock = characterMainActionReason(piece, character) || strategicMovementLockReason(piece) || (String(character.movementLockedRoundKey || "") === String(roundKey) ? (character.movementLockedReason || "This character has already committed a strategic action this turn.") : "");
+    if (existingLock) throw new Error(existingLock);
+    const entry = getCurrentTileEntryForToken(token, piece);
+    if (!entry?.tile || isSeaByTile(entry.tile)) throw new Error("Diligent construction planning must be performed while the character is in a land province.");
+    const region = String(entry.tile.region || getHouseData(entry.drawing)?.region || piece.currentRegion || "").trim();
+    if (!region) throw new Error("Could not determine this character's current region.");
+    const existingPrep = getActiveDiligentBuildPrep({ userId: actingUser.id, region, roundKey });
+    if (existingPrep) throw new Error(`${actingUser.name || requesterUserName} already has an unused Diligent construction discount prepared for ${region}.`);
+
+    const record = {
+      id: foundry.utils.randomID(16), status: "active", userId: String(actingUser.id || requesterUserId || ""), userName: actingUser.name || requesterUserName || "Player",
+      characterId: character.characterId || piece.characterId || token.document.id, characterName: character.characterName || piece.name || token.document.name,
+      region, roundKey, dateLabel: getDateLabel(getClock()), discountPercent: 0.25, createdAt: new Date().toISOString()
+    };
+    const rows = getDiligentBuildPrepLedger();
+    rows.push(record);
+    await saveDiligentBuildPrepLedger(rows);
+    await lockCharacterActionForRound(token, `Diligent construction planning in ${region} this turn.`);
+
+    await ChatMessage.create({
+      speaker: ChatMessage.getSpeaker({ alias: "Crown Build" }),
+      whisper: getPrivateActionRecipients(requesterUserId),
+      content: `<h2>Diligent Construction Planning</h2><p><strong>Character:</strong> ${escapeHtml(record.characterName)}</p><p><strong>Region:</strong> ${escapeHtml(region)}</p><p>The realm's next building or upgrade started in this region costs <strong>25% less</strong>. The sale remains active until a project successfully begins.</p><p><strong>Main Action:</strong> spent.</p><p>${escapeHtml(record.characterName)} is grounded for the rest of the round.</p>`
+    });
+    return record;
+  }
+
+  async function takeDiligentBuildAction(token) {
+    if (!token) return;
+    const piece = getWorldPiece(token) || {};
+    const character = getCharacterDataFromToken(token) || {};
+    if (!characterHasTrait(character, "Diligent")) { ui.notifications.warn(`${character.characterName || piece.name || token.document.name} does not have the Diligent trait.`); return; }
+    const entry = getCurrentTileEntryForToken(token, piece);
+    const region = String(entry?.tile?.region || piece.currentRegion || "Unknown Region");
+    const confirmed = await Dialog.confirm({
+      title: "Use Diligent Construction Action?",
+      content: `<p><strong>${escapeHtml(character.characterName || piece.name || token.document.name)}</strong> will prepare construction in <strong>${escapeHtml(region)}</strong>.</p>${mainActionWarningHtml()}<p>The realm's next building or upgrade begun in that region costs <strong>25% less</strong>. The sale remains active until a project successfully begins. This grounds the character for the rest of the round.</p>`,
+      yes: () => true, no: () => false, defaultYes: false
+    });
+    if (!confirmed) return;
+    if (game.user.isGM) {
+      const controller = getCharacterControllerIdentity(token);
+      const actingUser = (controller?.id && game.users.get(String(controller.id))) || game.user;
+      await applyDiligentBuildAction({ token, requesterUserId: actingUser.id, requesterUserName: actingUser.name });
+      ui.notifications.info(`${character.characterName || piece.name || token.document.name} prepared a 25% Diligent construction discount for ${region}.`);
+      return true;
+    }
+    const gm = findActiveGmForScene(canvas.scene?.id);
+    if (!gm) { ui.notifications.warn("An active GM is required to commit the Diligent construction action."); return; }
+    game.socket.emit(SOCKET_NAME, { type: "diligentBuildActionRequest", targetGmId: gm.id, sceneId: canvas.scene?.id, requesterUserId: game.user.id, requesterUserName: game.user.name, characterTokenId: token.document.id });
+    ui.notifications.info(`Diligent construction action sent to GM ${gm.name}.`);
+    return true;
   }
 
   async function lockCharacterActionForRound(token, reason) {
     if (!token) return;
+    const actionReason = reason || "Main Action used this round.";
+    await markCharacterMainActionForRound(token, actionReason);
     const roundKey = getCurrentActionRoundKey();
     const piece = foundry.utils.deepClone(getWorldPiece(token) || {});
     piece.movementUsed = Math.max(Number(piece.movementUsed || 0), Number(piece.movementMax || 0));
     piece.movementLockedRoundKey = roundKey;
-    piece.movementLockedReason = reason || "Character action committed this turn.";
+    piece.movementLockedReason = actionReason;
     await saveWorldPiece(token, piece);
     const character = foundry.utils.deepClone(getCharacterDataFromToken(token) || {});
     character.movementLockedRoundKey = roundKey;
-    character.movementLockedReason = reason || "Character action committed this turn.";
-    character.lastCharacterActionRoundKey = roundKey;
-    character.lastCharacterActionReason = reason || "Character action";
+    character.movementLockedReason = actionReason;
     await token.document.setFlag(FLAG_SCOPE, WORLD_CHARACTER_KEY, character);
     if (token.actor) await token.actor.setFlag(FLAG_SCOPE, WORLD_CHARACTER_KEY, foundry.utils.deepClone(character));
   }
 
-  function getRealmUsers() {
-    return game.users.contents.filter(u => !u.isGM && getHoldingsForUser(u).some(e => !isSeaByTile(e.tile)));
+  async function applyIntrigueAction({ token, requesterUserId, requesterUserName, actionType = "Other", actionDetails = "" }) {
+    if (!token) throw new Error("Could not find that character token.");
+    const actingUser = game.users.get(String(requesterUserId || "")) || { id: requesterUserId, name: requesterUserName, isGM: false };
+    const piece = getWorldPiece(token) || {};
+    if (!canUserControlWorldPieceForUser(token, piece, actingUser)) throw new Error(`${requesterUserName || "Player"} does not control ${piece.name || token.document.name}.`);
+    const character = getCharacterDataFromToken(token) || {};
+    const roundKey = getCurrentActionRoundKey();
+    const mainActionLock = characterMainActionReason(piece, character);
+    if (mainActionLock) throw new Error(mainActionLock);
+
+    const label = String(actionType || "Other").trim() || "Other";
+    const details = String(actionDetails || "").trim();
+    const reason = `Out-of-Map Action: ${label}`;
+    await markCharacterMainActionForRound(token, reason);
+
+    const updatedPiece = foundry.utils.deepClone(getWorldPiece(token) || piece);
+    updatedPiece.lastIntrigueActionRoundKey = roundKey; // compatibility with older UI/data
+    updatedPiece.lastOutOfMapActionRoundKey = roundKey;
+    updatedPiece.lastOutOfMapActionType = label;
+    updatedPiece.lastOutOfMapActionDetails = details;
+    updatedPiece.lastOutOfMapActionAt = new Date().toISOString();
+    updatedPiece.lastOutOfMapActionBy = requesterUserName || actingUser.name || game.user.name;
+    await saveWorldPiece(token, updatedPiece);
+
+    const updatedCharacter = foundry.utils.deepClone(getCharacterDataFromToken(token) || character);
+    updatedCharacter.lastIntrigueActionRoundKey = roundKey;
+    updatedCharacter.lastOutOfMapActionRoundKey = roundKey;
+    updatedCharacter.lastOutOfMapActionType = label;
+    updatedCharacter.lastOutOfMapActionDetails = details;
+    updatedCharacter.lastOutOfMapActionAt = updatedPiece.lastOutOfMapActionAt;
+    updatedCharacter.lastOutOfMapActionBy = updatedPiece.lastOutOfMapActionBy;
+    await token.document.setFlag(FLAG_SCOPE, WORLD_CHARACTER_KEY, updatedCharacter);
+    if (token.actor) await token.actor.setFlag(FLAG_SCOPE, WORLD_CHARACTER_KEY, foundry.utils.deepClone(updatedCharacter));
+
+    const entry = getCurrentTileEntryForToken(token, updatedPiece);
+    await ChatMessage.create({
+      speaker: ChatMessage.getSpeaker({ alias: "Crown Out-of-Map Action" }),
+      whisper: getPrivateActionRecipients(requesterUserId),
+      content: `<h2>Out-of-Map Action</h2><p><strong>Character:</strong> ${escapeHtml(updatedCharacter.characterName || updatedPiece.name || token.document.name)}</p><p><strong>Action:</strong> ${escapeHtml(label)}</p>${details ? `<p><strong>Details:</strong> ${escapeHtml(details)}</p>` : ""}<p><strong>Location:</strong> ${escapeHtml(entry ? getTileName(entry) : (updatedPiece.currentTileName || "Unknown"))}</p><p><strong>Main Action:</strong> spent for this round.</p><p><strong>Movement:</strong> remains available; this action does not ground the character.</p>`
+    });
+    return true;
   }
 
+  async function takeIntrigueAction(token) {
+    if (!token) return;
+    const piece = getWorldPiece(token) || {};
+    const character = getCharacterDataFromToken(token) || {};
+    const lockReason = characterMainActionReason(piece, character);
+    if (lockReason) { ui.notifications.warn(`Out-of-Map Action is unavailable: ${lockReason}`); return; }
+
+    const result = await new Promise(resolve => new Dialog({
+      title: "Take an Out-of-Map Action?",
+      content: `<form>
+        <p><strong>${escapeHtml(character.characterName || piece.name || token.document.name)}</strong> can spend their Main Action on a major event or scheme that is not directly automated on the strategic map.</p>
+        ${mainActionWarningHtml()}
+        <p class="notes">This does <strong>not</strong> spend or lock character movement.</p>
+        <div class="form-group"><label>Action</label><select name="actionType"><option>Festival</option><option>Organize a Kidnapping</option><option>Hunt</option><option>Host a Feast</option><option>Religious Event</option><option>Research / Project</option><option selected>Other</option></select></div>
+        <div class="form-group"><label>Details</label><textarea name="actionDetails" rows="4" placeholder="Describe the event, scheme, hunt, festival, or other major action for the GM."></textarea></div>
+      </form>`,
+      buttons: {
+        commit: { label: "Spend Main Action", callback: html => resolve({ actionType: String(html[0].querySelector('[name="actionType"]')?.value || "Other"), actionDetails: String(html[0].querySelector('[name="actionDetails"]')?.value || "") }) },
+        cancel: { label: "Cancel", callback: () => resolve(null) }
+      },
+      default: "commit",
+      close: () => resolve(null)
+    }, { width: 520, height: "auto", resizable: true }).render(true));
+    if (!result) return;
+
+    if (game.user.isGM) {
+      await applyIntrigueAction({ token, requesterUserId: game.user.id, requesterUserName: game.user.name, ...result });
+      ui.notifications.info(`${character.characterName || piece.name || token.document.name} spent their Main Action on ${result.actionType}.`);
+      return;
+    }
+    const gm = findActiveGmForScene(canvas.scene?.id);
+    if (!gm) { ui.notifications.warn("An active GM is required to commit an Out-of-Map Action."); return; }
+    game.socket.emit(SOCKET_NAME, {
+      type: "intrigueActionRequest", targetGmId: gm.id, sceneId: canvas.scene?.id, requesterUserId: game.user.id, requesterUserName: game.user.name, characterTokenId: token.document.id, actionType: result.actionType, actionDetails: result.actionDetails
+    });
+    ui.notifications.info(`Out-of-Map Action sent to GM ${gm.name}.`);
+  }
+
+
+
+
+  function getRealmUsers() {
+    return game.users.contents.filter(u => !u.isGM && getRealmLandEntriesForUser(u).length > 0);
+  }
+
+
   async function creditRealmResources(user, resources, reason) {
-    const entries = getHoldingsForUser(user).filter(e => !isSeaByTile(e.tile));
+    const entries = getRealmLandEntriesForUser(user);
     if (!entries.length) throw new Error(`${user?.name || "Recipient"} has no controlled land holdings.`);
     await creditRaidLootToRealm(entries, normalizeResourceMap(resources), reason);
   }
 
+
   async function debitRealmResources(user, resources, reason) {
-    const entries = getHoldingsForUser(user).filter(e => !isSeaByTile(e.tile));
+    const entries = getRealmLandEntriesForUser(user);
     if (!entries.length) throw new Error(`${user?.name || "House"} has no controlled land holdings.`);
     const stockpile = getRealmStockpileForEntries(entries);
     const missing = getMissingResources(stockpile, resources);
@@ -8420,8 +11172,169 @@ async function normalizeCharacterEmbarkState(token, piece = getWorldPiece(token)
     return debitCostFromRealmStockpile(entries, resources, reason);
   }
 
+
+  function getPrimaryPlayerHouseName(user) {
+    if (!user || user.isGM) return "";
+    const wantedId = String(user.id || "").trim();
+    const wantedName = normalize(user.name || "");
+
+    const mostCommon = values => {
+      const counts = new Map();
+      for (const raw of values) {
+        const name = String(raw || "").trim();
+        if (!name || isGenericNeutralLocalHouse(name)) continue;
+        const key = normalize(name);
+        const row = counts.get(key) || { name, count: 0 };
+        row.count += 1;
+        counts.set(key, row);
+      }
+      return [...counts.values()].sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))[0]?.name || "";
+    };
+
+    // The House on a character explicitly assigned to this player is the
+    // strongest realm-name signal and avoids ambiguity from preserved vassal
+    // House names in conquered provinces.
+    const characterHouses = [];
+    for (const token of getCharacterTokens()) {
+      const controller = getCharacterControllerIdentity(token);
+      const matches = wantedId
+        ? String(controller.id || "") === wantedId
+        : Boolean(wantedName && normalize(controller.name || "") === wantedName);
+      if (!matches) continue;
+      const character = getCharacterDataFromToken(token) || {};
+      const piece = getWorldPiece(token) || {};
+      characterHouses.push(character.house || piece.house || piece.faction || "");
+    }
+    const characterHouse = mostCommon(characterHouses);
+    if (characterHouse) return characterHouse;
+
+    const canonical = String(getCanonicalHouseNameForPlayer(user.id, user.name) || "").trim();
+    if (canonical) return canonical;
+
+    // Legacy fallback: derive the political House from provinces explicitly
+    // controlled by this player, preferring allegiance over local House name.
+    const directEntries = getHoldingsForUser(user).filter(entry => !isSeaByTile(entry.tile));
+    const allegianceHouse = mostCommon(directEntries.map(entry => {
+      const house = entry.house || getHouseData(entry.drawing) || {};
+      return house.allegiance || entry.tile?.allegiance || "";
+    }));
+    if (allegianceHouse) return allegianceHouse;
+
+    return mostCommon(directEntries.map(entry => {
+      const house = entry.house || getHouseData(entry.drawing) || {};
+      return house.house || entry.tile?.house || entry.tile?.owner || "";
+    }));
+  }
+
+
+  function getRealmEntriesForPlayerHouse(user, houseName = "") {
+    if (!user || user.isGM) return [];
+    const entries = [];
+    for (const entry of getWorldTileEntries()) {
+      if (isSeaByTile(entry.tile)) continue;
+      const house = getHouseData(entry.drawing) || {};
+      if (!isTileControlledByUser(entry.tile || {}, house, user)) continue;
+      entries.push({ ...entry, house });
+    }
+    entries.sort((a, b) => String(a.house?.region || a.tile?.region || "").localeCompare(String(b.house?.region || b.tile?.region || "")) || String(a.tile?.name || "").localeCompare(String(b.tile?.name || "")));
+    return entries;
+  }
+
+
+
+  function getRealmLandEntriesForUser(user) {
+    if (!user || user.isGM) return [];
+    const houseName = getPrimaryPlayerHouseName(user);
+    const dynamic = getRealmEntriesForPlayerHouse(user, houseName);
+    if (dynamic.length) return dynamic;
+    // Compatibility fallback for worlds that have only the original explicit owner fields.
+    return getHoldingsForUser(user).filter(entry => !isSeaByTile(entry.tile));
+  }
+
+
+  function getPlayerHouseAdjustmentRecords() {
+    const records = [];
+    for (const user of getPlayerUsers()) {
+      const canonicalHouse = getPrimaryPlayerHouseName(user);
+      const entries = getRealmEntriesForPlayerHouse(user, canonicalHouse);
+      // A player with an assigned House should remain visible even before their
+      // first province is explicitly controller-tagged. Truly unassigned player
+      // accounts are omitted because they are not yet a Crown player House.
+      if (!canonicalHouse && !entries.length) continue;
+      records.push({ user, houseName: canonicalHouse || user.name, entries });
+    }
+    return records.sort((a, b) => a.houseName.localeCompare(b.houseName) || a.user.name.localeCompare(b.user.name));
+  }
+
+
+  async function adjustHouseGoldFood() {
+    if (!requireOverviewScene()) return;
+    if (!game.user.isGM) { ui.notifications.warn("GM only."); return; }
+
+    // Rebuild this list from live world data every time the tool opens. Nothing
+    // here is a hard-coded House roster or cached setup-time snapshot.
+    const playerHouses = getPlayerHouseAdjustmentRecords();
+    if (!playerHouses.length) { ui.notifications.warn("No assigned player Houses were found in current world data."); return; }
+
+    const options = playerHouses.map(record => {
+      const stock = getRealmStockpileForEntries(record.entries);
+      const holdingsText = record.entries.length ? `${record.entries.length} land ${record.entries.length === 1 ? "holding" : "holdings"}` : "no land holdings found";
+      return `<option value="${escapeHtml(record.user.id)}">${escapeHtml(record.houseName)} — ${escapeHtml(record.user.name)} (G${escapeHtml(Number(stock.Gold || 0))} / F${escapeHtml(Number(stock.Food || 0))}; ${escapeHtml(holdingsText)})</option>`;
+    }).join("");
+
+    const result = await new Promise(resolve => new Dialog({
+      title: "Adjust House Gold / Food",
+      content: `<form>
+        <div class="form-group"><label>House / Player</label><select name="userId" style="width:100%;">${options}</select></div>
+        <div class="form-group"><label>Gold adjustment</label><input name="gold" type="number" step="1" value="0" style="width:100%;" /></div>
+        <div class="form-group"><label>Food adjustment</label><input name="food" type="number" step="1" value="0" style="width:100%;" /></div>
+        <p class="notes">Positive values add resources. Negative values remove resources, capped at the House's current realm stockpile so balances cannot be driven below 0.</p>
+      </form>`,
+      buttons: {
+        apply: { label: "Apply Adjustment", callback: html => {
+          const form = html[0].querySelector("form");
+          resolve({ userId: String(form.userId.value || ""), gold: Number(form.gold.value || 0), food: Number(form.food.value || 0) });
+        } },
+        cancel: { label: "Cancel", callback: () => resolve(null) }
+      },
+      default: "apply"
+    }, { width: 520, height: 360, resizable: true }).render(true));
+
+    if (!result) return;
+    const user = game.users.get(result.userId);
+    if (!user) { ui.notifications.error("Selected player could not be found."); return; }
+    // Resolve the realm again at Apply time so a province reassignment that
+    // happened while the dialog was open cannot leave us using stale holdings.
+    const houseName = getPrimaryPlayerHouseName(user) || user.name;
+    const entries = getRealmEntriesForPlayerHouse(user, houseName);
+    if (!entries.length) { ui.notifications.warn(`${houseName} has no land holdings available for realm stockpile adjustment.`); return; }
+
+    const before = getRealmStockpileForEntries(entries);
+    const requested = { Gold: Number(result.gold || 0), Food: Number(result.food || 0) };
+    const additions = {};
+    const removals = {};
+    for (const resource of ["Gold", "Food"]) {
+      const amount = Number(requested[resource] || 0);
+      if (amount > 0) additions[resource] = amount;
+      else if (amount < 0) removals[resource] = Math.min(Math.max(0, Number(before[resource] || 0)), Math.abs(amount));
+    }
+
+    if (hasAnyResources(removals)) await debitCostFromRealmStockpile(entries, removals, `GM House resource adjustment by ${game.user.name}`);
+    if (hasAnyResources(additions)) await creditRaidLootToRealm(entries, additions, `GM House resource adjustment by ${game.user.name}`);
+
+    const after = getRealmStockpileForEntries(entries);
+    await ChatMessage.create({
+      speaker: ChatMessage.getSpeaker({ alias: "Crown Economy" }),
+      content: `<h2>GM House Resource Adjustment</h2><p><strong>House:</strong> ${escapeHtml(houseName)}</p><p><strong>Player:</strong> ${escapeHtml(user.name)}</p><p><strong>Requested:</strong> Gold ${escapeHtml(requested.Gold >= 0 ? "+" + requested.Gold : requested.Gold)}; Food ${escapeHtml(requested.Food >= 0 ? "+" + requested.Food : requested.Food)}</p><p><strong>Before:</strong> ${escapeHtml(goldFoodOnlyText(before, "None"))}</p><p><strong>After:</strong> ${escapeHtml(goldFoodOnlyText(after, "None"))}</p>`
+    });
+    ui.notifications.info(`Adjusted ${houseName}: ${goldFoodOnlyText(before, "None")} → ${goldFoodOnlyText(after, "None")}.`);
+  }
+
+
   async function getTradeLedger() { return foundry.utils.deepClone(game.settings.get(MODULE_ID, "tradeLedger") || []); }
+
   async function saveTradeLedger(rows) { await game.settings.set(MODULE_ID, "tradeLedger", rows || []); }
+
   async function getBankLedger() { return foundry.utils.deepClone(game.settings.get(MODULE_ID, "bankLedger") || {}); }
   async function saveBankLedger(rows) { await game.settings.set(MODULE_ID, "bankLedger", rows || {}); }
 
@@ -8433,9 +11346,11 @@ async function normalizeCharacterEmbarkState(token, piece = getWorldPiece(token)
     if (String(sender.id) === String(recipient.id)) throw new Error("You cannot send resources to yourself.");
     const resources = { Gold: Math.max(0, Math.floor(Number(gold || 0))), Food: Math.max(0, Math.floor(Number(food || 0))) };
     if (!resources.Gold && !resources.Food) throw new Error("Enter at least 1 Gold or Food.");
-    await debitRealmResources(sender, resources, `Trade shipment sent to ${recipient.name}`);
+    // Validate scheduling before mutating the sender's stockpile. Previously an
+    // uninitialized clock could debit resources and then abort before a shipment existed.
     const clock = getClock();
     if (!clock) throw new Error("Initialize the World Round Clock before sending trade.");
+    await debitRealmResources(sender, resources, `Trade shipment sent to ${recipient.name}`);
     const ledger = await getTradeLedger();
     ledger.push({ id: foundry.utils.randomID(), senderUserId: sender.id, senderName: senderName || sender.name, recipientUserId: recipient.id, recipientName: recipient.name, resources, sentRoundKey: getRoundKey(clock), sentDateLabel: getDateLabel(clock), deliverRoundKey: getRoundKey(advanceClockData(clock)), deliverDateLabel: getDateLabel(advanceClockData(clock)), status: "in-transit", createdAt: new Date().toISOString() });
     await saveTradeLedger(ledger);
@@ -8447,7 +11362,7 @@ async function normalizeCharacterEmbarkState(token, piece = getWorldPiece(token)
     if (!requireOverviewScene()) return;
     const recipients = getRealmUsers().filter(u => String(u.id) !== String(game.user.id));
     if (!recipients.length) { ui.notifications.warn("No other player realms are available for trade."); return; }
-    const stock = getRealmStockpileForEntries(getHoldingsForUser(game.user).filter(e => !isSeaByTile(e.tile)));
+    const stock = getRealmStockpileForEntries(getRealmLandEntriesForUser(game.user));
     const result = await new Promise(resolve => new Dialog({ title: "Trade / Send Resources", content: `<form><p><strong>Your realm stockpile:</strong> ${escapeHtml(goldFoodOnlyText(stock, "None"))}</p><div class="form-group"><label>Recipient</label><select name="recipient">${recipients.map(u => `<option value="${escapeHtml(u.id)}">${escapeHtml(u.name)}</option>`).join("")}</select></div><div class="form-group"><label>Gold</label><input name="gold" type="number" min="0" step="1" value="0"/></div><div class="form-group"><label>Food</label><input name="food" type="number" min="0" step="1" value="0"/></div><p class="notes">Resources leave your stockpile immediately and arrive when the round ends. Shipments cannot be recalled.</p></form>`, buttons:{ send:{label:"Send Shipment",callback:html=>{const f=html[0].querySelector('form');resolve({recipientUserId:f.recipient.value,gold:f.gold.value,food:f.food.value});}}, cancel:{label:"Cancel",callback:()=>resolve(null)}}, default:"send" },{width:480}).render(true));
     if (!result) return;
     if (game.user.isGM) { await executeResourceTrade({ senderUserId: game.user.id, senderName: game.user.name, ...result }); ui.notifications.info("Shipment sent."); return; }
@@ -8457,10 +11372,85 @@ async function normalizeCharacterEmbarkState(token, piece = getWorldPiece(token)
   }
 
   async function processTradeDeliveries(clock = getClock()) {
-    if (!game.user.isGM) return {delivered:0};
-    const ledger=await getTradeLedger(); let delivered=0;
-    for(const row of ledger){ if(row.status!=="in-transit" || String(row.deliverRoundKey)!==String(getRoundKey(clock))) continue; const recipient=game.users.get(String(row.recipientUserId||"")); if(!recipient){row.status="failed";continue;} await creditRealmResources(recipient,row.resources,`Trade shipment from ${row.senderName}`); row.status="delivered"; row.deliveredAt=new Date().toISOString(); delivered++; await ChatMessage.create({speaker:ChatMessage.getSpeaker({alias:"Crown Trade"}),content:`<h2>Shipment Delivered</h2><p><strong>${escapeHtml(recipient.name)}</strong> received <strong>${escapeHtml(resourceMapToText(row.resources))}</strong> from <strong>${escapeHtml(row.senderName||"another realm")}</strong>.</p>`}); }
-    await saveTradeLedger(ledger); return {delivered};
+    if (!game.user.isGM) return { delivered: 0, waiting: 0, failed: 0 };
+    const ledger = await getTradeLedger();
+    const currentRoundKey = getRoundKey(clock);
+    const currentSort = roundSortValue(clock);
+    let delivered = 0, waiting = 0, failed = 0;
+
+    for (const row of ledger) {
+      if (row.status !== "in-transit") continue;
+      const dueSort = roundSortValueFromRoundKey(row.deliverRoundKey);
+      const isDue = dueSort === null
+        ? String(row.deliverRoundKey) === String(currentRoundKey)
+        : dueSort <= currentSort;
+      if (!isDue) continue;
+
+      const recipient = game.users.get(String(row.recipientUserId || ""));
+      if (!recipient) {
+        row.status = "failed";
+        row.lastDeliveryError = "Recipient user no longer exists.";
+        row.lastDeliveryAttemptRoundKey = currentRoundKey;
+        failed++;
+        continue;
+      }
+
+      try {
+        const entries = getRealmLandEntriesForUser(recipient);
+        if (!entries.length) {
+          // Do not destroy the shipment or abort Round Advance. It remains in
+          // transit and is retried on later rounds if the recipient regains land.
+          row.lastDeliveryError = "Recipient currently has no controlled land stockpile.";
+          row.lastDeliveryAttemptRoundKey = currentRoundKey;
+          waiting++;
+          continue;
+        }
+        await creditRaidLootToRealm(entries, normalizeResourceMap(row.resources), `Trade shipment from ${row.senderName}`);
+        row.status = "delivered";
+        row.deliveredAt = new Date().toISOString();
+        row.deliveredRoundKey = currentRoundKey;
+        delete row.lastDeliveryError;
+        delivered++;
+        await ChatMessage.create({
+          speaker: ChatMessage.getSpeaker({ alias: "Crown Trade" }),
+          content: `<h2>Shipment Delivered</h2><p><strong>${escapeHtml(recipient.name)}</strong> received <strong>${escapeHtml(resourceMapToText(row.resources))}</strong> from <strong>${escapeHtml(row.senderName || "another realm")}</strong>.</p>`
+        });
+      } catch (err) {
+        // A single bad shipment must never abort the rest of Round Advance.
+        row.lastDeliveryError = String(err?.message || err || "Unknown delivery error");
+        row.lastDeliveryAttemptRoundKey = currentRoundKey;
+        waiting++;
+        console.error("Crown trade delivery deferred", row, err);
+      }
+    }
+    await saveTradeLedger(ledger);
+    return { delivered, waiting, failed };
+  }
+
+  async function creditLoanToSingleRealmHolding(user, token, amount, reason = "Bank loan") {
+    const entries = getRealmLandEntriesForUser(user);
+    if (!entries.length) throw new Error(`${user?.name || "Borrower"} has no controlled land holdings.`);
+
+    const piece = token ? (getWorldPiece(token) || {}) : {};
+    const currentTileId = String(piece.currentTileId || "").trim();
+    let target = currentTileId
+      ? entries.find(entry => String(getTileId(entry) || "") === currentTileId)
+      : null;
+
+    // If the character is standing on an edge or old data lacks currentTileId,
+    // resolve their current province geometrically, but only accept it if it is
+    // actually one of this player's controlled land holdings.
+    if (!target && token) {
+      const current = getCurrentTileEntryForToken(token, piece);
+      const currentId = String(current ? getTileId(current) : "");
+      if (currentId) target = entries.find(entry => String(getTileId(entry) || "") === currentId) || null;
+    }
+
+    // Stable fallback: use the first controlled holding rather than spraying
+    // fractions of the loan across every province in the realm.
+    target = target || entries[0];
+    await applyResourceDeltaToTile(target, { Gold: Math.max(0, Number(amount || 0)) }, reason);
+    return { entry: target, tileName: getTileName(target) };
   }
 
   async function executeBankLoan({ borrowerUserId, characterTokenId, amount } = {}) {
@@ -8469,15 +11459,16 @@ async function normalizeCharacterEmbarkState(token, piece = getWorldPiece(token)
     const token=canvas.tokens.placeables.find(t=>String(t.document.id)===String(characterTokenId)); if(!token) throw new Error("Borrowing character not found on this scene.");
     const piece=getWorldPiece(token)||{}; if(!canUserControlWorldPieceForUser(token,piece,borrower)) throw new Error(`${borrower.name} does not control that character.`);
     const character=getCharacterDataFromToken(token)||{}; if(characterHasTrait(character,"Dishonorable")) throw new Error("Dishonorable characters cannot secure a bank loan.");
+    const mainActionLock = characterMainActionReason(piece, character); if(mainActionLock) throw new Error(mainActionLock);
     const roundKey=getCurrentActionRoundKey(); if(String(character.movementLockedRoundKey||"")===String(roundKey) || strategicMovementLockReason(piece)) throw new Error("This character has already committed an action this round.");
     amount=Math.max(1,Math.min(30,Math.floor(Number(amount||0))));
     const ledger=await getBankLedger(); if(ledger[borrower.id] && ledger[borrower.id].status!=="repaid") throw new Error("This House already has an outstanding bank loan.");
     const clock=getClock(); if(!clock) throw new Error("Initialize the World Round Clock before taking a loan.");
     const dueClock=addRoundsToClockData(clock,3); const repayment=Math.ceil(amount*1.20);
-    await creditRealmResources(borrower,{Gold:amount},`Bank loan secured by ${character.characterName||piece.name||token.document.name}`);
-    ledger[borrower.id]={borrowerUserId:borrower.id,borrowerName:borrower.name,characterName:character.characterName||piece.name||token.document.name,principal:amount,amountDue:repayment,borrowedRoundKey:getRoundKey(clock),borrowedDateLabel:getDateLabel(clock),dueRoundKey:getRoundKey(dueClock),dueDateLabel:getDateLabel(dueClock),status:"active",createdAt:new Date().toISOString()}; await saveBankLedger(ledger);
+    const loanDeposit = await creditLoanToSingleRealmHolding(borrower, token, amount, `Bank loan secured by ${character.characterName||piece.name||token.document.name}`);
+    ledger[borrower.id]={borrowerUserId:borrower.id,borrowerName:borrower.name,characterName:character.characterName||piece.name||token.document.name,principal:amount,amountDue:repayment,borrowedRoundKey:getRoundKey(clock),borrowedDateLabel:getDateLabel(clock),dueRoundKey:getRoundKey(dueClock),dueDateLabel:getDateLabel(dueClock),status:"active",depositTileId:String(getTileId(loanDeposit.entry)||""),depositTileName:loanDeposit.tileName||"",createdAt:new Date().toISOString()}; await saveBankLedger(ledger);
     await lockCharacterActionForRound(token,"This character secured a bank loan this round.");
-    await ChatMessage.create({speaker:ChatMessage.getSpeaker({alias:"Crown Bank"}),content:`<h2>Bank Loan Secured</h2><p><strong>${escapeHtml(character.characterName||piece.name||token.document.name)}</strong> secured <strong>${escapeHtml(amount)} Gold</strong> for ${escapeHtml(borrower.name)}.</p><p><strong>Repayment:</strong> ${escapeHtml(repayment)} Gold (20% total interest), due ${escapeHtml(getDateLabel(dueClock))}.</p>`});
+    await ChatMessage.create({speaker:ChatMessage.getSpeaker({alias:"Crown Bank"}),whisper:getPrivateActionRecipients(borrower.id),content:`<h2>Bank Loan Secured</h2><p><strong>${escapeHtml(character.characterName||piece.name||token.document.name)}</strong> secured <strong>${escapeHtml(amount)} Gold</strong> for ${escapeHtml(borrower.name)}.</p><p><strong>Deposited at:</strong> ${escapeHtml(loanDeposit.tileName || "Realm treasury")}. The Gold remains spendable realm-wide; it is no longer divided across every province.</p><p><strong>Repayment:</strong> ${escapeHtml(repayment)} Gold (20% total interest), due ${escapeHtml(getDateLabel(dueClock))}.</p>`});
     return ledger[borrower.id];
   }
 
@@ -8487,7 +11478,7 @@ async function normalizeCharacterEmbarkState(token, piece = getWorldPiece(token)
     const borrower=game.users.get(String(borrowerUserId||"")); if(!borrower) throw new Error("Borrower not found.");
     const ledger=await getBankLedger(); const loan=ledger[borrower.id]; if(!loan || loan.status==="repaid") throw new Error("This House has no outstanding bank loan.");
     await debitRealmResources(borrower,{Gold:Number(loan.amountDue||0)},"Early bank loan repayment"); loan.status="repaid";loan.repaidAt=new Date().toISOString();await saveBankLedger(ledger);
-    await ChatMessage.create({speaker:ChatMessage.getSpeaker({alias:"Crown Bank"}),content:`<h2>Loan Repaid</h2><p><strong>${escapeHtml(borrower.name)}</strong> repaid <strong>${escapeHtml(loan.amountDue)} Gold</strong>.</p>`}); return loan;
+    await ChatMessage.create({speaker:ChatMessage.getSpeaker({alias:"Crown Bank"}),whisper:getPrivateActionRecipients(borrower.id),content:`<h2>Loan Repaid</h2><p><strong>${escapeHtml(borrower.name)}</strong> repaid <strong>${escapeHtml(loan.amountDue)} Gold</strong>.</p>`}); return loan;
   }
 
   async function bankLoan() {
@@ -8501,14 +11492,15 @@ async function normalizeCharacterEmbarkState(token, piece = getWorldPiece(token)
     const token=selected[0], piece=getWorldPiece(token)||{}, character=getCharacterDataFromToken(token)||{};
     if(!canUserControlWorldPiece(token,piece)){ui.notifications.warn("You can only take a loan with a character you control.");return;}
     if(characterHasTrait(character,"Dishonorable")){ui.notifications.warn("Bank Loan — UNAVAILABLE: Dishonorable characters cannot secure institutional credit.");return;}
-    const result=await new Promise(resolve=>new Dialog({title:"Bank Loan",content:`<form><p><strong>Character:</strong> ${escapeHtml(character.characterName||piece.name||token.document.name)}</p><div class="form-group"><label>Borrow Gold (1–30)</label><input name="amount" type="number" min="1" max="30" step="1" value="30"/></div><p class="notes">20% total interest. Repayment is due in three rounds. One outstanding loan per House. Taking a loan consumes this character's action for the round.</p></form>`,buttons:{borrow:{label:"Accept Loan",callback:html=>resolve(Number(html[0].querySelector('[name="amount"]').value||0))},cancel:{label:"Cancel",callback:()=>resolve(null)}},default:"borrow"},{width:480}).render(true));
+    const loanActionLock = characterMainActionReason(piece, character); if(loanActionLock){ui.notifications.warn(loanActionLock);return;}
+    const result=await new Promise(resolve=>new Dialog({title:"Bank Loan",content:`<form><p><strong>Character:</strong> ${escapeHtml(character.characterName||piece.name||token.document.name)}</p><div class="form-group"><label>Borrow Gold (1–30)</label><input name="amount" type="number" min="1" max="30" step="1" value="30"/></div><p class="notes">20% total interest. Repayment is due in three rounds. One outstanding loan per House. <strong>This will take your Main Action.</strong> Taking a loan also grounds this character for the round.</p></form>`,buttons:{borrow:{label:"Accept Loan",callback:html=>resolve(Number(html[0].querySelector('[name="amount"]').value||0))},cancel:{label:"Cancel",callback:()=>resolve(null)}},default:"borrow"},{width:480}).render(true));
     if(!result)return; if(game.user.isGM){await executeBankLoan({borrowerUserId:game.user.id,characterTokenId:token.document.id,amount:result});ui.notifications.info("Loan secured.");return;}
     const gm=findActiveGmForScene(canvas.scene?.id);if(!gm){ui.notifications.warn("No active GM is online to register the loan.");return;} game.socket.emit(SOCKET_NAME,{type:"bankLoanRequest",targetGmId:gm.id,sceneId:canvas.scene?.id,requesterUserId:game.user.id,requesterUserName:game.user.name,characterTokenId:token.document.id,amount:result});ui.notifications.info("Bank loan request sent.");
   }
 
   async function processBankLoans(clock=getClock()) {
     if(!game.user.isGM)return {repaid:0,defaulted:0}; const ledger=await getBankLedger(); let repaid=0,defaulted=0;
-    for(const [userId,loan] of Object.entries(ledger)){ if(!loan || loan.status==="repaid" || String(loan.dueRoundKey)!==String(getRoundKey(clock))) continue; const user=game.users.get(String(userId)); if(!user)continue; const entries=getHoldingsForUser(user).filter(e=>!isSeaByTile(e.tile)); const stock=getRealmStockpileForEntries(entries); const gold=Math.max(0,Number(stock.Gold||0)); if(gold>=Number(loan.amountDue||0)){await debitRealmResources(user,{Gold:loan.amountDue},"Bank loan repayment");loan.status="repaid";loan.repaidAt=new Date().toISOString();repaid++;await ChatMessage.create({speaker:ChatMessage.getSpeaker({alias:"Crown Bank"}),content:`<h2>Loan Repaid</h2><p><strong>${escapeHtml(user.name)}</strong> repaid <strong>${escapeHtml(loan.amountDue)} Gold</strong>.</p>`});}else{loan.status="defaulted";loan.amountDue=Math.ceil(Number(loan.amountDue||0)*1.10);loan.dueRoundKey=getRoundKey(advanceClockData(clock));loan.dueDateLabel=getDateLabel(advanceClockData(clock));defaulted++;await ChatMessage.create({speaker:ChatMessage.getSpeaker({alias:"Crown Bank"}),content:`<h2>Loan Default</h2><p><strong>${escapeHtml(user.name)}</strong> could not repay the bank loan. Debt rises 10% to <strong>${escapeHtml(loan.amountDue)} Gold</strong> and is due next round.</p>`});} }
+    for(const [userId,loan] of Object.entries(ledger)){ if(!loan || loan.status==="repaid" || String(loan.dueRoundKey)!==String(getRoundKey(clock))) continue; const user=game.users.get(String(userId)); if(!user)continue; const entries=getRealmLandEntriesForUser(user); const stock=getRealmStockpileForEntries(entries); const gold=Math.max(0,Number(stock.Gold||0)); if(gold>=Number(loan.amountDue||0)){await debitRealmResources(user,{Gold:loan.amountDue},"Bank loan repayment");loan.status="repaid";loan.repaidAt=new Date().toISOString();repaid++;await ChatMessage.create({speaker:ChatMessage.getSpeaker({alias:"Crown Bank"}),whisper:getPrivateActionRecipients(user.id),content:`<h2>Loan Repaid</h2><p><strong>${escapeHtml(user.name)}</strong> repaid <strong>${escapeHtml(loan.amountDue)} Gold</strong>.</p>`});}else{loan.status="defaulted";loan.amountDue=Math.ceil(Number(loan.amountDue||0)*1.10);loan.dueRoundKey=getRoundKey(advanceClockData(clock));loan.dueDateLabel=getDateLabel(advanceClockData(clock));defaulted++;await ChatMessage.create({speaker:ChatMessage.getSpeaker({alias:"Crown Bank"}),whisper:getPrivateActionRecipients(user.id),content:`<h2>Loan Default</h2><p><strong>${escapeHtml(user.name)}</strong> could not repay the bank loan. Debt rises 10% to <strong>${escapeHtml(loan.amountDue)} Gold</strong> and is due next round.</p>`});} }
     await saveBankLedger(ledger); return {repaid,defaulted};
   }
 
@@ -8525,15 +11517,13 @@ async function normalizeCharacterEmbarkState(token, piece = getWorldPiece(token)
     const actualEntry = getCurrentTileEntryForToken(token, piece);
     if (!actualEntry || String(getTileId(actualEntry)) !== String(getTileId(entry))) throw new Error("The character is no longer standing in that territory.");
     let house = foundry.utils.deepClone(getHouseData(entry.drawing) || {});
-    const ownerId = getTileOwnerUserId(entry.tile, house);
-    const ownerName = getTileOwnerUserName(entry.tile, house);
-    if (!requester.isGM && ownerId && String(ownerId) !== String(requester.id)) throw new Error("That territory belongs to another player.");
-    if (!requester.isGM && !ownerId && ownerName && normalize(ownerName) !== normalize(requester.name)) throw new Error("That territory belongs to another player.");
+    if (!requester.isGM && !isTileControlledByUser(entry.tile, house, requester)) throw new Error("That territory is not part of your current realm.");
     const opposing = getOpposingArmiesOnTileForRaid(entry, piece, requester.id);
     if (opposing.length) throw new Error(`Building management is locked: opposing army present in ${getTileName(entry)}.`);
     const state = [...getBuildingLineState(house).entries()];
     const meta = state.find(([key]) => key === lineKey)?.[1];
     if (!meta) throw new Error("That building line is no longer present.");
+    const removedIncome = normalizeResourceMap(getBuildingIncomeForLevel(meta.line, meta.level, house));
     const names = new Set((meta.line?.levels || []).map(level => String(level.name)));
     house.builtBuildings = (house.builtBuildings || []).filter(name => !names.has(String(name)));
     if (Array.isArray(house.buildingData)) house.buildingData = house.buildingData.filter(row => !names.has(String(row?.name || row?.building || row)));
@@ -8543,7 +11533,7 @@ async function normalizeCharacterEmbarkState(token, piece = getWorldPiece(token)
     house.population = randomPopulation(house.developmentLevel);
     await entry.drawing.document.unsetFlag(FLAG_SCOPE, HOUSE_KEY);
     await entry.drawing.document.setFlag(FLAG_SCOPE, HOUSE_KEY, house);
-    await ChatMessage.create({ speaker: ChatMessage.getSpeaker({ alias: "Crown Construction" }), content: `<h2>Building Demolished</h2><p><strong>${escapeHtml(meta.line?.label || lineKey)}</strong> was removed from <strong>${escapeHtml(getTileName(entry))}</strong>. No resources were refunded.</p>` });
+    await ChatMessage.create({ speaker: ChatMessage.getSpeaker({ alias: "Crown Construction" }), whisper: getPrivateActionRecipients(requesterUserId), content: `<h2>Building Demolished</h2><p><strong>${escapeHtml(meta.line?.label || lineKey)}</strong> was removed from <strong>${escapeHtml(getTileName(entry))}</strong>. No resources were refunded.</p>${hasAnyResources(removedIncome) ? `<p><strong>Income Removed:</strong> ${escapeHtml(resourceMapToText(removedIncome))} per round.</p>` : ""}` });
     return meta.line?.label || lineKey;
   }
 
@@ -8557,8 +11547,7 @@ async function normalizeCharacterEmbarkState(token, piece = getWorldPiece(token)
     const entry = getCurrentTileEntryForToken(token, piece);
     if (!entry || isSeaByTile(entry.tile)) { ui.notifications.warn("The character must be standing in a land territory."); return; }
     const house = foundry.utils.deepClone(getHouseData(entry.drawing) || {});
-    const ownerId = getTileOwnerUserId(entry.tile, house);
-    if (ownerId && String(ownerId) !== String(game.user.id) && !game.user.isGM) { ui.notifications.warn("You can only demolish buildings in your own territory."); return; }
+    if (!game.user.isGM && !isTileControlledByUser(entry.tile, house, game.user)) { ui.notifications.warn("You can only demolish buildings in your own territory."); return; }
     const opposing = getOpposingArmiesOnTileForRaid(entry, piece, game.user.id);
     if (opposing.length) { ui.notifications.warn(`Building management is locked: opposing army present in ${getTileName(entry)}.`); return; }
     const state = [...getBuildingLineState(house).entries()];
@@ -8610,10 +11599,10 @@ async function normalizeCharacterEmbarkState(token, piece = getWorldPiece(token)
     if (result === "resetMovement") { await resetMovement(); return; }
     if (result === "collect") { await collectEconomyForRound(clock, { scope: "all", force: false, silent: false }); return; }
     if (result === "resetLedger") {
-      const confirmed = await Dialog.confirm({ title: "Reset Economy Ledger?", content: `<p>This clears collection locks so the current/all rounds can be collected again.</p><p><strong>Use this only for testing or corrections.</strong></p>`, yes: () => true, no: () => false, defaultYes: false });
+      const confirmed = await Dialog.confirm({ title: "Reset Economy Ledger?", content: `<p>This clears economy and military-upkeep collection locks so the current/all rounds can be collected again.</p><p><strong>Use this only for testing or corrections.</strong></p>`, yes: () => true, no: () => false, defaultYes: false });
       if (!confirmed) return;
       await clearEconomyLedger("all");
-      await ChatMessage.create({ speaker: ChatMessage.getSpeaker({ alias: "Crown Economy" }), content: `<h2>Economy Ledger Reset</h2><p>All economy collection ledger entries were cleared. Income can now be collected again for any round.</p>` });
+      await ChatMessage.create({ speaker: ChatMessage.getSpeaker({ alias: "Crown Economy" }), content: `<h2>Economy Ledger Reset</h2><p>All economy and military-upkeep collection ledger entries were cleared. Income and upkeep can now be collected again for any round.</p>` });
       ui.notifications.info("Economy ledger reset.");
       return;
     }
@@ -8649,7 +11638,7 @@ async function normalizeCharacterEmbarkState(token, piece = getWorldPiece(token)
       const bankSummary = await processBankLoans(newClock);
       await ChatMessage.create({
         speaker: ChatMessage.getSpeaker({ alias: "World Round Clock" }),
-        content: `<h2>Round Advanced</h2><p><strong>Previous:</strong> ${escapeHtml(getDateLabel(oldClock))}</p><p><strong>Current:</strong> ${escapeHtml(getDateLabel(newClock))}</p><p>All World Pieces now have their full movement available.</p><p><strong>Army Musters Completed:</strong> ${escapeHtml(Number(musterSummary?.processed || 0))}${Number(musterSummary?.waiting || 0) ? ` (${escapeHtml(Number(musterSummary.waiting))} still preparing)` : ""}${Number(musterSummary?.failed || 0) ? `; ${escapeHtml(Number(musterSummary.failed))} failed` : ""}</p><p><strong>Trade Shipments Delivered:</strong> ${escapeHtml(Number(tradeSummary?.delivered || 0))}</p><p><strong>Economy:</strong> ${economySummary.skipped ? "Already collected" : `${escapeHtml(economySummary.applied)} tile(s) paid ${escapeHtml(resourceMapToText(economySummary.totals))}`}</p><p><strong>Bank:</strong> ${escapeHtml(Number(bankSummary?.repaid || 0))} repaid; ${escapeHtml(Number(bankSummary?.defaulted || 0))} defaulted.</p><p><strong>Military Upkeep:</strong> ${escapeHtml(resourceMapToText(economySummary.militaryUpkeep || {}, "None"))}</p><p><strong>Manpower Recovery:</strong> ${escapeHtml(Number(manpowerRecovery.recovered || 0).toLocaleString())} men across ${escapeHtml(Number(manpowerRecovery.provinces || 0))} province(s).</p>`
+        content: `<h2>Round Advanced</h2><p><strong>Previous:</strong> ${escapeHtml(getDateLabel(oldClock))}</p><p><strong>Current:</strong> ${escapeHtml(getDateLabel(newClock))}</p><p>All World Pieces now have their full movement available.</p><p><strong>Military Musters Completed:</strong> ${escapeHtml(Number(musterSummary?.processed || 0))}${Number(musterSummary?.waiting || 0) ? ` (${escapeHtml(Number(musterSummary.waiting))} still preparing)` : ""}${Number(musterSummary?.failed || 0) ? `; ${escapeHtml(Number(musterSummary.failed))} failed` : ""}</p><p><strong>Trade Shipments Delivered:</strong> ${escapeHtml(Number(tradeSummary?.delivered || 0))}${Number(tradeSummary?.waiting || 0) ? `; ${escapeHtml(Number(tradeSummary.waiting))} still in transit` : ""}${Number(tradeSummary?.failed || 0) ? `; ${escapeHtml(Number(tradeSummary.failed))} failed` : ""}</p><p><strong>Economy:</strong> ${economySummary.skipped ? "Already collected" : `${escapeHtml(economySummary.applied)} tile(s) paid ${escapeHtml(resourceMapToText(economySummary.totals))}`}</p><p><strong>Bank:</strong> ${escapeHtml(Number(bankSummary?.repaid || 0))} repaid; ${escapeHtml(Number(bankSummary?.defaulted || 0))} defaulted.</p><p><strong>Military Upkeep:</strong> ${escapeHtml(resourceMapToText(economySummary.militaryUpkeep || {}, "None"))}</p><p><strong>Manpower Recovery:</strong> ${escapeHtml(Number(manpowerRecovery.recovered || 0).toLocaleString())} men across ${escapeHtml(Number(manpowerRecovery.provinces || 0))} province(s).</p>`
       });
     }
   }
@@ -8718,6 +11707,8 @@ async function normalizeCharacterEmbarkState(token, piece = getWorldPiece(token)
     const movementMax = Math.max(0, Number(piece.movementMax || 0));
     const movementRemaining = Math.max(0, movementMax - movementUsed);
     const diplomacyUsed = hasDiplomacyAttemptThisRound(character, piece);
+    const mainActionReason = characterMainActionReason(piece, character);
+    const mainActionUsed = Boolean(mainActionReason);
     const linkedArmy = character.characterId ? getExistingArmyForCharacter(character.characterId) : null;
     const linkedArmyPiece = linkedArmy ? (getWorldPiece(linkedArmy) || {}) : {};
     const linkedNavy = character.characterId ? getExistingNavyForCharacter(character.characterId) : null;
@@ -8744,7 +11735,7 @@ async function normalizeCharacterEmbarkState(token, piece = getWorldPiece(token)
     const influenceText = `${influence.score} / 21 — ${influence.mood}${influence.levyPenaltyPercent ? `; levy cap ${influence.levyCapPercent}%` : ""}`;
     const statsText = `Statecraft ${character.statecraft ?? piece.statecraft ?? 0}; Intrigue ${character.intrigue ?? piece.intrigue ?? 0}; Lore ${character.lore ?? piece.lore ?? 0}; Prowess ${character.prowess ?? piece.prowess ?? 0}; Martial ${character.martial ?? piece.martial ?? 0}; Diplomacy ${character.diplomacy ?? piece.diplomacy ?? 0}`;
     const secondaryStatsText = `Land ${character.landMovement ?? piece.landMovement ?? piece.movementMax ?? 0}; Naval ${character.navalMovement ?? piece.navalMovement ?? 0}; Wounds ${character.wounds ?? piece.wounds ?? 0}; Command ${character.commandPoints ?? piece.commandPoints ?? 0}`;
-    return { token, piece, character, linkedArmy, linkedArmyPiece, linkedNavy, linkedNavyPiece, movementUsed, movementMax, movementRemaining, diplomacyUsed, siegeUsed, lockReason, armyCurrent, armyMax, armyComposition, armyUpkeep, navyShips, navyMovementUsed, navyMovementMax, navyMovementRemaining, navyLockReason, navyComposition, transportCapacity, transportUsed, embarkedArmyCount, navyLocation: navyEntry ? getTileName(navyEntry) : (linkedNavyPiece.currentTileName || "Unknown"), location: entry ? getTileName(entry) : (piece.currentTileName || "Unknown"), statsText, secondaryStatsText, influence, influenceText };
+    return { token, piece, character, linkedArmy, linkedArmyPiece, linkedNavy, linkedNavyPiece, movementUsed, movementMax, movementRemaining, diplomacyUsed, mainActionUsed, mainActionReason, siegeUsed, lockReason, armyCurrent, armyMax, armyComposition, armyUpkeep, navyShips, navyMovementUsed, navyMovementMax, navyMovementRemaining, navyLockReason, navyComposition, transportCapacity, transportUsed, embarkedArmyCount, navyLocation: navyEntry ? getTileName(navyEntry) : (linkedNavyPiece.currentTileName || "Unknown"), location: entry ? getTileName(entry) : (piece.currentTileName || "Unknown"), statsText, secondaryStatsText, influence, influenceText };
   }
 
   async function selectCharacterTokenFromMenu(token, { action = "select" } = {}) {
@@ -8847,6 +11838,97 @@ async function normalizeCharacterEmbarkState(token, piece = getWorldPiece(token)
     dialog.render(true);
   }
 
+  function buildReadonlyCharacterSheet(token) {
+    const piece = getWorldPiece(token) || {};
+    const character = getCharacterDataFromToken(token) || {};
+    const stats = getCharacterStats(piece, character);
+    const secondary = getCharacterSecondaryStats(piece, character);
+    const val = (value, fallback = "—") => {
+      const text = String(value ?? "").trim();
+      return escapeHtml(text || fallback);
+    };
+    const stat = key => {
+      const n = Number(stats?.[key] ?? character?.[key] ?? piece?.[key]);
+      return Number.isFinite(n) ? escapeHtml(String(n)) : "—";
+    };
+    const substat = key => {
+      const n = Number(secondary?.[key] ?? character?.secondaryStats?.[key] ?? character?.[key] ?? piece?.[key]);
+      return Number.isFinite(n) ? escapeHtml(String(n)) : "—";
+    };
+    const location = character.currentTileName || piece.currentTileName || getCurrentTileEntryForToken(token, piece)?.tile?.name || "Unknown";
+    const gmNotes = game.user.isGM && String(character.gmNotes || "").trim()
+      ? `<div style="margin-top:10px;padding:8px;border:1px dashed #a44;border-radius:6px;"><strong>GM Notes</strong><br>${escapeHtml(character.gmNotes)}</div>`
+      : "";
+    return `<div style="font-size:13px;line-height:1.45;">
+      <div style="text-align:center;margin-bottom:12px;">
+        <h2 style="margin:0;">${val(character.characterName || piece.name || token.document.name, "Character")}</h2>
+        <div class="notes">${val(character.characterRole || character.ownerType || "Character")} — ${val(character.house || piece.house || piece.faction || "No House")}</div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div style="padding:8px;border:1px solid #777;border-radius:6px;">
+          <strong>Identity</strong><br>
+          <strong>Culture:</strong> ${val(character.culture || piece.culture)}<br>
+          <strong>Religion:</strong> ${val(character.religion || piece.religion)}<br>
+          <strong>Age:</strong> ${val(character.age)}<br>
+          <strong>Height / Weight:</strong> ${val(character.heightWeight)}<br>
+          <strong>Preferred Weapons:</strong> ${val(character.preferredWeapons)}<br>
+          <strong>Status:</strong> ${val(character.status, "Alive")}<br>
+          <strong>Current Province:</strong> ${val(location)}
+        </div>
+        <div style="padding:8px;border:1px solid #777;border-radius:6px;">
+          <strong>Primary Stats</strong><br>
+          Statecraft: <strong>${stat("statecraft")}</strong><br>
+          Intrigue: <strong>${stat("intrigue")}</strong><br>
+          Lore: <strong>${stat("lore")}</strong><br>
+          Prowess: <strong>${stat("prowess")}</strong><br>
+          Martial: <strong>${stat("martial")}</strong><br>
+          Diplomacy: <strong>${stat("diplomacy")}</strong>
+        </div>
+      </div>
+      <div style="margin-top:10px;padding:8px;border:1px solid #777;border-radius:6px;">
+        <strong>Secondary Stats</strong><br>
+        Marriage Diplomacy: <strong>${substat("marriageDiplomacy")}</strong> &nbsp; | &nbsp;
+        Land Movement: <strong>${substat("landMovement")}</strong> &nbsp; | &nbsp;
+        Naval Movement: <strong>${substat("navalMovement")}</strong><br>
+        Wounds: <strong>${substat("wounds")}</strong> &nbsp; | &nbsp;
+        Fertility: <strong>${substat("fertility")}</strong> &nbsp; | &nbsp;
+        Command Points: <strong>${substat("commandPoints")}</strong> &nbsp; | &nbsp;
+        Favoured Weapon Bonus: <strong>${substat("favouredWeaponBonus")}</strong>
+      </div>
+      <div style="margin-top:10px;padding:8px;border:1px solid #777;border-radius:6px;">
+        <strong>Traits:</strong> ${val(standardizeTraitText(character.traits))}<br>
+        <strong>Quirks:</strong> ${val(standardizeTraitText(character.quirks))}
+      </div>
+      <div style="margin-top:10px;padding:8px;border:1px solid #777;border-radius:6px;">
+        <strong>Marriage / Spouse:</strong> ${val(character.marriage)}<br>
+        <strong>Issue / Children:</strong> ${val(character.issueChildren)}
+      </div>
+      ${String(character.publicNotes || "").trim() ? `<div style="margin-top:10px;padding:8px;border:1px solid #777;border-radius:6px;"><strong>Public Notes</strong><br>${escapeHtml(character.publicNotes)}</div>` : ""}
+      ${gmNotes}
+      <div class="notes" style="margin-top:10px;text-align:center;">Read-only character sheet. Nothing in this window can modify the character.</div>
+    </div>`;
+  }
+
+  async function showReadonlyCharacterSheet(token) {
+    if (!token || !isCharacterToken(token)) {
+      ui.notifications.warn("That token is not a Crown character.");
+      return;
+    }
+    const character = getCharacterDataFromToken(token) || {};
+    new Dialog({
+      title: `Character — ${character.characterName || token.document.name}`,
+      content: buildReadonlyCharacterSheet(token),
+      buttons: {
+        locate: {
+          label: "Locate on Map",
+          callback: async () => { await selectCharacterTokenFromMenu(token, { action: "select" }); }
+        },
+        close: { label: "Close" }
+      },
+      default: "close"
+    }, { width: 650, height: "auto", resizable: true }).render(true);
+  }
+
   async function characterMoveMenu() {
     if (!requireOverviewScene()) return;
     const characters = getCharacterTokens()
@@ -8868,6 +11950,8 @@ async function normalizeCharacterEmbarkState(token, piece = getWorldPiece(token)
       const houseName = status.character.house || status.piece.house || status.piece.faction || "No House";
       const movementText = `${status.movementUsed} / ${status.movementMax} used — ${status.movementRemaining} remaining`;
       const diplomacyText = status.diplomacyUsed ? "Taken" : "Available";
+      const intrigueTaken = String(status.piece.lastOutOfMapActionRoundKey || status.character.lastOutOfMapActionRoundKey || status.piece.lastIntrigueActionRoundKey || status.character.lastIntrigueActionRoundKey || "") === String(getCurrentActionRoundKey());
+      const intrigueText = intrigueTaken ? "Taken" : "Available";
       const siegeText = status.linkedArmy ? (status.siegeUsed ? "Taken" : "Available") : "No army";
       const armyText = status.linkedArmy ? `${status.armyCurrent.toLocaleString()} / ${status.armyMax.toLocaleString()}` : "None";
       const armyBreakdown = status.linkedArmy ? `${status.armyComposition}; Upkeep: ${status.armyUpkeep}` : "—";
@@ -8875,8 +11959,9 @@ async function normalizeCharacterEmbarkState(token, piece = getWorldPiece(token)
       const navyMovementText = status.linkedNavy ? `${status.navyMovementUsed} / ${status.navyMovementMax} used — ${status.navyMovementRemaining} remaining` : "—";
       const transportText = status.linkedNavy ? `${status.transportUsed.toLocaleString()} / ${status.transportCapacity.toLocaleString()} troops (${status.embarkedArmyCount} embarked ${status.embarkedArmyCount === 1 ? "army" : "armies"})` : "—";
       const moveDisabled = status.movementRemaining <= 0 || Boolean(status.lockReason);
-      const diplomacyDisabled = status.diplomacyUsed;
-      const siegeDisabled = !status.linkedArmy || status.siegeUsed;
+      const diplomacyDisabled = status.diplomacyUsed || status.mainActionUsed;
+      const intrigueDisabled = status.mainActionUsed;
+      const siegeDisabled = !status.linkedArmy || status.siegeUsed || status.mainActionUsed;
       const navyMoveDisabled = !status.linkedNavy || status.navyMovementRemaining <= 0 || Boolean(status.navyLockReason);
       const disembarkDisabled = !status.linkedNavy || status.embarkedArmyCount <= 0;
       return `<div style="display:grid;grid-template-columns:minmax(180px,1.15fr) minmax(360px,2.2fr) minmax(250px,auto);gap:10px;align-items:center;padding:10px;border:1px solid #777;border-radius:6px;margin-bottom:8px;">
@@ -8888,7 +11973,8 @@ async function normalizeCharacterEmbarkState(token, piece = getWorldPiece(token)
           <strong>Character Movement:</strong> ${escapeHtml(movementText)}<br>
           <strong>Army:</strong> ${escapeHtml(armyText)}<br>
           ${status.linkedArmy ? `<strong>Army Breakdown:</strong> ${escapeHtml(armyBreakdown)}<br>` : ""}
-          <strong>Diplomacy:</strong> ${escapeHtml(diplomacyText)} &nbsp; <strong>Siege:</strong> ${escapeHtml(siegeText)}
+          <strong>Main Action:</strong> ${status.mainActionUsed ? `Taken — ${escapeHtml(status.mainActionReason)}` : "Available"}<br>
+          <strong>Diplomacy:</strong> ${escapeHtml(diplomacyText)} &nbsp; <strong>Out-of-Map:</strong> ${escapeHtml(intrigueText)} &nbsp; <strong>Siege:</strong> ${escapeHtml(siegeText)}
           ${status.lockReason ? `<br><strong>Character movement locked:</strong> ${escapeHtml(status.lockReason)}` : ""}
           <hr style="margin:5px 0;">
           <strong>Navy:</strong> ${escapeHtml(navyText)}<br>
@@ -8896,11 +11982,13 @@ async function normalizeCharacterEmbarkState(token, piece = getWorldPiece(token)
         </div>
         <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;">
           <button type="button" data-character-token-id="${escapeHtml(status.token.document.id)}" data-character-action="select">Character</button>
+          <button type="button" data-character-token-id="${escapeHtml(status.token.document.id)}" data-character-action="editDetails">Edit Details</button>
           <button type="button" data-character-token-id="${escapeHtml(status.token.document.id)}" data-character-action="move" ${moveDisabled ? "disabled" : ""}>Move Character</button>
-          <button type="button" data-character-token-id="${escapeHtml(status.token.document.id)}" data-character-action="diplomacy" ${diplomacyDisabled ? "disabled" : ""}>Diplomacy</button>
-          <button type="button" data-character-token-id="${escapeHtml(status.token.document.id)}" data-character-action="build">Build / Upgrade</button>
+          <button type="button" data-character-token-id="${escapeHtml(status.token.document.id)}" data-character-action="diplomacy" ${diplomacyDisabled ? "disabled" : ""}>Diplomacy (Main Action)</button>
+          <button type="button" data-character-token-id="${escapeHtml(status.token.document.id)}" data-character-action="intrigue" ${intrigueDisabled ? "disabled" : ""}>Out-of-Map Action (Main Action)</button>
+          <button type="button" data-character-token-id="${escapeHtml(status.token.document.id)}" data-character-action="build" ${status.mainActionUsed ? "disabled" : ""}>Build / Upgrade (Main Action)</button>
           <button type="button" data-character-token-id="${escapeHtml(status.token.document.id)}" data-character-action="army" ${status.linkedArmy ? "" : "disabled"}>Army</button>
-          <button type="button" data-character-token-id="${escapeHtml(status.token.document.id)}" data-character-action="siege" ${siegeDisabled ? "disabled" : ""}>Siege</button>
+          <button type="button" data-character-token-id="${escapeHtml(status.token.document.id)}" data-character-action="siege" ${siegeDisabled ? "disabled" : ""}>Siege (Main Action)</button>
           <button type="button" data-character-token-id="${escapeHtml(status.token.document.id)}" data-character-action="navy" ${status.linkedNavy ? "" : "disabled"}>Navy</button>
           <button type="button" data-character-token-id="${escapeHtml(status.token.document.id)}" data-character-action="navyMove" ${navyMoveDisabled ? "disabled" : ""}>Move Navy</button>
           <button type="button" data-character-token-id="${escapeHtml(status.token.document.id)}" data-character-action="embark" ${status.linkedArmy && status.linkedNavy ? "" : "disabled"}>Embark Army</button>
@@ -8912,7 +12000,7 @@ async function normalizeCharacterEmbarkState(token, piece = getWorldPiece(token)
     let dialog = null;
     dialog = new Dialog({
       title: "My Turn — Characters",
-      content: `<div style="margin-bottom:10px;"><strong>${escapeHtml(game.user.name)}</strong><br><span class="notes">Manage your assigned characters, linked armies, and linked navies from one place. Character and navy movement are tracked separately; all existing movement, embarkation, Diplomacy, and Siege rules still apply.</span></div><div style="max-height:640px;overflow-y:auto;padding-right:4px;">${rows}</div>`,
+      content: `<div style="margin-bottom:10px;"><strong>${escapeHtml(game.user.name)}</strong><br><span class="notes">Manage your assigned characters, linked armies, and linked navies from one place. Characters have one Main Action per round. Movement is tracked separately; an Out-of-Map Action spends the Main Action but does not spend movement.</span></div><div style="max-height:640px;overflow-y:auto;padding-right:4px;">${rows}</div>`,
       buttons: { close: { label: "Close" } },
       render: html => {
         for (const button of html[0].querySelectorAll("[data-character-action]")) {
@@ -8923,8 +12011,11 @@ async function normalizeCharacterEmbarkState(token, piece = getWorldPiece(token)
             const token = canvas.tokens.placeables.find(candidate => String(candidate.document.id) === tokenId);
             if (!token) { ui.notifications.warn("That character token is no longer available on this scene."); return; }
             const status = getCharacterTurnStatusForMenu(token);
-            if (["move", "diplomacy", "build", "siege", "navyMove", "embark", "disembark"].includes(action)) dialog?.close();
-            if (action === "army") await selectArmyFromCharacterMenu(token, status.linkedArmy, "select");
+            if (["move", "diplomacy", "intrigue", "build", "siege", "navyMove", "embark", "disembark"].includes(action)) dialog?.close();
+            if (action === "select") await showReadonlyCharacterSheet(token);
+            else if (action === "editDetails") await editPlayerCharacterDetails(token);
+            else if (action === "intrigue") await takeIntrigueAction(token);
+            else if (action === "army") await selectArmyFromCharacterMenu(token, status.linkedArmy, "select");
             else if (action === "siege") await selectArmyFromCharacterMenu(token, status.linkedArmy, "siege");
             else if (action === "navy") await selectNavyFromCharacterMenu(status.linkedNavy, "select");
             else if (action === "navyMove") await selectNavyFromCharacterMenu(status.linkedNavy, "move");
@@ -9044,14 +12135,15 @@ function setPoliticalOverlayMode(mode = "off") {
 function stopPoliticalOverlay() {
   const manager = globalThis[POLITICAL_OVERLAY_KEY];
   if (!manager) return;
-  try { manager.redrawHook && Hooks.off("drawDrawing", manager.redrawHook); } catch (err) {}
-  try { manager.updateHook && Hooks.off("updateDrawing", manager.updateHook); } catch (err) {}
-  try { manager.deleteHook && Hooks.off("deleteDrawing", manager.deleteHook); } catch (err) {}
-  try { manager.tokenHook && Hooks.off("updateToken", manager.tokenHook); } catch (err) {}
-  try { manager.controlHook && Hooks.off("controlToken", manager.controlHook); } catch (err) {}
-  if (manager.graphics?.parent) manager.graphics.parent.removeChild(manager.graphics);
-  manager.graphics?.clear?.();
-  manager.graphics?.destroy?.();
+  if (manager.redrawFrame) {
+    try { cancelAnimationFrame(manager.redrawFrame); } catch (err) {}
+    manager.redrawFrame = null;
+  }
+  clearPoliticalOverlaySnapshot(manager);
+  if (manager.currentContainer) manager.currentContainer.mask = null;
+  if (manager.memoryContainer) manager.memoryContainer.mask = null;
+  if (manager.container?.parent) manager.container.parent.removeChild(manager.container);
+  try { manager.container?.destroy?.({ children: true }); } catch (err) { try { manager.container?.destroy?.(); } catch (_) {} }
   globalThis[POLITICAL_OVERLAY_KEY] = null;
 }
 
@@ -9109,19 +12201,7 @@ function drawTileShapeWithStyle(graphics, drawing, fillColor, fillAlpha = 0, lin
   if (fillAlpha > 0) graphics.endFill();
 }
 
-function getPoliticalOverlaySeenTileIds() {
-  if (game.user.isGM) return null;
-  const manager = globalThis[VISIBILITY_KEY];
-  const ids = new Set();
-  for (const entry of manager?.revealedEntries || []) ids.add(String(getTileId(entry) || entry?.tile?.id || entry?.drawing?.document?.id || ""));
-  for (const entry of getOwnedTileRevealEntriesForUser(game.user)) ids.add(String(getTileId(entry) || entry?.tile?.id || entry?.drawing?.document?.id || ""));
-  return ids;
-}
-
-
 function getPoliticalOverlayPlayerPalette() {
-  // 24 deliberately separated colours. Player ownership uses one persistent colour
-  // across every region; unseen land still uses the region's base colour instead.
   return [
     0xd64545, 0x2f77d0, 0x37a65a, 0xd68b2c, 0x8c55c9, 0x25a5a5,
     0xc94f9d, 0x7a9f35, 0x5c62d6, 0xd2b33e, 0x3f93c7, 0xa65b35,
@@ -9130,12 +12210,15 @@ function getPoliticalOverlayPlayerPalette() {
   ];
 }
 
-function getPoliticalOverlayPlayerColorMap() {
+function getPoliticalOverlayPlayerContext() {
   const palette = getPoliticalOverlayPlayerPalette();
-  const players = game.users.contents
-    .filter(user => !user.isGM)
-    .sort((a, b) => String(a.id || "").localeCompare(String(b.id || "")));
-  const result = new Map();
+  const players = getPlayerUsers().slice().sort((a, b) => String(a.id || "").localeCompare(String(b.id || "")));
+  const byUserId = new Map();
+  const byUserName = new Map();
+  const byHouse = new Map();
+  const identityByUserId = new Map();
+  const identityByUserName = new Map();
+  const identityByHouse = new Map();
   const used = new Set();
 
   const hashString = value => {
@@ -9147,8 +12230,9 @@ function getPoliticalOverlayPlayerColorMap() {
     return hash >>> 0;
   };
 
+  // Resolve each player's House exactly once for this pass. Province lookups below
+  // are constant-time map reads; never rescan characters/holdings per province.
   for (const user of players) {
-    const key = normalize(user.id || user.name || "player");
     const start = hashString(user.id || user.name) % palette.length;
     let index = start;
     for (let offset = 0; offset < palette.length; offset++) {
@@ -9156,108 +12240,475 @@ function getPoliticalOverlayPlayerColorMap() {
       if (!used.has(candidate)) { index = candidate; break; }
     }
     used.add(index);
-    result.set(key, palette[index]);
+    const color = palette[index];
+    const userId = String(user.id || "").trim();
+    const userName = String(user.name || "").trim();
+    const userNameKey = normalize(userName);
+    const houseName = String(getPrimaryPlayerHouseName(user) || "").trim();
+    const houseKey = normalizeHouseIdentity(houseName);
+    const identity = { ownerType: "player", ownerUserId: userId, ownerUserName: userName, house: houseName, color };
+
+    if (userId) { byUserId.set(userId, color); identityByUserId.set(userId, identity); }
+    if (userNameKey) { byUserName.set(userNameKey, color); identityByUserName.set(userNameKey, identity); }
+    const politicalHouseKeys = getPlayerHouseIdentityKeys(user);
+    if (houseKey) politicalHouseKeys.add(houseKey);
+    for (const key of politicalHouseKeys) { byHouse.set(key, color); identityByHouse.set(key, identity); }
   }
-  return result;
+
+  return { byUserId, byUserName, byHouse, identityByUserId, identityByUserName, identityByHouse };
 }
 
-function getPoliticalOverlayStyle(entry, playerColors, seenTileIds = null) {
+function getPoliticalOverlayIdentity(entry, playerContext) {
   const house = getHouseData(entry.drawing) || {};
   const tile = entry.tile || {};
-  const tileId = String(getTileId(entry) || tile.id || entry.drawing?.document?.id || "");
-  const regionName = tile.region || house.region || "Unknown Region";
-  const hue = getRegionHue(regionName);
-  const ownershipType = normalize(inferOwnershipType(tile, house));
-  const ownerUser = getPlayerUserForTileOwnership(tile, house);
-  const isSeen = !seenTileIds || seenTileIds.has(tileId) || isTileOwnedByUser(tile, house, game.user);
 
-  // Never leak exact player ownership through fog of war. Unseen land gets only its
-  // regional identity, regardless of which player or NPC currently owns it.
-  if (!game.user.isGM && !isSeen) {
-    return {
-      fillColor: hslToHex(hue, 45, 58),
-      fillAlpha: 0.12,
-      lineColor: hslToHex(hue, 55, 48),
-      lineAlpha: 0.45,
-      lineWidth: 1
-    };
-  }
+  const directId = String(getTileOwnerUserId(tile, house) || "").trim();
+  const directName = normalize(getTileOwnerUserName(tile, house) || "");
+  let identity = (directId ? playerContext.identityByUserId.get(directId) : null)
+    ?? (directName ? playerContext.identityByUserName.get(directName) : null);
+  if (identity) return identity;
 
-  // A valid player controller is authoritative for revealed political ownership.
-  // Older partial transfers may still say Neutral in ownershipType even though the
-  // province already has a real player owner. Do not paint those provinces grey.
-  if (ownerUser) {
-    const ownerKey = normalize(ownerUser.id || ownerUser.name || getTileOwnerUserName(tile, house) || "owner");
-    const ownerColor = playerColors.get(ownerKey) ?? hslToHex(hue, 62, 48);
+  const swornId = String(house.swornToPlayerUserId || tile.swornToPlayerUserId || "").trim();
+  const swornName = normalize(house.swornToPlayerName || tile.swornToPlayerName || "");
+  identity = (swornId ? playerContext.identityByUserId.get(swornId) : null)
+    ?? (swornName ? playerContext.identityByUserName.get(swornName) : null);
+  if (identity) return identity;
+
+  const politicalHouse = normalizeHouseIdentity(house.allegiance || tile.allegiance || "");
+  identity = politicalHouse ? playerContext.identityByHouse.get(politicalHouse) : null;
+  if (identity) return identity;
+
+  return {
+    ownerType: "neutral",
+    ownerUserId: "",
+    ownerUserName: "",
+    house: String(house.allegiance || tile.allegiance || house.house || tile.house || tile.owner || "Neutral").trim() || "Neutral",
+    color: hslToHex(0, 0, 55)
+  };
+}
+
+function getPoliticalOverlayPlayerColor(entry, playerContext) {
+  return getPoliticalOverlayIdentity(entry, playerContext).color;
+}
+
+function getPoliticalOverlayStyle(entry, playerContext) {
+  const identity = getPoliticalOverlayIdentity(entry, playerContext);
+  if (identity.ownerType === "player") {
     return {
-      fillColor: ownerColor,
+      fillColor: identity.color,
       fillAlpha: 0.25,
-      lineColor: ownerColor,
+      lineColor: identity.color,
       lineAlpha: 0.82,
       lineWidth: 2
     };
   }
 
-  // Once seen, genuinely neutral / NPC / unowned territory uses a dedicated grey.
-  if (ownershipType === "neutral" || ownershipType === "npc" || !ownerUser) {
-    return {
-      fillColor: hslToHex(0, 0, 55),
-      fillAlpha: 0.22,
-      lineColor: hslToHex(0, 0, 72),
-      lineAlpha: 0.6,
-      lineWidth: 2
-    };
-  }
-
-  const ownerKey = normalize(ownerUser.id || ownerUser.name || getTileOwnerUserName(tile, house) || "owner");
+  return {
+    fillColor: hslToHex(0, 0, 55),
+    fillAlpha: 0.22,
+    lineColor: hslToHex(0, 0, 72),
+    lineAlpha: 0.6,
+    lineWidth: 2
+  };
 }
 
+function getPoliticalMemoryStyle(record = {}) {
+  const playerOwned = record.ownerType === "player";
+  const color = Number.isFinite(Number(record.color)) ? Number(record.color) : hslToHex(0, 0, 55);
+  return playerOwned
+    ? { fillColor: color, fillAlpha: 0.10, lineColor: color, lineAlpha: 0.30, lineWidth: 1.5 }
+    : { fillColor: hslToHex(0, 0, 55), fillAlpha: 0.07, lineColor: hslToHex(0, 0, 68), lineAlpha: 0.22, lineWidth: 1.25 };
+}
 
-function redrawPoliticalOverlay() {
-  const manager = globalThis[POLITICAL_OVERLAY_KEY];
-  if (!manager?.graphics) return;
-  manager.graphics.clear();
-  if (getPoliticalOverlayMode() !== "on" || !isOverviewScene()) {
-    manager.graphics.visible = false;
+function getPoliticalMemoryManager() {
+  if (game.user?.isGM) return null;
+  const userId = String(game.user?.id || "");
+  let manager = globalThis[POLITICAL_MEMORY_MANAGER_KEY];
+  if (manager?.userId === userId) return manager;
+
+  const raw = game.user?.getFlag?.(MODULE_ID, POLITICAL_MEMORY_KEY);
+  const data = raw && typeof raw === "object" ? foundry.utils.deepClone(raw) : {};
+  if (!data.version) data.version = 1;
+  if (!data.scenes || typeof data.scenes !== "object") data.scenes = {};
+  manager = {
+    userId,
+    data,
+    saveTimer: null,
+    saveInFlight: false,
+    saveAgain: false
+  };
+  globalThis[POLITICAL_MEMORY_MANAGER_KEY] = manager;
+  return manager;
+}
+
+function getPoliticalMemoryRecords(sceneId = String(canvas.scene?.id || ""), create = true) {
+  const manager = getPoliticalMemoryManager();
+  if (!manager || !sceneId) return {};
+  if (!manager.data.scenes[sceneId]) {
+    if (!create) return {};
+    manager.data.scenes[sceneId] = { provinces: {} };
+  }
+  const sceneMemory = manager.data.scenes[sceneId];
+  if (!sceneMemory.provinces || typeof sceneMemory.provinces !== "object") sceneMemory.provinces = {};
+  return sceneMemory.provinces;
+}
+
+async function persistPoliticalMemory(manager = getPoliticalMemoryManager()) {
+  if (!manager || game.user?.isGM) return;
+  if (manager.saveInFlight) { manager.saveAgain = true; return; }
+  manager.saveInFlight = true;
+  manager.saveAgain = false;
+  try {
+    await game.user.setFlag(MODULE_ID, POLITICAL_MEMORY_KEY, foundry.utils.deepClone(manager.data));
+  } catch (err) {
+    console.warn("Crown Overview Tools: could not persist political memory on the current User document.", err);
+  } finally {
+    manager.saveInFlight = false;
+    if (manager.saveAgain) schedulePoliticalMemorySave(50);
+  }
+}
+
+function schedulePoliticalMemorySave(delay = 250) {
+  const manager = getPoliticalMemoryManager();
+  if (!manager) return;
+  if (manager.saveTimer) clearTimeout(manager.saveTimer);
+  manager.saveTimer = setTimeout(() => {
+    manager.saveTimer = null;
+    persistPoliticalMemory(manager);
+  }, Math.max(0, Number(delay || 0)));
+}
+
+function upsertPoliticalMemoryGraphic(tileId, record) {
+  const overlay = globalThis[POLITICAL_OVERLAY_KEY];
+  if (!overlay?.memoryContainer || game.user.isGM) return;
+  const entry = getTileById(String(tileId || ""));
+  if (!entry || isSeaByTile(entry.tile)) return;
+
+  let graphics = overlay.memoryGraphicsByTileId?.get(String(tileId));
+  if (!graphics) {
+    graphics = new PIXI.Graphics();
+    graphics.eventMode = "none";
+    graphics.interactive = false;
+    overlay.memoryContainer.addChild(graphics);
+    overlay.memoryGraphicsByTileId.set(String(tileId), graphics);
+  }
+  graphics.clear();
+  const style = getPoliticalMemoryStyle(record);
+  drawTileShapeWithStyle(graphics, entry.drawing, style.fillColor, style.fillAlpha, style.lineColor, style.lineAlpha, style.lineWidth);
+  overlay.memoryHasGeometry = overlay.memoryGraphicsByTileId.size > 0;
+  overlay.container.visible = getPoliticalOverlayMode() === "on" && Boolean(overlay.snapshotHasGeometry || overlay.memoryHasGeometry);
+}
+
+function recordPoliticalMemoryForVisibleEntries(entries = []) {
+  if (game.user?.isGM || !isOverviewScene() || !entries?.length) return false;
+  const records = getPoliticalMemoryRecords();
+  const playerContext = getPoliticalOverlayPlayerContext();
+  const observedRoundKey = String(getRoundKey(getClock()) || "no-clock");
+  const observedAt = new Date().toISOString();
+  let changed = false;
+
+  for (const sourceEntry of entries) {
+    if (!sourceEntry?.drawing) continue;
+    const freshTile = getWorldTile(sourceEntry.drawing) || sourceEntry.tile || {};
+    const freshEntry = { ...sourceEntry, tile: freshTile };
+    if (isSeaByTile(freshTile)) continue;
+    const tileId = String(getTileId(freshEntry) || freshEntry.drawing?.document?.id || "");
+    if (!tileId) continue;
+
+    const identity = getPoliticalOverlayIdentity(freshEntry, playerContext);
+    const next = {
+      ownerType: identity.ownerType,
+      ownerUserId: String(identity.ownerUserId || ""),
+      ownerUserName: String(identity.ownerUserName || ""),
+      house: String(identity.house || ""),
+      color: Number(identity.color),
+      observedRoundKey,
+      observedAt
+    };
+    const prior = records[tileId] || null;
+    const sameIdentity = prior
+      && String(prior.ownerType || "") === next.ownerType
+      && String(prior.ownerUserId || "") === next.ownerUserId
+      && normalize(prior.ownerUserName || "") === normalize(next.ownerUserName)
+      && normalize(prior.house || "") === normalize(next.house)
+      && Number(prior.color) === Number(next.color);
+    const sameRound = prior && String(prior.observedRoundKey || "") === observedRoundKey;
+    if (sameIdentity && sameRound) continue;
+
+    records[tileId] = next;
+    changed = true;
+    upsertPoliticalMemoryGraphic(tileId, next);
+  }
+
+  if (changed) schedulePoliticalMemorySave();
+  return changed;
+}
+
+function renderPoliticalMemoryLayer(manager = globalThis[POLITICAL_OVERLAY_KEY]) {
+  if (!manager?.memoryContainer || game.user.isGM) return;
+  const old = manager.memoryContainer.removeChildren?.() || [];
+  for (const child of old) {
+    try { child.clear?.(); child.destroy?.(); } catch (err) {}
+  }
+  manager.memoryGraphicsByTileId = new Map();
+  const records = getPoliticalMemoryRecords(String(canvas.scene?.id || ""), false);
+  for (const [tileId, record] of Object.entries(records || {})) upsertPoliticalMemoryGraphic(tileId, record);
+  manager.memoryHasGeometry = manager.memoryGraphicsByTileId.size > 0;
+}
+
+function getPoliticalOverlaySnapshotKey() {
+  const sceneId = String(canvas.scene?.id || "no-scene");
+  const roundKey = String(getRoundKey(getClock()) || "no-clock");
+  return `${sceneId}|${roundKey}`;
+}
+
+function applyPoliticalOverlayVisibilityMask(manager = globalThis[POLITICAL_OVERLAY_KEY]) {
+  if (!manager?.currentContainer) return;
+  if (game.user.isGM) {
+    manager.currentContainer.mask = null;
+    manager.memoryContainer && (manager.memoryContainer.mask = null);
+    manager.maskGraphics?.clear?.();
+    manager.memoryMaskGraphics?.clear?.();
     return;
   }
-  const entries = getWorldTileEntries().filter(entry => !isSeaByTile(entry.tile));
-  const seenTileIds = getPoliticalOverlaySeenTileIds();
-  const playerColors = getPoliticalOverlayPlayerColorMap();
-  for (const entry of entries) {
-    const style = getPoliticalOverlayStyle(entry, playerColors, seenTileIds);
-    drawTileShapeWithStyle(manager.graphics, entry.drawing, style.fillColor, style.fillAlpha, style.lineColor, style.lineAlpha, style.lineWidth);
+
+  const currentMask = manager.maskGraphics;
+  const memoryMask = manager.memoryMaskGraphics;
+  const revealed = globalThis[VISIBILITY_KEY]?.revealedEntries || [];
+
+  if (currentMask) {
+    currentMask.clear();
+    for (const entry of revealed) {
+      currentMask.beginFill(0xffffff, 1);
+      drawTilePath(currentMask, entry.drawing);
+      currentMask.endFill();
+    }
+    manager.currentContainer.mask = currentMask;
+  } else manager.currentContainer.mask = null;
+
+  // Last-known politics should be visible only OUTSIDE current vision. This keeps
+  // stale/faded memory from tinting a province underneath its current full-strength
+  // colour. The mask is cheap geometry and may update with Crown visibility; neither
+  // political layer is rebuilt.
+  if (memoryMask && manager.memoryContainer) {
+    memoryMask.clear();
+    const rect = getSceneVisionRect();
+    memoryMask.beginFill(0xffffff, 1);
+    memoryMask.drawRect(rect.x, rect.y, rect.width, rect.height);
+    if (revealed.length && typeof memoryMask.beginHole === "function") {
+      memoryMask.beginHole();
+      for (const entry of revealed) drawTilePath(memoryMask, entry.drawing);
+      memoryMask.endHole();
+    }
+    memoryMask.endFill();
+    manager.memoryContainer.mask = memoryMask;
+  } else if (manager.memoryContainer) manager.memoryContainer.mask = null;
+}
+
+function ensurePoliticalOverlayParent(manager = globalThis[POLITICAL_OVERLAY_KEY]) {
+  if (!manager?.container) return false;
+  const overlayParent = canvas.interface || canvas.stage;
+  if (!overlayParent) return false;
+
+  const container = manager.container;
+  // Foundry v14 normal-play suppression operates on the interactive DrawingsLayer.
+  // Political graphics must live under InterfaceCanvasGroup (or stage fallback) so
+  // player drawing suppression cannot hide them. Re-parent stale containers that
+  // survived a canvas/group rebuild.
+  if (container.parent !== overlayParent) {
+    try { container.parent?.removeChild?.(container); } catch (err) {}
+    if (typeof overlayParent.addChildAt === "function") overlayParent.addChildAt(container, 0);
+    else overlayParent.addChild(container);
   }
-  manager.graphics.visible = true;
+
+  // Keep the overlay behind other interface children while remaining above the
+  // primary world canvas. This is defensive on v14 where InterfaceCanvasGroup may
+  // sort children after a canvas rebuild.
+  try { overlayParent.sortableChildren = true; } catch (err) {}
+  container.zIndex = -1000;
+  container.eventMode = "none";
+  container.interactive = false;
+  container.interactiveChildren = false;
+  return true;
+}
+
+function syncPoliticalOverlayVisibilityOnly() {
+  const manager = globalThis[POLITICAL_OVERLAY_KEY];
+  if (!manager?.container) return;
+  if (!ensurePoliticalOverlayParent(manager)) return;
+  if (!game.user.isGM) applyPoliticalOverlayVisibilityMask(manager);
+  manager.container.visible = getPoliticalOverlayMode() === "on" && Boolean(manager.snapshotHasGeometry || manager.memoryHasGeometry);
+}
+
+function clearPoliticalOverlaySnapshot(manager) {
+  if (!manager) return;
+  if (manager.batchFrame) {
+    try { cancelAnimationFrame(manager.batchFrame); } catch (err) {}
+    manager.batchFrame = null;
+  }
+  manager.renderGeneration = Number(manager.renderGeneration || 0) + 1;
+  const children = manager.currentContainer?.removeChildren?.() || [];
+  for (const child of children) {
+    try { child.clear?.(); child.destroy?.(); } catch (err) {}
+  }
+  manager.snapshotHasGeometry = false;
+}
+
+function redrawPoliticalOverlay({ force = false } = {}) {
+  const manager = globalThis[POLITICAL_OVERLAY_KEY];
+  if (!manager?.container) return false;
+  if (!ensurePoliticalOverlayParent(manager)) return false;
+
+  if (getPoliticalOverlayMode() !== "on" || !isOverviewScene()) {
+    manager.container.visible = false;
+    return false;
+  }
+
+  applyPoliticalOverlayVisibilityMask(manager);
+  const snapshotKey = getPoliticalOverlaySnapshotKey();
+
+  // Expensive political geometry is built once per strategic round. Visibility
+  // changes only change the mask; newly learned history only updates one small
+  // remembered-province graphic rather than rebuilding the map.
+  if (!force && manager.hasSnapshot && manager.snapshotKey === snapshotKey) {
+    manager.container.visible = Boolean(manager.snapshotHasGeometry || manager.memoryHasGeometry);
+    return false;
+  }
+
+  clearPoliticalOverlaySnapshot(manager);
+  renderPoliticalMemoryLayer(manager);
+
+  const entries = getWorldTileEntries().filter(entry => !isSeaByTile(entry.tile));
+  manager.snapshotKey = snapshotKey;
+  manager.hasSnapshot = true;
+  manager.snapshotHasGeometry = entries.length > 0;
+
+  if (!entries.length) {
+    manager.container.visible = Boolean(manager.memoryHasGeometry);
+    return true;
+  }
+
+  // Snapshot current politics for the WHOLE land map once. Non-GMs cannot see
+  // hidden current politics because currentContainer is clipped by Crown vision.
+  // Their separate memoryContainer contains only provinces they have actually seen.
+  const playerContext = getPoliticalOverlayPlayerContext();
+  const generation = manager.renderGeneration;
+  manager.container.visible = true;
+  let index = 0;
+  const batchSize = 20;
+
+  const drawBatch = () => {
+    const current = globalThis[POLITICAL_OVERLAY_KEY];
+    if (!current || current !== manager || manager.renderGeneration !== generation) return;
+
+    const graphics = new PIXI.Graphics();
+    graphics.eventMode = "none";
+    graphics.interactive = false;
+    const end = Math.min(entries.length, index + batchSize);
+    for (; index < end; index++) {
+      const entry = entries[index];
+      const style = getPoliticalOverlayStyle(entry, playerContext);
+      drawTileShapeWithStyle(graphics, entry.drawing, style.fillColor, style.fillAlpha, style.lineColor, style.lineAlpha, style.lineWidth);
+    }
+    manager.currentContainer.addChild(graphics);
+
+    if (index < entries.length) manager.batchFrame = requestAnimationFrame(drawBatch);
+    else manager.batchFrame = null;
+  };
+
+  drawBatch();
+  return true;
 }
 
 function startPoliticalOverlay() {
   if (getPoliticalOverlayMode() !== "on") return;
-  if (globalThis[POLITICAL_OVERLAY_KEY]?.graphics) {
+
+  // Refresh the player's Crown reveal set before constructing/applying the
+  // political mask. This matters after character/ownership imports and canvas
+  // refreshes where the existing visibility manager can otherwise be stale.
+  if (!game.user.isGM && globalThis[VISIBILITY_KEY]) revealForCurrentPlayerPieces();
+
+  const existing = globalThis[POLITICAL_OVERLAY_KEY];
+  if (existing?.container) {
+    ensurePoliticalOverlayParent(existing);
+    applyPoliticalOverlayVisibilityMask(existing);
     redrawPoliticalOverlay();
     return;
   }
-  const layer = canvas.drawings;
-  if (!layer) return;
-  const graphics = new PIXI.Graphics();
-  graphics.name = POLITICAL_OVERLAY_KEY;
-  graphics.eventMode = "none";
-  graphics.interactive = false;
-  layer.addChildAt(graphics, 0);
-  const redrawHook = Hooks.on("drawDrawing", () => { if (isOverviewScene()) redrawPoliticalOverlay(); });
-  const updateHook = Hooks.on("updateDrawing", () => { if (isOverviewScene()) redrawPoliticalOverlay(); });
-  const deleteHook = Hooks.on("deleteDrawing", () => { if (isOverviewScene()) redrawPoliticalOverlay(); });
-  const tokenHook = Hooks.on("updateToken", () => { if (isOverviewScene()) redrawPoliticalOverlay(); });
-  const controlHook = Hooks.on("controlToken", () => { if (isOverviewScene()) redrawPoliticalOverlay(); });
-  globalThis[POLITICAL_OVERLAY_KEY] = { graphics, redrawHook, updateHook, deleteHook, tokenHook, controlHook };
+
+  const overlayParent = canvas.interface || canvas.stage;
+  if (!overlayParent) return;
+
+  const container = new PIXI.Container();
+  container.name = POLITICAL_OVERLAY_KEY;
+  container.eventMode = "none";
+  container.interactive = false;
+  container.interactiveChildren = false;
+  container.zIndex = -1000;
+  try { overlayParent.sortableChildren = true; } catch (err) {}
+  if (typeof overlayParent.addChildAt === "function") overlayParent.addChildAt(container, 0);
+  else overlayParent.addChild(container);
+
+  const memoryContainer = new PIXI.Container();
+  memoryContainer.name = `${POLITICAL_OVERLAY_KEY}_MEMORY`;
+  memoryContainer.eventMode = "none";
+  memoryContainer.interactive = false;
+  memoryContainer.interactiveChildren = false;
+  container.addChild(memoryContainer);
+
+  const currentContainer = new PIXI.Container();
+  currentContainer.name = `${POLITICAL_OVERLAY_KEY}_CURRENT`;
+  currentContainer.eventMode = "none";
+  currentContainer.interactive = false;
+  currentContainer.interactiveChildren = false;
+  container.addChild(currentContainer);
+
+  const maskGraphics = new PIXI.Graphics();
+  maskGraphics.name = `${POLITICAL_OVERLAY_KEY}_VISIBILITY_MASK`;
+  maskGraphics.eventMode = "none";
+  maskGraphics.interactive = false;
+  container.addChild(maskGraphics);
+
+  const memoryMaskGraphics = new PIXI.Graphics();
+  memoryMaskGraphics.name = `${POLITICAL_OVERLAY_KEY}_MEMORY_MASK`;
+  memoryMaskGraphics.eventMode = "none";
+  memoryMaskGraphics.interactive = false;
+  container.addChild(memoryMaskGraphics);
+
+  globalThis[POLITICAL_OVERLAY_KEY] = {
+    container,
+    memoryContainer,
+    currentContainer,
+    maskGraphics,
+    memoryMaskGraphics,
+    memoryGraphicsByTileId: new Map(),
+    memoryHasGeometry: false,
+    redrawFrame: null,
+    batchFrame: null,
+    renderGeneration: 0,
+    snapshotKey: null,
+    hasSnapshot: false,
+    snapshotHasGeometry: false
+  };
+
+  if (!game.user.isGM) recordPoliticalMemoryForVisibleEntries(globalThis[VISIBILITY_KEY]?.revealedEntries || []);
+  renderPoliticalMemoryLayer(globalThis[POLITICAL_OVERLAY_KEY]);
+  applyPoliticalOverlayVisibilityMask(globalThis[POLITICAL_OVERLAY_KEY]);
   redrawPoliticalOverlay();
+}
+
+function hidePoliticalOverlay() {
+  const manager = globalThis[POLITICAL_OVERLAY_KEY];
+  if (manager?.container) manager.container.visible = false;
 }
 
 async function togglePoliticalOverlay() {
   const next = getPoliticalOverlayMode() === "on" ? "off" : "on";
   setPoliticalOverlayMode(next);
-  if (next === "on") startPoliticalOverlay();
-  else stopPoliticalOverlay();
+  if (next === "on") {
+    if (!game.user.isGM && globalThis[VISIBILITY_KEY]) revealForCurrentPlayerPieces();
+    startPoliticalOverlay();
+  } else hidePoliticalOverlay();
   renderPanel();
   ui.notifications.info(`Political Overlay ${next === "on" ? "enabled" : "disabled"}.`);
 }
@@ -9451,6 +12902,124 @@ async function togglePoliticalOverlay() {
     return destinations;
   }
 
+  function getPortPermissionPendingMap() {
+    if (!(globalThis[PORT_PERMISSION_PENDING_KEY] instanceof Map)) globalThis[PORT_PERMISSION_PENDING_KEY] = new Map();
+    return globalThis[PORT_PERMISSION_PENDING_KEY];
+  }
+
+  async function showPortTravelPermissionDialog(data = {}) {
+    return await new Promise(resolve => {
+      let settled = false;
+      const finish = value => { if (settled) return; settled = true; resolve(Boolean(value)); };
+      new Dialog({
+        title: "Port Travel Permission",
+        content: `<div style="padding:8px;border:1px solid #777;border-radius:6px;">
+          <p><strong>${escapeHtml(data.requesterUserName || "Another player")}</strong> requests permission to enter your Port.</p>
+          <p><strong>Piece:</strong> ${escapeHtml(data.pieceName || "World Piece")} (${escapeHtml(data.pieceType || "unknown")})</p>
+          ${Number(data.armyStrength || 0) > 0 ? `<p><strong>Army Strength:</strong> ${escapeHtml(Number(data.armyStrength).toLocaleString())}</p>` : ""}
+          <p><strong>Origin:</strong> ${escapeHtml(data.originName || "Unknown")}</p>
+          <p><strong>Destination:</strong> ${escapeHtml(data.destinationName || "Unknown")}</p>
+          <p class="notes">Approval applies only to this Port Crossing attempt.</p>
+        </div>`,
+        buttons: {
+          allow: { label: "Allow", callback: () => finish(true) },
+          deny: { label: "Deny", callback: () => finish(false) }
+        },
+        default: "deny",
+        close: () => finish(false)
+      }, { width: 500, height: 390, resizable: true }).render(true);
+    });
+  }
+
+  async function handlePortTravelPermissionRequest(message) {
+    if (!message?.targetUserId || String(message.targetUserId) !== String(game.user.id)) return;
+    const allowed = await showPortTravelPermissionDialog(message);
+    game.socket.emit(SOCKET_NAME, {
+      type: "portTravelPermissionResponse",
+      requestId: message.requestId,
+      targetUserId: message.requesterUserId,
+      approverUserId: game.user.id,
+      approverUserName: game.user.name,
+      allowed
+    });
+  }
+
+  function handlePortTravelPermissionResponse(message) {
+    if (!message?.targetUserId || String(message.targetUserId) !== String(game.user.id)) return;
+    const pending = getPortPermissionPendingMap();
+    const row = pending.get(String(message.requestId || ""));
+    if (!row) return;
+    pending.delete(String(message.requestId || ""));
+    if (row.timer) clearTimeout(row.timer);
+    row.resolve({ allowed: Boolean(message.allowed), timedOut: false, approverUserId: message.approverUserId || "", approverUserName: message.approverUserName || "" });
+  }
+
+  async function requestPortTravelPermission({ destinationPort, token = null, piece, pieceType, originPort, armyStrength = 0 } = {}) {
+    const house = getHouseData(destinationPort?.drawing) || {};
+    // v1.1.15 hardening: explicit owner fields remain authoritative, but Ports whose
+    // political owner is represented only by sworn-player/allegiance data must still
+    // request permission from the correct player realm.
+    const resolvedOwner = getPlayerUserForTileOwnership(destinationPort?.tile || {}, house);
+    const ownerId = String(resolvedOwner?.id || getTileOwnerUserId(destinationPort?.tile || {}, house) || "").trim();
+    const ownerName = String(resolvedOwner?.name || getTileOwnerUserName(destinationPort?.tile || {}, house) || "").trim();
+    if (!ownerId && !ownerName) return { allowed: true, required: false };
+
+    const ownerUser = resolvedOwner || getUserByIdOrName(ownerId, ownerName);
+    let travelerUser = null;
+    if (token && normalize(pieceType) === "army") travelerUser = getMilitaryForceController(token, piece);
+    if (token && normalize(pieceType) === "character") {
+      const identity = getCharacterControllerIdentity(token, game.user.id, game.user.name);
+      travelerUser = getUserByIdOrName(identity.id, identity.name);
+    }
+    const travelerOwnerId = String(travelerUser?.id || getPieceOwnerId(piece) || game.user.id || "").trim();
+    const travelerOwnerName = String(travelerUser?.name || getPieceOwnerName(piece) || game.user.name || "").trim();
+    const isOwnPort = (ownerId && travelerOwnerId && String(ownerId) === String(travelerOwnerId))
+      || (ownerName && travelerOwnerName && normalize(ownerName) === normalize(travelerOwnerName));
+    if (isOwnPort) return { allowed: true, required: false };
+
+    let approver = ownerUser?.active ? ownerUser : findActiveGmForScene(canvas.scene?.id);
+    let fallbackToGm = Boolean(ownerUser && !ownerUser.active && approver?.isGM);
+    if (!approver) return { allowed: false, required: true, reason: `${ownerName || "The destination owner"} is offline and no active GM is available to approve the crossing.` };
+
+    const payload = {
+      requestId: foundry.utils.randomID(),
+      requesterUserId: game.user.id,
+      requesterUserName: game.user.name,
+      targetUserId: approver.id,
+      destinationOwnerUserId: ownerUser?.id || ownerId || "",
+      destinationOwnerUserName: ownerUser?.name || ownerName || "",
+      fallbackToGm,
+      pieceName: piece?.name || "World Piece",
+      pieceType,
+      armyStrength: Number(armyStrength || piece?.strengthCurrent || 0),
+      originName: getTileName(originPort),
+      destinationName: getTileName(destinationPort)
+    };
+
+    let response;
+    if (String(approver.id) === String(game.user.id)) {
+      const allowed = await showPortTravelPermissionDialog(payload);
+      response = { allowed, timedOut: false, approverUserId: approver.id, approverUserName: approver.name };
+    } else {
+      response = await new Promise(resolve => {
+        const pending = getPortPermissionPendingMap();
+        const timer = setTimeout(() => {
+          pending.delete(payload.requestId);
+          resolve({ allowed: false, timedOut: true, approverUserId: approver.id, approverUserName: approver.name });
+        }, 60000);
+        pending.set(payload.requestId, { resolve, timer });
+        game.socket.emit(SOCKET_NAME, { type: "portTravelPermissionRequest", ...payload });
+      });
+    }
+
+    const status = response.allowed ? "APPROVED" : response.timedOut ? "TIMED OUT / DENIED" : "DENIED";
+    await ChatMessage.create({
+      speaker: ChatMessage.getSpeaker({ alias: "Port Crossing" }),
+      content: `<h2>Port Travel Permission — ${escapeHtml(status)}</h2><p><strong>Requester:</strong> ${escapeHtml(game.user.name)}</p><p><strong>Piece:</strong> ${escapeHtml(payload.pieceName)}</p><p><strong>From:</strong> ${escapeHtml(payload.originName)}</p><p><strong>To:</strong> ${escapeHtml(payload.destinationName)}</p><p><strong>Approver:</strong> ${escapeHtml(response.approverUserName || approver.name)}${fallbackToGm ? " (GM fallback)" : ""}</p>`
+    });
+    return { ...response, required: true };
+  }
+
   async function portCrossing() {
     if (!requireOverviewScene()) return;
     const selected = canvas.tokens.controlled;
@@ -9468,9 +13037,11 @@ async function togglePoliticalOverlay() {
     if (!sourcePort) { ui.notifications.warn("Could not determine the World Piece's current tile."); return; }
     if (!isActivePort(sourcePort.tile)) { ui.notifications.warn("Port Crossing can only begin from an active Port."); return; }
     if (!getPortSeaIds(sourcePort.tile).length) { ui.notifications.warn("This Port is not linked to any Sea tiles."); return; }
-    const movementRemaining = getMovementRemaining(originalPiece);
-    const crossingCost = 1;
-    if (movementRemaining < crossingCost) { ui.notifications.warn(`This piece needs ${crossingCost} movement point(s), but only has ${movementRemaining} remaining.`); return; }
+
+    const effective = getEffectiveMovementForToken(token, originalPiece);
+    const movementRemaining = Math.max(0, Number(effective.remaining || 0));
+    if (movementRemaining <= 0) { ui.notifications.warn("This piece has no movement remaining for a Port Crossing."); return; }
+    const crossingCost = movementRemaining;
     const destinations = getCrossingDestinations(sourcePort);
     if (!destinations.length) { ui.notifications.warn("No Ports are within crossing range of this Port."); return; }
 
@@ -9483,7 +13054,7 @@ async function togglePoliticalOverlay() {
     const details = await new Promise(resolve => {
       new Dialog({
         title: "Port Crossing",
-        content: `<form><div style="padding:8px;margin-bottom:10px;border:1px solid #777;border-radius:6px;"><strong>Piece:</strong> ${escapeHtml(originalPiece.name || token.document.name)}<br><strong>Type:</strong> ${escapeHtml(pieceType)}<br><strong>Current Port:</strong> ${escapeHtml(getTileName(sourcePort))}<br><strong>Movement:</strong> ${escapeHtml(originalPiece.movementUsed || 0)} / ${escapeHtml(originalPiece.movementMax || 0)} used</div><div class="form-group"><label><strong>Destination Port</strong></label><select name="destinationPortId" style="width:100%;">${destinationOptions}</select></div>${pieceType === "army" ? `<div class="form-group"><label><strong>Current Army Strength</strong></label><input type="number" name="armyStrength" value="${escapeHtml(originalPiece.strengthCurrent ?? "")}" min="1" step="1" style="width:100%;" /><p class="notes">Required for crossing casualties.</p></div>` : ""}<div style="padding:8px;margin-top:10px;border:1px solid #777;border-radius:6px;"><strong>Crossing Check</strong><br>${pieceType === "army" ? "1–5 — Safe<br>6–7 — Lose 1d10%<br>8–9 — Lose 20%<br>10 — Lose 30%" : "1–9 — Safe<br>10 — Gain 1 Wound"}<br><br><strong>Movement Cost:</strong> ${crossingCost}</div></form>`,
+        content: `<form><div style="padding:8px;margin-bottom:10px;border:1px solid #777;border-radius:6px;"><strong>Piece:</strong> ${escapeHtml(originalPiece.name || token.document.name)}<br><strong>Type:</strong> ${escapeHtml(pieceType)}<br><strong>Current Port:</strong> ${escapeHtml(getTileName(sourcePort))}<br><strong>Movement:</strong> ${escapeHtml(effective.used || 0)} / ${escapeHtml(effective.max || 0)} used</div><div class="form-group"><label><strong>Destination Port</strong></label><select name="destinationPortId" style="width:100%;">${destinationOptions}</select></div>${pieceType === "army" ? `<div class="form-group"><label><strong>Current Army Strength</strong></label><input type="number" name="armyStrength" value="${escapeHtml(originalPiece.strengthCurrent ?? "")}" min="1" step="1" style="width:100%;" /><p class="notes">Required for crossing casualties.</p></div>` : ""}<div style="padding:8px;margin-top:10px;border:1px solid #777;border-radius:6px;"><strong>Crossing Check</strong><br>${pieceType === "army" ? "1–5 — Safe<br>6–7 — Lose 1d10%<br>8–9 — Lose 20%<br>10 — Lose 30%" : "1–9 — Safe<br>10 — Gain 1 Wound"}<br><br><strong>Movement:</strong> Port Crossing consumes all ${escapeHtml(crossingCost)} remaining movement point(s) for this round.</div></form>`,
         buttons: { cross: { label: "Make Crossing", callback: html => { const form = html[0].querySelector("form"); resolve({ destinationPortId: String(form.destinationPortId.value || ""), armyStrength: pieceType === "army" ? Number(form.armyStrength.value || 0) : null }); } }, cancel: { label: "Cancel", callback: () => resolve(null) } },
         default: "cross"
       }, { width: 580, height: pieceType === "army" ? 560 : 500, resizable: true }).render(true);
@@ -9493,9 +13064,16 @@ async function togglePoliticalOverlay() {
     const destinationData = destinations.find(destination => getTileId(destination.entry) === details.destinationPortId);
     if (!destinationData) { ui.notifications.error("Could not locate destination Port."); return; }
     const destinationPort = destinationData.entry;
+
+    // v1.0.0 restored in v1.0.13: another player's Port requires one-attempt approval
+    // before any roll, movement expenditure, casualties, or teleport occurs.
+    const permission = await requestPortTravelPermission({ destinationPort, token, piece: originalPiece, pieceType, originPort: sourcePort, armyStrength: details.armyStrength || originalPiece.strengthCurrent || 0 });
+    if (!permission.allowed) { ui.notifications.warn(permission.reason || (permission.timedOut ? "Port Crossing permission timed out." : "Port Crossing permission was denied.")); return; }
+
     const crossingRoll = await (new Roll("1d10")).evaluate();
     const crossingResult = Number(crossingRoll.total);
     const piece = foundry.utils.deepClone(originalPiece);
+    if (pieceType === "character" && effective.attachedArmy) piece.movementMax = Math.max(0, Number(effective.max || piece.movementMax || 0));
     let lossPercent = 0;
     let soldiersLost = 0;
     let woundGained = false;
@@ -9510,12 +13088,19 @@ async function togglePoliticalOverlay() {
       else lossPercent = 30;
       if (lossPercent > 0) { soldiersLost = Math.ceil(currentStrength * (lossPercent / 100)); piece.strengthCurrent = Math.max(0, currentStrength - soldiersLost); }
     }
-    if (pieceType === "character" && crossingResult === 10) { piece.wounds = Number(piece.wounds || 0) + 1; woundGained = true; }
-    piece.movementUsed = Number(piece.movementUsed || 0) + crossingCost;
+    if (pieceType === "character") {
+      const characterBeforeCrossing = getCharacterDataFromToken(token) || {};
+      piece.wounds = Number(characterBeforeCrossing.wounds ?? piece.wounds ?? 0);
+      if (crossingResult === 10) { piece.wounds += 1; woundGained = true; }
+    }
+
+    // v1.0.3 restored in v1.0.13: Port Crossing consumes every remaining movement point.
+    piece.movementUsed = Math.max(Number(effective.max || piece.movementMax || 0), Number(piece.movementMax || 0));
     piece.previousTileId = getTileId(sourcePort);
     piece.previousTileName = getTileName(sourcePort);
     piece.currentTileId = getTileId(destinationPort);
     piece.currentTileName = getTileName(destinationPort);
+    piece.currentRegion = destinationPort.tile?.region || "";
     piece.lastMoveCost = crossingCost;
     piece.lastRouteMode = "crossing";
     piece.lastCrossingRoll = crossingResult;
@@ -9531,11 +13116,27 @@ async function togglePoliticalOverlay() {
     piece.lastMovedSource = `Crown Overview Tools ${MODULE_VERSION}`;
     const position = getTokenTopLeftForTileSlot(token, destinationPort);
     await saveWorldPiece(token, piece);
+
+    // v1.0.3 restored in v1.0.13: keep the character record and Actor record in
+    // sync with the world-piece Wound total.
+    if (pieceType === "character") {
+      const character = foundry.utils.deepClone(getWorldCharacter(token) || getCharacterDataFromToken(token) || {});
+      character.wounds = Number(piece.wounds || 0);
+      character.currentTileId = piece.currentTileId;
+      character.currentTileName = piece.currentTileName;
+      character.currentRegion = piece.currentRegion;
+      await token.document.setFlag(FLAG_SCOPE, WORLD_CHARACTER_KEY, character);
+      if (token.actor) await token.actor.setFlag(FLAG_SCOPE, WORLD_CHARACTER_KEY, foundry.utils.deepClone(character));
+    }
+
     await token.document.update({ x: position.x, y: position.y }, { animate: true, worldMovementBypass: true, bypassWorldMovementWatcher: true, portCrossingBypass: true });
+    await moveLinkedArmyToCharacter(token, piece, destinationPort, { syncMovement: true });
+    await moveLinkedCharacterWithArmy(token, piece, destinationPort, { syncMovement: true });
+
     let resultText = "";
     if (pieceType === "army") resultText = lossPercent === 0 ? `<p><strong>Result:</strong> Safe crossing. No soldiers lost.</p>` : `<p><strong>Result:</strong> ${escapeHtml(lossPercent)}% losses.</p><p><strong>Soldiers Lost:</strong> ${escapeHtml(soldiersLost.toLocaleString())}</p><p><strong>Army Strength Remaining:</strong> ${escapeHtml(Number(piece.strengthCurrent).toLocaleString())} / ${escapeHtml(Number(piece.strengthMax).toLocaleString())}</p>`;
     if (pieceType === "character") resultText = woundGained ? `<p><strong>Result:</strong> Dangerous crossing! The character gains 1 Wound.</p><p><strong>Total Wounds:</strong> ${escapeHtml(piece.wounds)}</p>` : `<p><strong>Result:</strong> Safe crossing. No wound suffered.</p>`;
-    await ChatMessage.create({ speaker: ChatMessage.getSpeaker({ alias: "Port Crossing" }), content: `<h2>Port Crossing</h2><p><strong>Piece:</strong> ${escapeHtml(piece.name || token.document.name)}</p><p><strong>From:</strong> ${escapeHtml(getTileName(sourcePort))}</p><p><strong>To:</strong> ${escapeHtml(getTileName(destinationPort))}</p><p><strong>Route:</strong> ${destinationData.crossingType === "same-sea" ? "Same Sea Tile" : "Adjacent Sea Tile"}</p><p><strong>Crossing Check:</strong> ${escapeHtml(crossingResult)} on 1d10</p>${secondaryRoll ? `<p><strong>Loss Roll:</strong> ${escapeHtml(secondaryRoll.total)}%</p>` : ""}${resultText}<p><strong>Movement Spent:</strong> ${escapeHtml(crossingCost)}</p><p><strong>Total Movement Used:</strong> ${escapeHtml(piece.movementUsed)} / ${escapeHtml(piece.movementMax || 0)}</p>` });
+    await ChatMessage.create({ speaker: ChatMessage.getSpeaker({ alias: "Port Crossing" }), content: `<h2>Port Crossing</h2><p><strong>Piece:</strong> ${escapeHtml(piece.name || token.document.name)}</p><p><strong>From:</strong> ${escapeHtml(getTileName(sourcePort))}</p><p><strong>To:</strong> ${escapeHtml(getTileName(destinationPort))}</p><p><strong>Route:</strong> ${destinationData.crossingType === "same-sea" ? "Same Sea Tile" : "Adjacent Sea Tile"}</p><p><strong>Crossing Check:</strong> ${escapeHtml(crossingResult)} on 1d10</p>${secondaryRoll ? `<p><strong>Loss Roll:</strong> ${escapeHtml(secondaryRoll.total)}%</p>` : ""}${resultText}<p><strong>Movement Spent:</strong> ${escapeHtml(crossingCost)} (all remaining movement)</p><p><strong>Total Movement Used:</strong> ${escapeHtml(piece.movementUsed)} / ${escapeHtml(piece.movementMax || 0)}</p>` });
   }
 
 
@@ -9558,8 +13159,37 @@ async function togglePoliticalOverlay() {
     await canvas.scene.setFlag(FLAG_SCOPE, BUILD_LEDGER_KEY, ledger);
   }
 
-  function getAlreadyBuiltForRound(ledger, roundKey, userId) {
-    return ledger?.[roundKey]?.users?.[userId] ?? null;
+  function getBuildsForRound(ledger, roundKey) {
+    const round = ledger?.[roundKey] || {};
+    const builds = Array.isArray(round.builds) ? round.builds.filter(Boolean) : [];
+    return builds;
+  }
+
+  function getBuildCountForUserRound(ledger, roundKey, userId) {
+    const uid = String(userId || "");
+    if (!uid) return 0;
+    const builds = getBuildsForRound(ledger, roundKey);
+    const explicit = builds.filter(build => String(build?.userId || build?.builderUserId || "") === uid).length;
+    if (explicit) return explicit;
+    // Backward compatibility for older ledgers, which stored only one row per user.
+    return ledger?.[roundKey]?.users?.[uid] ? 1 : 0;
+  }
+
+  function getAlreadyBuiltOnTileForRound(ledger, roundKey, tileId, tileName = "") {
+    const tid = String(tileId || "");
+    const tname = normalize(tileName || "");
+    const builds = getBuildsForRound(ledger, roundKey);
+    const found = builds.find(build =>
+      (tid && String(build?.tileId || "") === tid) ||
+      (tname && normalize(build?.tileName || "") === tname)
+    );
+    if (found) return found;
+    // Older ledgers may only have the per-user map.
+    const users = Object.values(ledger?.[roundKey]?.users || {});
+    return users.find(build =>
+      (tid && String(build?.tileId || "") === tid) ||
+      (tname && normalize(build?.tileName || "") === tname)
+    ) || null;
   }
 
   function buildBuildingOptions(existingBuildings, house = {}, piece = {}) {
@@ -9578,12 +13208,20 @@ async function togglePoliticalOverlay() {
     return rows.map((option, index) => `<option value="${escapeHtml(option.value)}" ${String(option.value) === String(selectedValue) || (!selectedValue && index === 0) ? "selected" : ""} ${option.disabled ? "disabled" : ""}>${escapeHtml(option.label)}</option>`).join("");
   }
 
-  function buildBuildingDetailCard(option, { currentDevelopment = "Ruins", nextDevelopment = "Village", currentSlots = 0 } = {}) {
+  function buildBuildingDetailCard(option, { currentDevelopment = "Ruins", nextDevelopment = "Village", currentSlots = 0, discountPercent = 0, saleActive = false, discountLabel = "" } = {}) {
     if (!option) return `<div style="padding:12px;border:1px solid #777;border-radius:6px;opacity:0.8;">No building is available in this category.</div>`;
     const isUpgrade = option.mode === "upgrade";
-    const costText = resourceMapToText(option.cost || {}, "None");
-    const constructionRounds = Math.max(1, Number(option.tier || 1));
-    const slotText = `${currentSlots} / 4 → ${Math.min(4, currentSlots + 1)} / 4`;
+    const baseCost = normalizeResourceMap(option.cost || {});
+    const effectiveDiscount = Math.max(0, Math.min(0.90, Number(discountPercent || 0)));
+    const discountedCost = applyPercentDiscountToResourceMap(baseCost, effectiveDiscount);
+    const costText = resourceMapToText(baseCost, "None");
+    const discountedCostText = resourceMapToText(discountedCost, "None");
+    const costHtml = effectiveDiscount > 0
+      ? `<span style="text-decoration:line-through;opacity:0.55;margin-right:7px;">${escapeHtml(costText)}</span><strong style="font-size:1.12em;">${escapeHtml(discountedCostText)}</strong>${discountLabel ? `<br><span style="opacity:0.78;font-size:0.9em;">${escapeHtml(discountLabel)}</span>` : ""}`
+      : escapeHtml(costText);
+    const resultingSlot = Math.min(4, Math.max(1, Number(currentSlots || 0) + 1));
+    const constructionRounds = getConstructionRoundsForResultingSlot(resultingSlot);
+    const slotText = `${currentSlots} / 4 → ${resultingSlot} / 4`;
     const developmentText = `${currentDevelopment} → ${nextDevelopment}`;
     const lockHtml = option.disabled ? `<div style="margin-top:8px;padding:7px;border:1px solid rgba(180,70,70,0.8);border-radius:5px;"><strong>LOCKED:</strong> ${escapeHtml(option.lockedReason || "Requirements not met.")}</div>` : `<div style="margin-top:8px;"><strong>Requirements:</strong> Statecraft ${escapeHtml(option.statecraftRequired || 0)} ✓</div>`;
     const currentHtml = isUpgrade ? `<div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(120,120,120,0.45);"><strong>Current:</strong> ${escapeHtml(option.currentName || "Tier " + option.currentTier)}<br><span style="opacity:0.8;">${escapeHtml(option.currentEffect || "")}</span></div>` : "";
@@ -9591,7 +13229,7 @@ async function togglePoliticalOverlay() {
       <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start;"><div><strong style="font-size:16px;">${escapeHtml(option.value)}</strong><br><span style="opacity:0.75;">${escapeHtml(option.lineLabel || option.category || "Building")}</span></div><div style="text-align:right;"><strong>Tier ${escapeHtml(option.tier || 1)}</strong><br><span style="opacity:0.75;">${isUpgrade ? "Upgrade" : "New building piece"}</span></div></div>
       ${currentHtml}
       <div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(120,120,120,0.45);"><strong>${isUpgrade ? "After upgrade" : "Provides"}:</strong><br>${escapeHtml(option.effect || "No passive effect")}</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:9px;"><div><strong>Cost:</strong> ${escapeHtml(costText)}</div><div><strong>Construction:</strong> ${escapeHtml(constructionRounds)} round${constructionRounds === 1 ? "" : "s"}</div><div><strong>Building Slots:</strong> ${escapeHtml(slotText)}</div><div><strong>Development:</strong> ${escapeHtml(developmentText)}</div></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:9px;"><div><strong>Cost:</strong> ${costHtml}</div><div><strong>Construction:</strong> ${escapeHtml(constructionRounds)} round${constructionRounds === 1 ? "" : "s"} <span style="opacity:0.7;">(based on Slot ${escapeHtml(resultingSlot)})</span></div><div><strong>Building Slots:</strong> ${escapeHtml(slotText)}</div><div><strong>Development:</strong> ${escapeHtml(developmentText)}</div></div>
       ${lockHtml}
     </div>`;
   }
@@ -9716,17 +13354,61 @@ async function togglePoliticalOverlay() {
     return html;
   }
 
+  function normalizeTradeGoodRecord(value, fallbackName = "") {
+    const record = value && typeof value === "object" ? value : {};
+    const name = String(record.name || fallbackName || "").trim();
+    if (!name) return null;
+    const catalog = getTradeGoodByName(name);
+    const legacy = LEGACY_TRADE_GOOD_VALUES[name] || LEGACY_TRADE_GOOD_VALUES[Object.keys(LEGACY_TRADE_GOOD_VALUES).find(key => normalize(key) === normalize(name))];
+
+    let category = String(record.category || catalog?.category || "Trade & Industry").trim();
+    let rawGold = record.goldValue ?? catalog?.goldValue ?? 0;
+    let rawFood = record.foodValue ?? catalog?.foodValue ?? 0;
+
+    // v1.0.12: Known catalog goods saved by the regressed 1.0.x economy carry
+    // copied legacy Gold/Food values on the province flag. Recognize those exact
+    // old catalog values and upgrade them to the restored v0.6.30 catalog. A GM
+    // value that differs from the old catalog remains a deliberate custom override.
+    if (catalog) {
+      const hasStoredValues = record.goldValue !== undefined || record.foodValue !== undefined;
+      const storedGold = Number(record.goldValue ?? legacy?.goldValue);
+      const storedFood = Number(record.foodValue ?? legacy?.foodValue);
+      const matchesLegacy = legacy && hasStoredValues
+        && Number.isFinite(storedGold) && Number.isFinite(storedFood)
+        && storedGold === Number(legacy.goldValue)
+        && storedFood === Number(legacy.foodValue);
+      const missingStoredValues = record.goldValue === undefined && record.foodValue === undefined;
+      if (matchesLegacy || missingStoredValues) {
+        category = catalog.category;
+        rawGold = catalog.goldValue;
+        rawFood = catalog.foodValue;
+      }
+    }
+
+    return {
+      category,
+      name: catalog?.name || name,
+      tier: catalog?.tier ?? record.tier ?? null,
+      goldValue: Number.isFinite(Number(rawGold)) ? Number(rawGold) : 0,
+      foodValue: Number.isFinite(Number(rawFood)) ? Number(rawFood) : 0
+    };
+  }
+
   function getHouseTradeGoods(house = {}) {
     const primaryName = house.tradeGoods?.primary?.name || house.primaryTradeGood || house.primaryExport || house.exports || "";
     const secondaryName = house.tradeGoods?.secondary?.name || house.secondaryTradeGood || house.secondaryExport || "";
-    const primary = getTradeGoodByName(primaryName);
-    const secondary = getTradeGoodByName(secondaryName);
+    const primary = normalizeTradeGoodRecord(house.tradeGoods?.primary, primaryName);
+    const secondary = normalizeTradeGoodRecord(house.tradeGoods?.secondary, secondaryName);
     return { primary, secondary };
   }
 
-  function setHouseTradeGoods(house, primaryName, secondaryName) {
-    const primary = getTradeGoodByName(primaryName);
-    const secondary = getTradeGoodByName(secondaryName);
+  function setHouseTradeGoods(house, primaryName, secondaryName, overrides = {}) {
+    const primaryCatalog = getTradeGoodByName(primaryName);
+    const secondaryCatalog = getTradeGoodByName(secondaryName);
+    const primaryOverride = overrides.primary && typeof overrides.primary === "object" ? overrides.primary : {};
+    const secondaryOverride = overrides.secondary && typeof overrides.secondary === "object" ? overrides.secondary : {};
+    const primary = normalizeTradeGoodRecord({ ...(primaryCatalog || {}), ...primaryOverride, name: primaryOverride.name || primaryCatalog?.name || String(primaryName || "").trim() }, primaryName);
+    const secondary = normalizeTradeGoodRecord({ ...(secondaryCatalog || {}), ...secondaryOverride, name: secondaryOverride.name || secondaryCatalog?.name || String(secondaryName || "").trim() }, secondaryName);
     house.tradeGoods = {
       primary: primary ? foundry.utils.deepClone(primary) : null,
       secondary: secondary ? foundry.utils.deepClone(secondary) : null
@@ -9736,6 +13418,13 @@ async function togglePoliticalOverlay() {
     house.primaryExport = primary?.name || String(primaryName || "").trim();
     house.secondaryExport = secondary?.name || String(secondaryName || "").trim();
     return house;
+  }
+
+  function tradeGoodCategoryOptions(selectedCategory = "") {
+    const selected = normalize(selectedCategory);
+    const categories = [...TRADE_GOOD_CATEGORIES];
+    if (selectedCategory && !categories.some(category => normalize(category) === selected)) categories.push(selectedCategory);
+    return categories.map(category => `<option value="${escapeHtml(category)}" ${normalize(category) === selected ? "selected" : ""}>${escapeHtml(category)}</option>`).join("");
   }
 
   function getDefaultMarketForces() {
@@ -9810,22 +13499,45 @@ async function togglePoliticalOverlay() {
     return DEVELOPMENT_ECONOMY_BONUSES[level] || DEVELOPMENT_ECONOMY_BONUSES[0];
   }
 
+  function getMarketTradeMultipliers(house = {}, clock = getClock()) {
+    const marketState = getActiveBuildingLineState(house, clock).get("market");
+    const level = Math.max(0, Math.min(3, Number(marketState?.level?.level || 0)));
+    if (level >= 3) return { level, label: "Trading Hall", primary: 3, secondary: 3 };
+    if (level === 2) return { level, label: "Market Square", primary: 1.5, secondary: 1.5 };
+    if (level === 1) return { level, label: "Town Square", primary: 1, secondary: 1 };
+    return { level: 0, label: "No Market", primary: 1, secondary: 0.5 };
+  }
+
   function getTradeGoodIncomeBreakdown(house = {}, clock = getClock()) {
     const forces = getMarketForces();
     const season = String(clock?.season || "Spring");
     const goods = getHouseTradeGoods(house);
-    const selectedGoods = [goods.primary, goods.secondary].filter(Boolean);
+    const market = getMarketTradeMultipliers(house, clock);
+    const selectedGoods = [
+      goods.primary ? { slot: "primary", good: goods.primary, marketMultiplier: market.primary } : null,
+      goods.secondary ? { slot: "secondary", good: goods.secondary, marketMultiplier: market.secondary } : null
+    ].filter(Boolean);
     let gold = 0;
     let food = 0;
     const rows = [];
 
-    for (const good of selectedGoods) {
+    for (const entry of selectedGoods) {
+      const good = entry.good;
       const force = forces[season]?.[good.category] || { gold: 1, food: 1 };
-      const goldValue = Math.round(Number(good.goldValue || 0) * Number(force.gold || 1) * 100) / 100;
-      const foodValue = Math.round(Number(good.foodValue || 0) * Number(force.food || 1) * 100) / 100;
+      const marketMultiplier = Number(entry.marketMultiplier ?? 1);
+      const goldValue = Math.round(Number(good.goldValue || 0) * marketMultiplier * Number(force.gold || 1) * 100) / 100;
+      const foodValue = Math.round(Number(good.foodValue || 0) * marketMultiplier * Number(force.food || 1) * 100) / 100;
       gold += goldValue;
       food += foodValue;
-      rows.push({ ...good, finalGoldValue: goldValue, finalFoodValue: foodValue, goldMultiplier: force.gold, foodMultiplier: force.food });
+      rows.push({
+        ...good,
+        slot: entry.slot,
+        marketMultiplier,
+        finalGoldValue: goldValue,
+        finalFoodValue: foodValue,
+        goldMultiplier: force.gold,
+        foodMultiplier: force.food
+      });
     }
 
     const rawDev = getDevelopmentEconomyBonus(house, clock);
@@ -9847,6 +13559,7 @@ async function togglePoliticalOverlay() {
 
     return {
       goods,
+      market,
       rows,
       development: dev,
       gold,
@@ -9869,10 +13582,15 @@ async function togglePoliticalOverlay() {
     const manual = getHouseResourceIncome(house);
     const building = getActiveBuildingIncome(house, clock);
     const manualAndBuildings = scaleResourceMapByGeneralMarket(addResourceMaps(manual, building), clock);
-    const total = addResourceMaps(manualAndBuildings, breakdown.income);
+    const uncursedTotal = addResourceMaps(manualAndBuildings, breakdown.income);
+    const cursed = house?.cursedHolding === true;
+    const total = applyCursedIncomePenalty(uncursedTotal, cursed);
     return {
       trade: breakdown,
       manualAndBuildings,
+      uncursedTotal,
+      cursed,
+      curseMultiplier: cursed ? 0.5 : 1,
       total,
       totalText: resourceMapToText(total)
     };
@@ -10127,11 +13845,59 @@ async function togglePoliticalOverlay() {
     await canvas.scene.setFlag(FLAG_SCOPE, ECONOMY_LEDGER_KEY, ledger);
   }
 
+  function getMilitaryUpkeepLedger() {
+    return canvas.scene?.getFlag(FLAG_SCOPE, MILITARY_UPKEEP_LEDGER_KEY) ?? {};
+  }
+
+  async function saveMilitaryUpkeepLedger(ledger) {
+    await canvas.scene.setFlag(FLAG_SCOPE, MILITARY_UPKEEP_LEDGER_KEY, ledger);
+  }
+
+  async function clearMilitaryUpkeepLedger(scope = "all") {
+    if (scope === "all") {
+      await canvas.scene.unsetFlag(FLAG_SCOPE, MILITARY_UPKEEP_LEDGER_KEY);
+      return { cleared: "all" };
+    }
+    const roundKey = getRoundKey(getClock());
+    const ledger = foundry.utils.deepClone(getMilitaryUpkeepLedger() || {});
+    let cleared = 0;
+    for (const key of Object.keys(ledger)) {
+      if (!roundKey || key.startsWith(`${roundKey}|`)) {
+        delete ledger[key];
+        cleared++;
+      }
+    }
+    await saveMilitaryUpkeepLedger(ledger);
+    return { cleared };
+  }
+
+
+  async function clearTileEconomyCollectionMarkers(roundKey = "") {
+    let cleared = 0;
+    for (const entry of getWorldTileEntries()) {
+      const doc = entry?.drawing?.document;
+      if (!doc) continue;
+      const house = foundry.utils.deepClone(doc.getFlag(FLAG_SCOPE, HOUSE_KEY) ?? {});
+      const storedRoundKey = String(house.lastEconomyCollectedRoundKey || "");
+      if (!storedRoundKey) continue;
+      if (roundKey && storedRoundKey !== String(roundKey)) continue;
+      delete house.lastEconomyCollectedRoundKey;
+      delete house.lastEconomyCollectedDateLabel;
+      delete house.lastEconomyCollectedAt;
+      delete house.lastEconomyCollectedBy;
+      await doc.unsetFlag(FLAG_SCOPE, HOUSE_KEY);
+      await doc.setFlag(FLAG_SCOPE, HOUSE_KEY, house);
+      cleared++;
+    }
+    return cleared;
+  }
 
   async function clearEconomyLedger(scope = "all") {
     if (scope === "all") {
       await canvas.scene.unsetFlag(FLAG_SCOPE, ECONOMY_LEDGER_KEY);
-      return { cleared: "all" };
+      await clearMilitaryUpkeepLedger("all");
+      const tileMarkersCleared = await clearTileEconomyCollectionMarkers("");
+      return { cleared: "all", tileMarkersCleared };
     }
     const clock = getClock();
     const roundKey = getRoundKey(clock);
@@ -10144,7 +13910,9 @@ async function togglePoliticalOverlay() {
       }
     }
     await saveEconomyLedger(ledger);
-    return { cleared };
+    await clearMilitaryUpkeepLedger("current");
+    const tileMarkersCleared = await clearTileEconomyCollectionMarkers(roundKey || "");
+    return { cleared, tileMarkersCleared };
   }
 
   function addRoundsToClockData(clock = getClock(), rounds = 1) {
@@ -10169,17 +13937,53 @@ async function togglePoliticalOverlay() {
     };
   }
 
+  function getConstructionRoundsForResultingSlot(resultingSlot = 1) {
+    const slot = Math.max(1, Math.min(4, Math.floor(Number(resultingSlot || 1))));
+    return slot <= 2 ? 1 : 2;
+  }
+
   function canUserBuildOnTileForUser(worldTile, house = null, user = game.user) {
-    if (!user) return false;
-    if (user.isGM) return true;
+    return isTileControlledByUser(worldTile, house || {}, user);
+  }
 
-    const ownerUserId = getTileOwnerUserId(worldTile, house);
-    if (ownerUserId) return String(ownerUserId) === String(user.id);
+  function getActiveConstructionForTile(house = {}, clock = getClock()) {
+    if (!clock) return null;
+    const currentSort = roundSortValue(clock);
+    const rows = Array.isArray(house?.buildingData) ? house.buildingData : [];
+    const builtNames = new Set((Array.isArray(house?.builtBuildings) ? house.builtBuildings : []).map(value => normalize(value)));
+    return rows.find(item => {
+      if (!item) return false;
+      const name = String(item.name || item.building || "").trim();
+      // Construction records are authoritative only for a real, current catalog
+      // building that is also present in builtBuildings. Old exports sometimes
+      // retained orphan/future-dated buildingData rows after the building itself
+      // had been removed; those must never block new construction.
+      if (!name || !getBuildingMetaByName(name) || !builtNames.has(normalize(name))) return false;
+      const activeSort = Number(item.activeFromSort);
+      if (Number.isFinite(activeSort) && activeSort > currentSort) return true;
+      const activeRoundKey = String(item.activeFromRoundKey || "").trim();
+      return activeRoundKey && activeRoundKey !== String(getRoundKey(clock) || "") && Number(item.constructionRounds || 0) > 0 && !Number.isFinite(activeSort);
+    }) || null;
+  }
 
-    const ownerUserName = getTileOwnerUserName(worldTile, house);
-    if (ownerUserName) return normalize(ownerUserName) === normalize(user.name);
+  function getRecentOwnershipChangeThisRound(worldTile = {}, house = {}, roundKey = getCurrentActionRoundKey()) {
+    if (!roundKey) return null;
+    const audits = [house?.lastOwnershipChange, worldTile?.lastOwnershipChange].filter(Boolean);
+    return audits.find(audit => String(audit?.roundKey || "") === String(roundKey)) || null;
+  }
 
-    return false;
+  function getTileConstructionBlockReason(worldTile = {}, house = {}, clock = getClock()) {
+    const activeConstruction = getActiveConstructionForTile(house, clock);
+    if (activeConstruction) {
+      const name = activeConstruction.name || activeConstruction.building || "another building";
+      const until = activeConstruction.activeFromDateLabel || activeConstruction.activeFromRoundKey || "a later round";
+      return `${worldTile.name || "This tile"} is already constructing ${name}. Only one building may be under construction in a tile at a time; it completes on ${until}.`;
+    }
+    const recentTransfer = getRecentOwnershipChangeThisRound(worldTile, house, getCurrentActionRoundKey());
+    if (recentTransfer) {
+      return `${worldTile.name || "This tile"} changed political control this turn and cannot begin construction until the next world round.`;
+    }
+    return "";
   }
 
   function findActiveGmForScene(sceneId = canvas.scene?.id) {
@@ -10193,31 +13997,56 @@ async function togglePoliticalOverlay() {
     return Array.isArray(piece?.pendingBuildRequests) ? [...piece.pendingBuildRequests] : [];
   }
 
-  function hasPendingBuildForRound(roundKey, userId) {
-    if (!roundKey || !userId) return null;
+  function getPendingBuildsForRound(roundKey, userId = null) {
+    if (!roundKey) return [];
+    const uid = userId == null ? null : String(userId || "");
+    const found = [];
     for (const token of canvas.tokens.placeables) {
       const piece = getWorldPiece(token);
       if (!piece) continue;
-      const requests = getPendingBuildRequestsFromPiece(piece);
-      const found = requests.find(request =>
-        request &&
-        request.status === PENDING_BUILD_STATUS_PENDING &&
-        String(request.roundKey || "") === String(roundKey) &&
-        String(request.requesterUserId || "") === String(userId)
-      );
-      if (found) return { token, piece, request: found };
+      for (const request of getPendingBuildRequestsFromPiece(piece)) {
+        if (!request || request.status !== PENDING_BUILD_STATUS_PENDING) continue;
+        if (String(request.roundKey || "") !== String(roundKey)) continue;
+        if (uid !== null && String(request.requesterUserId || "") !== uid) continue;
+        found.push({ token, piece, request });
+      }
     }
-    return null;
+    return found;
+  }
+
+  function hasPendingBuildForRound(roundKey, userId) {
+    return getPendingBuildsForRound(roundKey, userId)[0] || null;
+  }
+
+  function getPendingBuildCountForRound(roundKey, userId) {
+    return getPendingBuildsForRound(roundKey, userId).length;
+  }
+
+  function hasPendingBuildForTileRound(roundKey, tileId, tileName = "") {
+    const tid = String(tileId || "");
+    const tname = normalize(tileName || "");
+    return getPendingBuildsForRound(roundKey).find(entry =>
+      (tid && String(entry.request?.tileId || "") === tid) ||
+      (tname && normalize(entry.request?.tileName || "") === tname)
+    ) || null;
   }
 
   async function savePendingBuildRequest({ token, piece, entry, building }) {
     const clock = getClock();
     const roundKey = getRoundKey(clock);
     const dateLabel = clock ? getDateLabel(clock) : "Unknown Date";
-    const existingPending = hasPendingBuildForRound(roundKey, game.user.id);
+    const tileId = entry.tile.id || entry.drawing.document.id;
+    const tileName = entry.tile.name || "Unnamed Tile";
+    const existingPendingOnTile = hasPendingBuildForTileRound(roundKey, tileId, tileName);
+    const pendingCount = getPendingBuildCountForRound(roundKey, game.user.id);
+    const ledgerCount = getBuildCountForUserRound(getBuildLedger(), roundKey, game.user.id);
 
-    if (existingPending) {
-      ui.notifications.warn(`You already have a pending build this round: ${existingPending.request.building} at ${existingPending.request.tileName}.`);
+    if (existingPendingOnTile) {
+      ui.notifications.warn(`${tileName} already has a pending build this round: ${existingPendingOnTile.request.building}. Only one construction start per province per round is allowed.`);
+      return false;
+    }
+    if ((pendingCount + ledgerCount) >= 3) {
+      ui.notifications.warn(`You have already started or queued 3 construction projects this round.`);
       return false;
     }
 
@@ -10257,11 +14086,17 @@ async function togglePoliticalOverlay() {
     updatedPiece.lastBuiltAt = request.requestedAt;
     updatedPiece.lastBuiltBy = game.user.name;
     updatedPiece.lastBuildStatus = PENDING_BUILD_STATUS_PENDING;
+    updatedPiece.movementUsed = Math.max(Number(updatedPiece.movementUsed || 0), Number(updatedPiece.movementMax || 0));
+    updatedPiece.movementLockedRoundKey = roundKey;
+    updatedPiece.movementLockedReason = `Overseeing ${building} construction this turn.`;
+    updatedPiece.movementLockedAt = new Date().toISOString();
+    updatedPiece.movementLockedBy = game.user.name;
 
     await saveWorldPiece(token, updatedPiece);
 
     await ChatMessage.create({
       speaker: ChatMessage.getSpeaker({ alias: "Crown Build" }),
+      whisper: getPrivateActionRecipients(game.user.id),
       content: `<h2>Build Request Queued</h2>
         <p><strong>Player:</strong> ${escapeHtml(game.user.name)}</p>
         <p><strong>Piece:</strong> ${escapeHtml(updatedPiece.name || token.document.name)}</p>
@@ -10315,12 +14150,20 @@ async function togglePoliticalOverlay() {
     if (!roundKey) throw new Error("World Round Clock is not initialized.");
     if (isSeaByTile(worldTile)) throw new Error("Sea tiles cannot build settlements/buildings.");
     if (!canUserControlWorldPieceForUser(token, piece, builderUser || { id: builderUserId, name: builderUserName, isGM: false })) throw new Error(`${builderUserName} does not control ${piece.name || token.document.name}.`);
+    const builderCharacter = getCharacterDataFromToken(token) || {};
+    if (!builderIsGm) {
+      const actionLock = characterMainActionReason(piece, builderCharacter) || strategicMovementLockReason(piece) || (String(builderCharacter.movementLockedRoundKey || "") === String(roundKey) ? (builderCharacter.movementLockedReason || "This character has already committed a strategic action this turn.") : "");
+      if (actionLock) throw new Error(`Construction is unavailable: ${actionLock}`);
+    }
 
     const house = foundry.utils.deepClone(doc.getFlag(FLAG_SCOPE, HOUSE_KEY) ?? {});
 
     if (!canUserBuildOnTileForUser(worldTile, house, builderUser || { id: builderUserId, name: builderUserName, isGM: false })) {
-      throw new Error(getBuildBlockedReason(worldTile, house));
+      throw new Error(getBuildBlockedReason(worldTile, house, builderUser || { id: builderUserId, name: builderUserName, isGM: false }));
     }
+
+    const tileConstructionBlock = getTileConstructionBlockReason(worldTile, house, clock);
+    if (tileConstructionBlock) throw new Error(tileConstructionBlock);
 
     const existingBuildings = Array.isArray(house.builtBuildings) ? [...house.builtBuildings].map(String) : [];
     const targetMeta = getBuildingMetaByName(building);
@@ -10336,14 +14179,20 @@ async function togglePoliticalOverlay() {
     if (targetMeta && currentLineState && !isUpgrade) throw new Error(`${worldTile.name || "This tile"} already has ${currentLineState.level.name} in the ${targetMeta.line.label} line.`);
 
     const ledger = foundry.utils.deepClone(getBuildLedger());
-    const existingBuildThisRound = getAlreadyBuiltForRound(ledger, roundKey, builderUserId);
+    const tileIdForLedger = worldTile.id || doc.id;
+    const existingBuildOnTile = getAlreadyBuiltOnTileForRound(ledger, roundKey, tileIdForLedger, worldTile.name || "");
+    const playerBuildCount = getBuildCountForUserRound(ledger, roundKey, builderUserId);
 
-    if (!builderIsGm && existingBuildThisRound) {
-      throw new Error(`${builderUserName} has already built this turn: ${existingBuildThisRound.building} at ${existingBuildThisRound.tileName}.`);
+    if (!builderIsGm && existingBuildOnTile) {
+      throw new Error(`${worldTile.name || "This province"} has already started a construction project this round: ${existingBuildOnTile.building || "building"}. Only one construction start per province per round is allowed.`);
+    }
+    if (!builderIsGm && playerBuildCount >= 3) {
+      throw new Error(`${builderUserName} has already started 3 construction projects this round.`);
     }
 
-    // v0.2.4+: the scene build ledger and pending-build queue are the source of truth for one-build-per-round.
-    // Older piece-level lastBuildRoundKey flags can become stale when a GM rewinds the round clock or edits test data.
+    // Construction limits are per province (one start per province per round), with
+    // up to three starts per player per round. Each start still requires an available
+    // overseeing character, whose strategic action is consumed normally.
 
     const rule = getBuildingRule(building, house);
     const resultingDevelopment = Math.min(4, currentSlotCount + 1);
@@ -10354,16 +14203,45 @@ async function togglePoliticalOverlay() {
     }
 
     const economyActive = isEconomyEnabled(house);
-    const currentStockpile = getHouseResourceStockpile(house);
-    const buildingCost = normalizeResourceMap(rule.cost);
+    const baseBuildingCost = normalizeResourceMap(rule.cost);
+    const engineerDiscount = characterHasTrait(builderCharacter, "Engineer") ? 0.10 : 0;
+    const diligentPrep = (!builderIsGm && builderUser) ? getActiveDiligentBuildPrep({ userId: builderUser.id, region: worldTile.region || house.region || "" }) : null;
+    const diligentDiscount = diligentPrep ? 0.25 : 0;
+    const totalConstructionDiscount = Math.min(0.90, engineerDiscount + diligentDiscount);
+    const buildingCost = applyPercentDiscountToResourceMap(baseBuildingCost, totalConstructionDiscount);
+
+    // Player construction spends from the player's REALM treasury, not only
+    // from the province where the building happens. Neutral / Unaligned tiles
+    // are excluded by getRealmLandEntriesForUser/isTileControlledByUser. GM
+    // direct edits retain the old local-tile behavior.
+    const realmSpendEntries = (!builderIsGm && builderUser)
+      ? getRealmLandEntriesForUser(builderUser)
+      : [entry];
+    const currentStockpile = (!builderIsGm && builderUser)
+      ? getRealmStockpileForEntries(realmSpendEntries)
+      : getHouseResourceStockpile(house);
     const missingResources = economyActive ? getMissingResources(currentStockpile, buildingCost) : {};
 
     if (economyActive && hasAnyResources(missingResources)) {
-      throw new Error(`${worldTile.name || "This tile"} lacks the resources for ${building}. Missing: ${resourceMapToText(missingResources)}.`);
+      throw new Error(`${builderUserName || worldTile.name || "This realm"} lacks the realm resources for ${building}. Missing: ${resourceMapToText(missingResources)}.`);
     }
 
-    const stockpileAfterCost = economyActive ? spendResources(currentStockpile, buildingCost) : currentStockpile;
-    const activation = getNextRoundActivation(clock, Math.max(1, Number(rule.level || 1)));
+    let realmStockpileAfterCost = currentStockpile;
+    let localStockpileAfterCost = getHouseResourceStockpile(house);
+    if (economyActive) {
+      if (!builderIsGm && builderUser) {
+        const debitResult = await debitCostFromRealmStockpile(realmSpendEntries, buildingCost, `Construction: ${building} at ${worldTile.name || "province"}`);
+        realmStockpileAfterCost = normalizeResourceMap(debitResult.after);
+        const refreshedHouse = foundry.utils.deepClone(getHouseData(drawing) || house);
+        localStockpileAfterCost = getHouseResourceStockpile(refreshedHouse);
+      } else {
+        localStockpileAfterCost = spendResources(currentStockpile, buildingCost);
+        realmStockpileAfterCost = localStockpileAfterCost;
+      }
+    }
+    const resultingSlotNumber = Math.min(4, currentSlotCount + 1);
+    const constructionRounds = getConstructionRoundsForResultingSlot(resultingSlotNumber);
+    const activation = getNextRoundActivation(clock, constructionRounds);
 
     const updatedBuildings = getBuiltBuildingsAfterCatalogChange(house, building);
     const updatedBuildingSlots = getBuildingSlotsAfterCatalogChange({ ...house, builtBuildings: updatedBuildings }, building);
@@ -10378,8 +14256,12 @@ async function togglePoliticalOverlay() {
     const buildingData = Array.isArray(house.buildingData) ? house.buildingData : [];
     const filteredBuildingData = buildingData.filter(item => String(item.name || item.building || "") !== String(building));
 
+    const houseAfterRealmDebit = (!builderIsGm && builderUser && economyActive)
+      ? foundry.utils.deepClone(getHouseData(drawing) || house)
+      : house;
+
     const updatedHouse = {
-      ...house,
+      ...houseAfterRealmDebit,
       house: house.house || worldTile.owner || "Neutral",
       lord: house.lord || "",
       region: house.region || worldTile.region || "",
@@ -10390,7 +14272,7 @@ async function togglePoliticalOverlay() {
       builtBuildings: updatedBuildings,
       buildingSlots: updatedBuildingSlots,
       economyEnabled: economyActive || house.economyEnabled === true,
-      resourceStockpile: stockpileAfterCost,
+      resourceStockpile: localStockpileAfterCost,
       manualResourceIncome: cleanManualIncome,
       manualResourceIncomeCleared: !hasAnyResources(cleanManualIncome),
       buildingData: [
@@ -10402,7 +14284,12 @@ async function togglePoliticalOverlay() {
           lineLabel: rule.lineLabel || building,
           group: rule.group || "Legacy",
           level: rule.level || 1,
+          baseCost: baseBuildingCost,
           cost: buildingCost,
+          constructionDiscountPercent: totalConstructionDiscount,
+          engineerDiscountApplied: engineerDiscount > 0,
+          diligentDiscountApplied: diligentDiscount > 0,
+          diligentPrepId: diligentPrep?.id || "",
           income: normalizeResourceMap(rule.income),
           effect: rule.effect || "",
           statecraftRequired,
@@ -10427,7 +14314,7 @@ async function togglePoliticalOverlay() {
       lastBuiltByPieceName: piece.name || token.document.name,
       lastBuiltAt: now,
       buildLog: [
-        ...(Array.isArray(house.buildLog) ? house.buildLog : []),
+        ...(Array.isArray(houseAfterRealmDebit.buildLog) ? houseAfterRealmDebit.buildLog : []),
         {
           building,
           action: isUpgrade ? "upgrade" : "build",
@@ -10438,7 +14325,12 @@ async function togglePoliticalOverlay() {
           userName: builderUserName,
           pieceId: token.document.id,
           pieceName: piece.name || token.document.name,
-          builtAt: now
+          builtAt: now,
+          baseCost: baseBuildingCost,
+          costPaid: buildingCost,
+          constructionDiscountPercent: totalConstructionDiscount,
+          engineerDiscountApplied: engineerDiscount > 0,
+          diligentDiscountApplied: diligentDiscount > 0
         }
       ],
       version: `Crown Overview Tools ${MODULE_VERSION}`,
@@ -10461,11 +14353,17 @@ async function togglePoliticalOverlay() {
     updatedPiece.lastBuiltBy = builderUserName;
     await saveWorldPiece(token, updatedPiece);
 
+    // Overseeing the opening round of construction grounds the character for
+    // the remainder of the current strategic round. Construction may continue
+    // into later rounds, but only the round in which it is started grounds them.
+    await lockCharacterActionForRound(token, `Overseeing ${building} construction this turn.`);
+
     ledger[roundKey] = ledger[roundKey] || { dateLabel, users: {}, builds: [] };
     ledger[roundKey].dateLabel = dateLabel;
     ledger[roundKey].users = ledger[roundKey].users || {};
     ledger[roundKey].builds = Array.isArray(ledger[roundKey].builds) ? ledger[roundKey].builds : [];
     ledger[roundKey].users[builderUserId] = {
+      userId: builderUserId,
       userName: builderUserName,
       building,
       action: isUpgrade ? "upgrade" : "build",
@@ -10477,9 +14375,11 @@ async function togglePoliticalOverlay() {
     };
     ledger[roundKey].builds.push(ledger[roundKey].users[builderUserId]);
     await saveBuildLedger(ledger);
+    if (diligentPrep?.id) await consumeDiligentBuildPrep(diligentPrep.id, { building, tileName: worldTile.name || "Unnamed Tile", builderName: piece.name || token.document.name });
 
     await ChatMessage.create({
       speaker: ChatMessage.getSpeaker({ alias: "Crown Build" }),
+      whisper: getPrivateActionRecipients(builderUserId),
       content: `<h2>${isUpgrade ? "Building Upgrade Started" : "Building Construction Started"}</h2>
         <p><strong>Player:</strong> ${escapeHtml(builderUserName)}</p>
         <p><strong>Piece:</strong> ${escapeHtml(piece.name || token.document.name)}</p>
@@ -10488,9 +14388,10 @@ async function togglePoliticalOverlay() {
         <p><strong>Building:</strong> ${escapeHtml(building)}</p>
         ${isUpgrade ? `<p><strong>Upgraded From:</strong> ${escapeHtml(currentLineState?.level?.name || "Unknown")}</p>` : ""}
         ${statecraftRequired ? `<p><strong>Statecraft Required:</strong> ${escapeHtml(statecraftRequired)}${pieceStatecraft !== null ? ` — Piece has ${escapeHtml(pieceStatecraft)}` : " — not checked because no Statecraft is stored on this piece yet"}</p>` : ""}
-        ${economyActive ? `<p><strong>Cost Paid:</strong> ${escapeHtml(resourceMapToText(buildingCost))}</p><p><strong>Tile Stockpile:</strong> ${escapeHtml(resourceMapToText(stockpileAfterCost))}</p><p><strong>Bonuses Unlock:</strong> ${escapeHtml(activation.activeFromDateLabel)} after ${escapeHtml(activation.constructionRounds)} round(s) — ${escapeHtml(resourceMapToText(rule.income))}</p>` : `<p><strong>Economy:</strong> Not enabled for this tile, so no resource cost was charged.</p>`}
+        ${economyActive ? `<p><strong>Base Cost:</strong> ${escapeHtml(resourceMapToText(baseBuildingCost))}</p>${totalConstructionDiscount > 0 ? `<p><strong>Construction Discount:</strong> ${escapeHtml(Math.round(totalConstructionDiscount * 100))}%${engineerDiscount ? " — Engineer 10%" : ""}${diligentDiscount ? " — Diligent 25%" : ""}</p>` : ""}<p><strong>Cost Paid:</strong> ${escapeHtml(resourceMapToText(buildingCost))}</p><p><strong>Realm Resources Remaining:</strong> ${escapeHtml(resourceMapToText(realmStockpileAfterCost))}</p><p><strong>Bonuses Unlock:</strong> ${escapeHtml(activation.activeFromDateLabel)} after ${escapeHtml(activation.constructionRounds)} round(s) — ${escapeHtml(resourceMapToText(rule.income))}</p>` : `<p><strong>Economy:</strong> Not enabled for this tile, so no resource cost was charged.</p>`}
         <p><strong>Development:</strong> ${escapeHtml(developmentLabel)} (${escapeHtml(developmentLevel)} / 4)</p>
         <p><strong>Population:</strong> ${escapeHtml(Number(population).toLocaleString())}${oldPopulation !== undefined && oldPopulation !== "" ? ` <span style="opacity:0.75;">previously ${escapeHtml(oldPopulation)}</span>` : ""}</p>
+        <p><strong>Movement:</strong> ${escapeHtml(piece.name || token.document.name)} is grounded for the rest of this round while overseeing the start of construction.</p>
         <p><strong>Date:</strong> ${escapeHtml(dateLabel)}</p>`
     });
 
@@ -10536,7 +14437,7 @@ async function togglePoliticalOverlay() {
       const requester = game.users.get(String(message.requesterUserId || ""));
       await ChatMessage.create({
         speaker: ChatMessage.getSpeaker({ alias: "Crown Build" }),
-        whisper: requester ? [requester.id, ...ChatMessage.getWhisperRecipients("GM").map(u => u.id)] : undefined,
+        whisper: getPrivateActionRecipients(message.requesterUserId),
         content: `<h2>Build Request Failed</h2><p><strong>Player:</strong> ${escapeHtml(message.requesterUserName || "Unknown")}</p><p><strong>Reason:</strong> ${escapeHtml(err.message || err)}</p>`
       });
       if (requester && game.socket) game.socket.emit(SOCKET_NAME, { type: "playerNotification", targetUserId: requester.id, level: "error", message: `Build failed: ${err.message || err}` });
@@ -10551,6 +14452,65 @@ async function togglePoliticalOverlay() {
         if (!message.targetUserId || String(message.targetUserId) === String(game.user.id)) {
           const fn = message.level === "error" ? ui.notifications.error : message.level === "warn" ? ui.notifications.warn : ui.notifications.info;
           fn.call(ui.notifications, message.message || "Crown Overview notification.");
+        }
+        return;
+      }
+      if (message.type === "portTravelPermissionRequest") {
+        await handlePortTravelPermissionRequest(message);
+        return;
+      }
+      if (message.type === "portTravelPermissionResponse") {
+        handlePortTravelPermissionResponse(message);
+        return;
+      }
+      if (message.type === "characterDetailsUpdateRequest") {
+        if (!game.user.isGM || (message.targetGmId && String(message.targetGmId) !== String(game.user.id))) return;
+        if (String(message.sceneId || "") !== String(canvas.scene?.id || "")) {
+          game.socket.emit(SOCKET_NAME, { type: "playerNotification", targetUserId: message.requesterUserId, level: "error", message: "Character details could not be saved because the GM is not on the Crown Overview scene." });
+          return;
+        }
+        try {
+          const token = canvas.tokens.get(message.characterTokenId) || canvas.tokens.placeables.find(t => String(t.document.id) === String(message.characterTokenId));
+          if (!token) throw new Error("Could not find that character token on the overview scene.");
+          const saved = await applyPlayerCharacterDetailsUpdate({ token, requesterUserId: message.requesterUserId, requesterUserName: message.requesterUserName, details: message.details || {} });
+          game.socket.emit(SOCKET_NAME, { type: "playerNotification", targetUserId: message.requesterUserId, level: "info", message: `${saved.characterName || token.document.name} details saved.` });
+        } catch (err) {
+          console.error("Crown Overview character detail update failed:", err, message);
+          game.socket.emit(SOCKET_NAME, { type: "playerNotification", targetUserId: message.requesterUserId, level: "error", message: `Character details failed to save: ${err.message || err}` });
+        }
+        return;
+      }
+      if (message.type === "intrigueActionRequest") {
+        if (!game.user.isGM || (message.targetGmId && String(message.targetGmId) !== String(game.user.id))) return;
+        if (String(message.sceneId || "") !== String(canvas.scene?.id || "")) {
+          game.socket.emit(SOCKET_NAME, { type: "playerNotification", targetUserId: message.requesterUserId, level: "error", message: "Out-of-Map Action failed because the GM is not on the Crown Overview scene." });
+          return;
+        }
+        try {
+          const token = canvas.tokens.get(message.characterTokenId) || canvas.tokens.placeables.find(t => String(t.document.id) === String(message.characterTokenId));
+          if (!token) throw new Error("Could not find that character token.");
+          await applyIntrigueAction({ token, requesterUserId: message.requesterUserId, requesterUserName: message.requesterUserName, actionType: message.actionType, actionDetails: message.actionDetails });
+          game.socket.emit(SOCKET_NAME, { type: "playerNotification", targetUserId: message.requesterUserId, level: "info", message: `${token.document.name} spent their Main Action on ${message.actionType || "an Out-of-Map Action"}. Movement remains available.` });
+        } catch (err) {
+          console.error("Crown Overview out-of-map action failed:", err, message);
+          game.socket.emit(SOCKET_NAME, { type: "playerNotification", targetUserId: message.requesterUserId, level: "error", message: `Out-of-Map Action failed: ${err.message || err}` });
+        }
+        return;
+      }
+      if (message.type === "diligentBuildActionRequest") {
+        if (!game.user.isGM || (message.targetGmId && String(message.targetGmId) !== String(game.user.id))) return;
+        if (String(message.sceneId || "") !== String(canvas.scene?.id || "")) {
+          game.socket.emit(SOCKET_NAME, { type: "playerNotification", targetUserId: message.requesterUserId, level: "error", message: "Diligent construction action failed because the GM is not on the Crown Overview scene." });
+          return;
+        }
+        try {
+          const token = canvas.tokens.get(message.characterTokenId) || canvas.tokens.placeables.find(t => String(t.document.id) === String(message.characterTokenId));
+          if (!token) throw new Error("Could not find that character token.");
+          const record = await applyDiligentBuildAction({ token, requesterUserId: message.requesterUserId, requesterUserName: message.requesterUserName });
+          game.socket.emit(SOCKET_NAME, { type: "playerNotification", targetUserId: message.requesterUserId, level: "info", message: `${token.document.name} prepared a 25% construction discount for ${record.region}.` });
+        } catch (err) {
+          console.error("Crown Overview Diligent construction action failed:", err, message);
+          game.socket.emit(SOCKET_NAME, { type: "playerNotification", targetUserId: message.requesterUserId, level: "error", message: `Diligent construction action failed: ${err.message || err}` });
         }
         return;
       }
@@ -10765,6 +14725,7 @@ async function togglePoliticalOverlay() {
 
     await ChatMessage.create({
       speaker: ChatMessage.getSpeaker({ alias: "Crown Build" }),
+      whisper: ChatMessage.getWhisperRecipients("GM").map(u => u.id),
       content: `<h2>Pending Builds Processed</h2><p><strong>Applied:</strong> ${escapeHtml(applied)}</p><p><strong>Failed:</strong> ${escapeHtml(failed)}</p><ul>${summary}</ul>`
     });
 
@@ -11037,6 +14998,7 @@ async function togglePoliticalOverlay() {
 
     await ChatMessage.create({
       speaker: ChatMessage.getSpeaker({ alias: "Crown Build" }),
+      whisper: ChatMessage.getWhisperRecipients("GM").map(u => u.id),
       content: `<h2>Build Uses Reset</h2><p><strong>Player:</strong> ${escapeHtml(targetName)}</p><p><strong>Scope:</strong> ${escapeHtml(result.scope === "all" ? "All rounds" : currentLabel)}</p><p><strong>Ledger entries cleared:</strong> ${escapeHtml(summary.ledgerCleared)}</p><p><strong>Pending requests cleared:</strong> ${escapeHtml(summary.pendingCleared)}</p><p><strong>World pieces unlocked:</strong> ${escapeHtml(summary.piecesCleared)}</p>${summary.selectedPiecesChecked ? `<p><strong>Selected pieces force-checked:</strong> ${escapeHtml(summary.selectedPiecesChecked)}</p>` : ""}`
     });
 
@@ -11062,6 +15024,7 @@ async function togglePoliticalOverlay() {
 
     await ChatMessage.create({
       speaker: ChatMessage.getSpeaker({ alias: "Crown Build" }),
+      whisper: ChatMessage.getWhisperRecipients("GM").map(u => u.id),
       content: `<h2>Build Locks Repaired</h2><p><strong>Scene:</strong> ${escapeHtml(canvas.scene?.name || "Unknown")}</p><p><strong>Ledger entries cleared:</strong> ${escapeHtml(summary.ledgerCleared)}</p><p><strong>Pending requests cleared:</strong> ${escapeHtml(summary.pendingCleared)}</p><p><strong>World pieces unlocked:</strong> ${escapeHtml(summary.piecesCleared)}</p><p>Existing buildings on tiles were not changed.</p>`
     });
 
@@ -11097,6 +15060,11 @@ async function togglePoliticalOverlay() {
       ui.notifications.warn("Initialize the World Round Clock before building, so the one-building-per-turn rule can be tracked.");
       return;
     }
+    if (!game.user.isGM) {
+      const character = getCharacterDataFromToken(token) || {};
+      const actionLock = characterMainActionReason(piece, character) || strategicMovementLockReason(piece) || (String(character.movementLockedRoundKey || "") === String(roundKey) ? (character.movementLockedReason || "This character has already committed a strategic action this turn.") : "");
+      if (actionLock) { ui.notifications.warn(`Construction is unavailable: ${actionLock}`); return; }
+    }
 
     const entry = getCurrentTileEntryForToken(token, piece);
     if (!entry) {
@@ -11122,26 +15090,40 @@ async function togglePoliticalOverlay() {
       return;
     }
 
+    const tileConstructionBlock = getTileConstructionBlockReason(worldTile, house, clock);
+    if (tileConstructionBlock) {
+      ui.notifications.warn(tileConstructionBlock);
+      return;
+    }
+
     const existingBuildings = Array.isArray(house.builtBuildings) ? [...house.builtBuildings] : [];
     const existingBuildingSlots = getBuildingSlotCount(house);
 
     const ledger = foundry.utils.deepClone(getBuildLedger());
-    const existingBuildThisRound = getAlreadyBuiltForRound(ledger, roundKey, game.user.id);
-    const pendingBuildThisRound = hasPendingBuildForRound(roundKey, game.user.id);
+    const tileIdForLedger = worldTile.id || doc.id;
+    const existingBuildOnTile = getAlreadyBuiltOnTileForRound(ledger, roundKey, tileIdForLedger, worldTile.name || "");
+    const pendingBuildOnTile = hasPendingBuildForTileRound(roundKey, tileIdForLedger, worldTile.name || "");
+    const playerBuildCount = getBuildCountForUserRound(ledger, roundKey, game.user.id);
+    const playerPendingCount = getPendingBuildCountForRound(roundKey, game.user.id);
 
-    if (!game.user.isGM && pendingBuildThisRound) {
-      ui.notifications.warn(`You already have a pending build this turn: ${pendingBuildThisRound.request.building} at ${pendingBuildThisRound.request.tileName}.`);
+    if (!game.user.isGM && pendingBuildOnTile) {
+      ui.notifications.warn(`${worldTile.name || "This province"} already has a pending construction project this round: ${pendingBuildOnTile.request.building}.`);
       return;
     }
 
-    if (!game.user.isGM && existingBuildThisRound) {
-      ui.notifications.warn(`You have already built this turn: ${existingBuildThisRound.building} at ${existingBuildThisRound.tileName}.`);
+    if (!game.user.isGM && existingBuildOnTile) {
+      ui.notifications.warn(`${worldTile.name || "This province"} has already started a construction project this round: ${existingBuildOnTile.building || "building"}.`);
       return;
     }
 
-    // v0.2.4: do not block on piece.lastBuildRoundKey.
-    // The player build ledger and pending-build queue handle one-build-per-round.
-    // This avoids stale token locks after GM testing, rollback, or manual house edits.
+    if (!game.user.isGM && (playerBuildCount + playerPendingCount) >= 3) {
+      ui.notifications.warn(`You have already started or queued 3 construction projects this round.`);
+      return;
+    }
+
+    // Build starts are limited per province, not one-per-house. Up to three
+    // projects may be started by a player in a round if they have available
+    // characters and eligible provinces.
 
     const catalogOptions = buildCatalogBuildingOptions(house, piece);
     if (!catalogOptions.length) {
@@ -11159,28 +15141,49 @@ async function togglePoliticalOverlay() {
     const firstOptions = catalogOptions.filter(option => (option.category || option.group) === firstCategory);
     const firstOption = firstOptions.find(option => !option.disabled) || firstOptions[0] || catalogOptions[0];
     const builderStatecraft = getPieceStatecraft(piece);
-    const stockpileText = resourceMapToText(getHouseResourceStockpile(house));
+    const buildResourceEntries = game.user.isGM ? [entry] : getRealmLandEntriesForUser(game.user);
+    const buildResourceStockpile = game.user.isGM ? getHouseResourceStockpile(house) : getRealmStockpileForEntries(buildResourceEntries);
+    const stockpileText = resourceMapToText(buildResourceStockpile);
+    const stockpileLabel = game.user.isGM ? "Tile Resources" : "Realm Resources";
+    const builderCharacter = getCharacterDataFromToken(token) || {};
+    const engineerBuildDiscount = characterHasTrait(builderCharacter, "Engineer") ? 0.10 : 0;
+    const hasDiligentBuildTrait = characterHasTrait(builderCharacter, "Diligent");
+    const buildController = getCharacterControllerIdentity(token);
+    const diligentOwnerUserId = game.user.isGM && buildController?.id ? String(buildController.id) : String(game.user.id);
+    const activeDiligentPrep = getActiveDiligentBuildPrep({ userId: diligentOwnerUserId, region: worldTile.region || house.region || "" });
+    const diligentBuildDiscount = activeDiligentPrep ? 0.25 : 0;
+    const previewBuildDiscount = engineerBuildDiscount + diligentBuildDiscount;
+    const discountText = previewBuildDiscount > 0 ? `${Math.round(previewBuildDiscount * 100)}% total${engineerBuildDiscount ? " (Engineer 10%" : " ("}${engineerBuildDiscount && diligentBuildDiscount ? " + " : ""}${diligentBuildDiscount ? "Diligent 25%" : ""})` : "None";
+    const buildDiscountLabel = previewBuildDiscount > 0
+      ? `${Math.round(previewBuildDiscount * 100)}% off${engineerBuildDiscount && diligentBuildDiscount ? " — Diligent 25% + Engineer 10%" : diligentBuildDiscount ? " — Diligent 25%" : " — Engineer 10%"}`
+      : "";
+    const diligentSaleBanner = activeDiligentPrep ? `<div style="margin:0 0 10px 0;padding:11px 14px;border:2px dashed #9b6a00;border-radius:8px;text-align:center;background:rgba(255,205,64,0.16);transform:rotate(-0.35deg);"><div style="font-size:22px;font-weight:900;letter-spacing:1.2px;">✨ ALL BUILDINGS ON SALE! ✨</div><div style="margin-top:3px;font-weight:700;">Diligent planning: 25% OFF the next project in ${escapeHtml(worldTile.region || house.region || "this region")}!</div><div style="margin-top:2px;font-size:0.88em;opacity:0.78;">Sale ends when somebody actually starts a building. No rain checks. Probably.</div></div>` : "";
+    const diligentPrepareBox = hasDiligentBuildTrait ? `<div style="margin:0 0 10px 0;padding:10px;border:1px solid #777;border-radius:7px;display:flex;gap:10px;align-items:center;justify-content:space-between;"><div><strong>Prepare the Way</strong><br><span style="font-size:0.9em;opacity:0.8;">Diligent action: spend this character's <strong>Main Action</strong> to cut the next building or upgrade in this region by <strong>one fourth (25%)</strong>. <strong>This will take your Main Action.</strong></span></div><button type="button" data-diligent-prepare style="flex:0 0 auto;" ${activeDiligentPrep ? "disabled" : ""}>${activeDiligentPrep ? "Sale Already Active!" : "Prepare the Way"}</button></div>` : "";
     const categoryButtons = categories.map(category => `<button type="button" data-building-category="${escapeHtml(category)}" style="width:auto;min-width:110px;padding:5px 10px;margin:2px;${category === firstCategory ? "font-weight:700;outline:2px solid rgba(180,145,90,0.8);" : ""}">${escapeHtml(category)}</button>`).join("");
 
     const details = await new Promise(resolve => {
-      new Dialog({
+      let buildDialog = null;
+      buildDialog = new Dialog({
         title: `Build — ${worldTile.name || "World Tile"}`,
         content: `<form>
+          ${diligentSaleBanner}
+          ${diligentPrepareBox}
           <div style="display:grid;grid-template-columns:repeat(4,minmax(120px,1fr));gap:7px;margin-bottom:10px;">
             <div style="padding:8px;border:1px solid #777;border-radius:6px;"><strong>Tile</strong><br>${escapeHtml(worldTile.name || "Unnamed Tile")}<br><span style="opacity:0.75;">${escapeHtml(worldTile.region || house.region || "None")}</span></div>
             <div style="padding:8px;border:1px solid #777;border-radius:6px;"><strong>Development</strong><br>${escapeHtml(currentDevelopment)}<br><span style="opacity:0.75;">${escapeHtml(existingBuildingSlots)} / 4 building slots</span></div>
-            <div style="padding:8px;border:1px solid #777;border-radius:6px;"><strong>Resources</strong><br>${escapeHtml(stockpileText)}</div>
-            <div style="padding:8px;border:1px solid #777;border-radius:6px;"><strong>Builder</strong><br>${escapeHtml(piece.name || token.document.name)}<br><span style="opacity:0.75;">Statecraft ${escapeHtml(builderStatecraft ?? "Not set")}</span></div>
+            <div style="padding:8px;border:1px solid #777;border-radius:6px;"><strong>${escapeHtml(stockpileLabel)}</strong><br>${escapeHtml(stockpileText)}</div>
+            <div style="padding:8px;border:1px solid #777;border-radius:6px;"><strong>Builder</strong><br>${escapeHtml(piece.name || token.document.name)}<br><span style="opacity:0.75;">Statecraft ${escapeHtml(builderStatecraft ?? "Not set")}</span><br><span style="opacity:0.85;"><strong>Cost Discount:</strong> ${escapeHtml(discountText)}</span></div>
           </div>
           <div style="margin-bottom:8px;"><strong>Category</strong><div data-building-categories style="display:flex;flex-wrap:wrap;gap:2px;margin-top:4px;">${categoryButtons}</div></div>
           <div class="form-group"><label><strong>Building / Upgrade</strong></label><select name="building" style="width:100%;">${conciseBuildingOptionsHtml(catalogOptions, firstCategory, firstOption?.value || "")}</select></div>
-          <div data-building-detail>${buildBuildingDetailCard(firstOption, { currentDevelopment, nextDevelopment, currentSlots: existingBuildingSlots })}</div>
+          <div data-building-detail>${buildBuildingDetailCard(firstOption, { currentDevelopment, nextDevelopment, currentSlots: existingBuildingSlots, discountPercent: previewBuildDiscount, saleActive: Boolean(activeDiligentPrep), discountLabel: buildDiscountLabel })}</div>
           <div style="padding:8px;margin-top:10px;border:1px solid #777;border-radius:6px;"><strong>Existing Buildings:</strong><br>${existingBuildings.length ? escapeHtml(existingBuildings.join(", ")) : "None"}</div>
-          <p class="notes"><strong>Building rule:</strong> Each building tier is a physical piece of its set and uses one of four Development slots. Upgrading adds the next piece; the line uses the highest completed tier bonus rather than stacking tier bonuses. Development 1/2/3/4 requires Statecraft 5/10/12/16. Construction takes a number of rounds equal to the tier. Players may build or upgrade once per world round.</p>
+          ${mainActionWarningHtml()}
+          <p class="notes"><strong>Building rule:</strong> A province has four physical Development slots. Construction time is based on the <strong>resulting occupied slot, not the building tier/level</strong>: <strong>Slot 1 = 1 round, Slot 2 = 1 round, Slot 3 = 2 rounds, Slot 4 = 2 rounds.</strong> Upgrading a building line adds its next physical piece and therefore fills the next available slot; only the highest completed tier provides that line's active bonus. Development 1/2/3/4 requires Statecraft 5/10/12/16. Starting construction takes the overseeing character's Main Action and grounds them for the rest of that round. Players may start up to three builds or upgrades per world round, provided each starts in a different eligible province and an available character oversees each project. A province may start only one construction project per round and may have only one building under construction at a time. A province that changed political control this round cannot begin construction until the next round.</p>
         </form>`,
         buttons: {
           build: {
-            label: "Build / Upgrade",
+            label: "Build / Upgrade — Spend Main Action",
             callback: html => {
               const form = html[0].querySelector("form");
               const value = String(form.building.value || "").trim();
@@ -11198,9 +15201,24 @@ async function togglePoliticalOverlay() {
           const select = form.querySelector('[name="building"]');
           const detail = root.querySelector('[data-building-detail]');
           const buttons = [...root.querySelectorAll('[data-building-category]')];
+          const diligentPrepareButton = root.querySelector('[data-diligent-prepare]');
+          if (diligentPrepareButton) {
+            diligentPrepareButton.addEventListener("click", async event => {
+              event.preventDefault();
+              if (diligentPrepareButton.disabled) return;
+              diligentPrepareButton.disabled = true;
+              const committed = await takeDiligentBuildAction(token);
+              if (committed) {
+                resolve(null);
+                buildDialog?.close();
+              } else {
+                diligentPrepareButton.disabled = false;
+              }
+            });
+          }
           const renderDetail = () => {
             const option = catalogOptions.find(row => String(row.value) === String(select.value || ""));
-            detail.innerHTML = buildBuildingDetailCard(option, { currentDevelopment, nextDevelopment, currentSlots: existingBuildingSlots });
+            detail.innerHTML = buildBuildingDetailCard(option, { currentDevelopment, nextDevelopment, currentSlots: existingBuildingSlots, discountPercent: previewBuildDiscount, saleActive: Boolean(activeDiligentPrep), discountLabel: buildDiscountLabel });
           };
           const activateCategory = category => {
             for (const button of buttons) {
@@ -11218,7 +15236,8 @@ async function togglePoliticalOverlay() {
           select.addEventListener("change", renderDetail);
           renderDetail();
         }
-      }, { width: 760, height: 700, resizable: true }).render(true);
+      }, { width: 760, height: 700, resizable: true });
+      buildDialog.render(true);
     });
 
     if (!details?.building) return;
@@ -11526,7 +15545,7 @@ async function assignHouse() {
   const currentBuildingCount = Math.min(existingState.size, 4);
   const currentDevelopment = DEVELOPMENT_LEVELS[currentBuildingCount] || DEVELOPMENT_LEVELS[0];
   const cultureValue = existing.culture || worldTile.culture || "";
-  const religionValue = existing.religion || worldTile.religion || "";
+  const religionValue = canonicalizeReligionLabel(existing.religion || worldTile.religion || "");
   const cultureOptions = CULTURES.map(culture => `<option value="${escapeHtml(culture)}" ${cultureValue === culture ? "selected" : ""}>${escapeHtml(culture)}</option>`).join("");
   const currentOwnerId = getTileOwnerUserId(worldTile, existing) || "";
   const ownerOptions = [`<option value="" ${!currentOwnerId ? "selected" : ""}>Unassigned / NPC / Neutral</option>`, ...getPlayerUsers().map(user => `<option value="${escapeHtml(user.id)}" ${String(user.id) === String(currentOwnerId) ? "selected" : ""}>${escapeHtml(user.name)}</option>`)].join("");
@@ -11538,7 +15557,7 @@ async function assignHouse() {
   const ownershipOptions = ["Player", "NPC", "Neutral", "None"].map(type => `<option value="${type}" ${normalize(ownershipType) === normalize(type) ? "selected" : ""}>${type}</option>`).join("");
   const swornTypeValue = existing.swornToType || worldTile.swornToType || (currentOwnerId ? "Player" : normalize(ownershipType) === "npc" ? "NPC" : "");
   const swornTypeOptions = ["", "Player", "NPC", "Neutral", "None"].map(type => `<option value="${escapeHtml(type)}" ${normalize(swornTypeValue) === normalize(type) ? "selected" : ""}>${escapeHtml(type || "None")}</option>`).join("");
-  const religions = ["", "Faith of the Seven", "Old Gods", "Drowned God", "R'hllor", "Many-Faced God", "Other"];
+  const religions = ["", "Faith of the Seven", ...FOTS_SECT_RELIGIONS, "Dornish Faith of the Seven", "Old Gods", "Drowned God", "R'hllor", "Many-Faced God", "Other"];
   const religionOptions = religions.map(religion => `<option value="${escapeHtml(religion)}" ${religionValue === religion ? "selected" : ""}>${escapeHtml(religion || "Select Religion")}</option>`).join("");
 
   const groupedLines = new Map();
@@ -11592,8 +15611,27 @@ async function assignHouse() {
     <div class="form-group"><label><input type="checkbox" name="diplomaticTakeoverAllowed" ${csvBoolean(existing.diplomaticTakeoverAllowed ?? worldTile.diplomaticTakeoverAllowed, !isSea) ? "checked" : ""} /> Diplomatic takeover allowed</label></div>
     ${developmentSection}
     <hr><h2>Economy</h2>
-    <div class="form-group"><label>Primary Export</label><input type="text" name="primaryExport" value="${escapeHtml(existing.primaryExport ?? existing.exports ?? "")}" style="width:100%;" /></div>
-    <div class="form-group"><label>Secondary Export</label><input type="text" name="secondaryExport" value="${escapeHtml(existing.secondaryExport ?? "")}" style="width:100%;" /></div>
+    <div style="padding:10px;border:1px solid #777;border-radius:6px;margin-bottom:10px;">
+      <strong>Primary Trade Good</strong>
+      <div class="form-group"><label>Catalog Good</label><select name="primaryTradeCatalog" style="width:100%;">${buildTradeGoodOptions(getHouseTradeGoods(existing).primary?.name || existing.primaryExport || "")}</select></div>
+      <div style="display:grid;grid-template-columns:2fr 2fr 1fr 1fr;gap:8px;">
+        <div class="form-group"><label>Name / Custom Export</label><input type="text" name="primaryExport" value="${escapeHtml(getHouseTradeGoods(existing).primary?.name || existing.primaryExport || existing.exports || "")}" placeholder="e.g. Brax Red Wine" style="width:100%;" /></div>
+        <div class="form-group"><label>Category</label><select name="primaryTradeCategory" style="width:100%;">${tradeGoodCategoryOptions(getHouseTradeGoods(existing).primary?.category || "Trade & Industry")}</select></div>
+        <div class="form-group"><label>Gold</label><input type="number" step="0.25" name="primaryTradeGoldValue" value="${escapeHtml(getHouseTradeGoods(existing).primary?.goldValue ?? 0)}" style="width:100%;" /></div>
+        <div class="form-group"><label>Food</label><input type="number" step="0.25" name="primaryTradeFoodValue" value="${escapeHtml(getHouseTradeGoods(existing).primary?.foodValue ?? 0)}" style="width:100%;" /></div>
+      </div>
+      <p class="notes">Choose a catalog good or give the export a custom name/value. Custom goods remain attached to this holding and round-trip through Realm CSV export/import.</p>
+    </div>
+    <div style="padding:10px;border:1px solid #777;border-radius:6px;margin-bottom:10px;">
+      <strong>Secondary Trade Good</strong>
+      <div class="form-group"><label>Catalog Good</label><select name="secondaryTradeCatalog" style="width:100%;">${buildTradeGoodOptions(getHouseTradeGoods(existing).secondary?.name || existing.secondaryExport || "")}</select></div>
+      <div style="display:grid;grid-template-columns:2fr 2fr 1fr 1fr;gap:8px;">
+        <div class="form-group"><label>Name / Custom Export</label><input type="text" name="secondaryExport" value="${escapeHtml(getHouseTradeGoods(existing).secondary?.name || existing.secondaryExport || "")}" style="width:100%;" /></div>
+        <div class="form-group"><label>Category</label><select name="secondaryTradeCategory" style="width:100%;">${tradeGoodCategoryOptions(getHouseTradeGoods(existing).secondary?.category || "Trade & Industry")}</select></div>
+        <div class="form-group"><label>Gold</label><input type="number" step="0.25" name="secondaryTradeGoldValue" value="${escapeHtml(getHouseTradeGoods(existing).secondary?.goldValue ?? 0)}" style="width:100%;" /></div>
+        <div class="form-group"><label>Food</label><input type="number" step="0.25" name="secondaryTradeFoodValue" value="${escapeHtml(getHouseTradeGoods(existing).secondary?.foodValue ?? 0)}" style="width:100%;" /></div>
+      </div>
+    </div>
     <div class="form-group"><label>Treasury</label><input type="number" name="treasury" value="${escapeHtml(existing.treasury ?? "")}" style="width:100%;" /></div>
     <div class="form-group"><label>Allegiance Notes</label><input type="text" name="allegiance" value="${escapeHtml(existing.allegiance ?? "")}" style="width:100%;" /></div>
     <div class="form-group"><label>Ownership Notes</label><textarea name="ownershipNotes" style="width:100%;height:70px;">${escapeHtml(existing.ownershipNotes || worldTile.ownershipNotes || "")}</textarea></div>
@@ -11603,6 +15641,27 @@ async function assignHouse() {
   new Dialog({
     title: `Tile Ownership / House Data — ${worldTile.name || "Unnamed World Tile"}`,
     content,
+    render: html => {
+      const form = html[0].querySelector("form");
+      const wireTradeCatalog = prefix => {
+        const select = form?.querySelector(`[name="${prefix}TradeCatalog"]`);
+        if (!select) return;
+        select.addEventListener("change", () => {
+          const good = getTradeGoodByName(select.value);
+          if (!good) return;
+          const nameInput = form.querySelector(`[name="${prefix}Export"]`);
+          const categoryInput = form.querySelector(`[name="${prefix}TradeCategory"]`);
+          const goldInput = form.querySelector(`[name="${prefix}TradeGoldValue"]`);
+          const foodInput = form.querySelector(`[name="${prefix}TradeFoodValue"]`);
+          if (nameInput) nameInput.value = good.name;
+          if (categoryInput) categoryInput.value = good.category;
+          if (goldInput) goldInput.value = good.goldValue;
+          if (foodInput) foodInput.value = good.foodValue;
+        });
+      };
+      wireTradeCatalog("primary");
+      wireTradeCatalog("secondary");
+    },
     buttons: {
       save: {
         label: "Save Tile Data",
@@ -11635,7 +15694,7 @@ async function assignHouse() {
           const updatedWorldTile = foundry.utils.deepClone(worldTile || {});
           const ownershipTypeValue = String(form.ownershipType.value || inferOwnershipType(worldTile, existing)).trim();
           const culture = String(form.customCulture.value || form.culture.value || "").trim();
-          const religion = String(form.customReligion.value || form.religion.value || "").trim();
+          const religion = canonicalizeReligionLabel(form.customReligion.value || form.religion.value || "");
           const rulerDiplomacy = numberOrBlank(form.rulerDiplomacy.value);
           const npcDefenderDiplomacy = numberOrBlank(form.npcDefenderDiplomacy.value);
           updatedWorldTile.ownershipType = ownershipTypeValue;
@@ -11670,6 +15729,14 @@ async function assignHouse() {
             delete updatedWorldTile.ownerUserId; delete updatedWorldTile.ownerUserName; delete updatedWorldTile.playerOwnerUserId; delete updatedWorldTile.playerOwnerUserName; houseData.ownerUserId = ""; houseData.ownerUserName = ""; houseData.playerOwnerUserId = ""; houseData.playerOwnerUserName = "";
           }
           if (!isSea) { houseData.developmentLevel = developmentLevel; houseData.developmentLabel = developmentLabel; houseData.population = population; houseData.builtBuildings = buildings; }
+          const primaryCatalogName = String(form.primaryTradeCatalog?.value || "").trim();
+          const secondaryCatalogName = String(form.secondaryTradeCatalog?.value || "").trim();
+          const primaryName = String(form.primaryExport?.value || primaryCatalogName || "").trim();
+          const secondaryName = String(form.secondaryExport?.value || secondaryCatalogName || "").trim();
+          setHouseTradeGoods(houseData, primaryName, secondaryName, {
+            primary: primaryName ? { name: primaryName, category: String(form.primaryTradeCategory?.value || getTradeGoodByName(primaryCatalogName)?.category || "Trade & Industry"), goldValue: Number(form.primaryTradeGoldValue?.value || 0), foodValue: Number(form.primaryTradeFoodValue?.value || 0) } : null,
+            secondary: secondaryName ? { name: secondaryName, category: String(form.secondaryTradeCategory?.value || getTradeGoodByName(secondaryCatalogName)?.category || "Trade & Industry"), goldValue: Number(form.secondaryTradeGoldValue?.value || 0), foodValue: Number(form.secondaryTradeFoodValue?.value || 0) } : null
+          });
           await doc.setFlag(FLAG_SCOPE, WORLD_TILE_KEY, updatedWorldTile);
           await doc.unsetFlag(FLAG_SCOPE, HOUSE_KEY);
           await doc.setFlag(FLAG_SCOPE, HOUSE_KEY, houseData);
@@ -11722,6 +15789,36 @@ function getHoldingsForUser(user) {
       if (value > 0) parts.push(`${troop.label}: ${value.toLocaleString()}`);
     }
     return parts.length ? parts.join("; ") : emptyText;
+  }
+
+  function getRaisedMilitaryForUser(user) {
+    if (!user) return [];
+    return getMilitaryForceTokensForUpkeep().map(token => {
+      const piece = getWorldPiece(token) || {};
+      const controller = getMilitaryForceController(token, piece);
+      if (!controller || String(controller.id) !== String(user.id)) return null;
+      const type = normalize(piece.pieceType || piece.forceType || "");
+      if (!["army", "fleet", "navy"].includes(type) || normalize(piece.status || "") === "dismissed") return null;
+      const composition = type === "army" ? getArmyComposition(piece) : getNavyComposition(piece);
+      const computedTotal = type === "army" ? getArmyTotalStrength(composition) : getNavyTotalShips(composition);
+      const current = Math.max(0, Number(piece.strengthCurrent ?? piece.shipsCurrent ?? piece.totalStrength ?? piece.totalShips ?? computedTotal ?? 0));
+      if (!(current > 0)) return null;
+      return {
+        token,
+        piece,
+        type: type === "army" ? "Army" : "Navy",
+        name: String(piece.armyName || piece.navyName || piece.name || token.document?.name || (type === "army" ? "Army" : "Navy")),
+        commander: String(piece.linkedCharacterName || piece.commanderName || "Unassigned"),
+        location: String(piece.currentTileName || piece.currentRegion || "Unknown"),
+        current,
+        composition,
+        upkeep: getMilitaryForceUpkeep(piece)
+      };
+    }).filter(Boolean);
+  }
+
+  function getRaisedMilitaryUpkeepForUser(user) {
+    return getRaisedMilitaryForUser(user).reduce((total, force) => addResourceMaps(total, force.upkeep), {});
   }
 
   function holdingsSummary(entries) {
@@ -11778,9 +15875,9 @@ function getHoldingsForUser(user) {
   function getInfluenceLevyMultiplier(score = 10) {
     const value = Math.max(0, Math.min(21, Number(score || 0)));
     if (value >= 7) return 1;
-    if (value <= 0) return 0.7;
-    if (value <= 3) return 0.8;
-    return 0.9;
+    // Guidebook rule: below 7 Influence, lose 10% of levy capacity for EACH
+    // point below 7, to a maximum 70% penalty at Influence 0.
+    return Math.max(0.3, Math.round((1 - ((7 - value) * 0.1)) * 1000) / 1000);
   }
 
   function getInfluenceMood(score = 10) {
@@ -11836,9 +15933,8 @@ function getHoldingsForUser(user) {
     let used = 0;
     for (const token of getArmyTokens()) {
       const piece = getWorldPiece(token) || {};
-      const ownerId = String(piece.ownerUserId || piece.playerOwnerUserId || "");
-      const ownerName = String(piece.ownerUserName || piece.playerOwnerUserName || "");
-      if ((ownerId && ownerId === String(user.id)) || (!ownerId && ownerName && normalize(ownerName) === normalize(user.name))) used += getSiegeEquipmentCapacityUsed(getSiegeEquipment(piece));
+      const controller = getMilitaryForceController(token, piece);
+      if (controller && String(controller.id) === String(user.id)) used += getSiegeEquipmentCapacityUsed(getSiegeEquipment(piece));
     }
     for (const token of getCharacterTokens()) {
       const pending = getPendingArmyMuster(token);
@@ -11855,16 +15951,21 @@ function getHoldingsForUser(user) {
     const user = await chooseHoldingsUser();
     if (!user) return;
 
-    const entries = getHoldingsForUser(user);
+    const entries = getRealmLandEntriesForUser(user);
     const summary = holdingsSummary(entries);
     const siegeCapacityUsed = getCommittedSiegeCapacityForUser(user);
     const siegeCapacityAvailable = Math.max(0, Number(summary.siegeCapacityTotal || 0) - siegeCapacityUsed);
+    const raisedMilitary = getRaisedMilitaryForUser(user);
+    const militaryUpkeep = raisedMilitary.reduce((total, force) => addResourceMaps(total, force.upkeep), {});
+    const netIncome = addResourceMaps(summary.income, scaleResourceMap(militaryUpkeep, -1));
+    const militaryUpkeepText = hasAnyResources(militaryUpkeep) ? `−${resourceMapToText(militaryUpkeep)}` : "None";
+    const marriageRecords = getMarriageRecordsForUser(user);
 
     const rows = entries.map(entry => {
       const tile = entry.tile || {};
       const house = entry.house || {};
       const built = Array.isArray(house.builtBuildings) ? house.builtBuildings : [];
-      const developmentLevel = built.length;
+      const developmentLevel = getBuildingSlotCount(house);
       const developmentLabel = house.developmentLabel || DEVELOPMENT_LEVELS[developmentLevel]?.label || "Ruins";
       const resources = [house.primaryExport || house.exports, house.secondaryExport].filter(Boolean).join(", ") || "None";
       const stockpileText = resourceMapToText(withoutArmyTroopResources(getHouseResourceStockpile(house)));
@@ -11884,40 +15985,94 @@ function getHoldingsForUser(user) {
       `;
     }).join("") || `<tr><td colspan="5" style="padding:8px;border:1px solid #777;">No holdings assigned to ${escapeHtml(user.name)} yet.</td></tr>`;
 
+    const militaryRows = raisedMilitary.map(force => {
+      const isArmy = force.type === "Army";
+      const compositionText = isArmy ? armyCompositionText(force.composition) : navyCompositionText(force.composition);
+      const strengthLabel = isArmy ? `${force.current.toLocaleString()} troops` : `${force.current.toLocaleString()} ships`;
+      return `<tr>
+        <td style="padding:6px 8px;border:1px solid #777;"><strong>${escapeHtml(force.name)}</strong><br><span style="opacity:0.75;">${escapeHtml(force.type)}</span></td>
+        <td style="padding:6px 8px;border:1px solid #777;">${escapeHtml(force.commander)}</td>
+        <td style="padding:6px 8px;border:1px solid #777;">${escapeHtml(force.location)}</td>
+        <td style="padding:6px 8px;border:1px solid #777;"><strong>${escapeHtml(strengthLabel)}</strong><br><span style="opacity:0.75;">${escapeHtml(compositionText)}</span></td>
+        <td style="padding:6px 8px;border:1px solid #777;">${escapeHtml(resourceMapToText(force.upkeep, "None"))}</td>
+      </tr>`;
+    }).join("") || `<tr><td colspan="5" style="padding:8px;border:1px solid #777;">No raised armies or navies.</td></tr>`;
+
+    const marriageList = marriageRecords.length
+      ? `<ul style="margin:6px 0 0 18px;">${marriageRecords.map(record => `<li>${escapeHtml(record.characterName || "Marriage alliance")} — ${escapeHtml(record.targetHouse || record.tileName || "Unknown House")}</li>`).join("")}</ul>`
+      : `<span style="opacity:0.75;">No marriage alliances recorded.</span>`;
+
     new Dialog({
       title: `Holdings — ${user.name}`,
       content: `
-        <div style="max-height:70vh;overflow:auto;">
-          <h2 style="margin-top:0;">${escapeHtml(user.name)} Holdings</h2>
-          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(125px,1fr));gap:8px;margin-bottom:8px;">
-            <div style="padding:8px;border:1px solid #777;border-radius:6px;"><strong>Tiles</strong><br>${escapeHtml(entries.length)}</div>
-            <div style="padding:8px;border:1px solid #777;border-radius:6px;"><strong>Buildings</strong><br>${escapeHtml(summary.buildings)}</div>
-            <div style="padding:8px;border:1px solid #777;border-radius:6px;"><strong>Manpower</strong><br>${escapeHtml(summary.manpowerCurrent.toLocaleString())} / ${escapeHtml(summary.manpowerMax.toLocaleString())}</div>
-            <div style="padding:8px;border:1px solid #777;border-radius:6px;"><strong>Training Capacity</strong><br><span style="font-size:11px;line-height:1.3;">${escapeHtml(trainingCapacityText(summary.trainingCapacity))}</span></div>
-            <div style="padding:8px;border:1px solid #777;border-radius:6px;"><strong>Siege Capacity</strong><br>${escapeHtml(siegeCapacityAvailable.toLocaleString())} available / ${escapeHtml(Number(summary.siegeCapacityTotal || 0).toLocaleString())} total<br><span style="opacity:0.75;">${escapeHtml(siegeCapacityUsed.toLocaleString())} committed</span></div>
-            <div style="padding:8px;border:1px solid #777;border-radius:6px;"><strong>Influence</strong><br>${escapeHtml(summary.influence.score)} / 21<br><span style="opacity:0.75;">${escapeHtml(summary.influence.mood)}${summary.influence.levyPenaltyPercent ? ` — levies ${escapeHtml(summary.influence.levyCapPercent)}% cap` : ""}</span></div>
-            <div style="padding:8px;border:1px solid #777;border-radius:6px;"><strong>Realm Stockpile</strong><br>${escapeHtml(goldFoodOnlyText(summary.stockpile))}</div>
-            <div style="padding:8px;border:1px solid #777;border-radius:6px;"><strong>Round Income</strong><br>${escapeHtml(resourceMapToText(summary.income))}</div>
+        <div class="coa-holdings-tabs" style="max-height:72vh;overflow:auto;">
+          <div style="display:flex;gap:6px;margin-bottom:10px;position:sticky;top:0;background:var(--color-bg, #222);padding:4px 0;z-index:2;">
+            <button type="button" data-holdings-tab="realm"><strong>Realm</strong></button>
+            <button type="button" data-holdings-tab="military"><strong>Raised Armies (${escapeHtml(raisedMilitary.length)})</strong></button>
           </div>
-          <p style="margin:4px 0 8px;opacity:0.8;"><strong>Realm Population:</strong> ${escapeHtml(summary.population.toLocaleString())}</p>
-          <p><strong>Total Realm Stockpile:</strong> ${escapeHtml(resourceMapToText(summary.stockpile))}</p>
-          <table style="border-collapse:collapse;width:100%;font-size:13px;">
-            <thead>
-              <tr>
+
+          <section data-holdings-panel="realm">
+            <h2 style="margin-top:0;">${escapeHtml(user.name)} Realm</h2>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:8px;margin-bottom:8px;">
+              <div style="padding:8px;border:1px solid #777;border-radius:6px;"><strong>Tiles</strong><br>${escapeHtml(entries.length)}</div>
+              <div style="padding:8px;border:1px solid #777;border-radius:6px;"><strong>Buildings</strong><br>${escapeHtml(summary.buildings)}</div>
+              <div style="padding:8px;border:1px solid #777;border-radius:6px;"><strong>Manpower</strong><br>${escapeHtml(summary.manpowerCurrent.toLocaleString())} / ${escapeHtml(summary.manpowerMax.toLocaleString())}</div>
+              <div style="padding:8px;border:1px solid #777;border-radius:6px;"><strong>Training Capacity</strong><br><span style="font-size:11px;line-height:1.3;">${escapeHtml(trainingCapacityText(summary.trainingCapacity))}</span></div>
+              <div style="padding:8px;border:1px solid #777;border-radius:6px;"><strong>Siege Capacity</strong><br>${escapeHtml(siegeCapacityAvailable.toLocaleString())} available / ${escapeHtml(Number(summary.siegeCapacityTotal || 0).toLocaleString())} total<br><span style="opacity:0.75;">${escapeHtml(siegeCapacityUsed.toLocaleString())} committed</span></div>
+              <div style="padding:8px;border:1px solid #777;border-radius:6px;"><strong>Influence</strong><br>${escapeHtml(summary.influence.score)} / 21<br><span style="opacity:0.75;">${escapeHtml(summary.influence.mood)}${summary.influence.levyPenaltyPercent ? ` — levies ${escapeHtml(summary.influence.levyCapPercent)}% cap` : ""}</span></div>
+              <div style="padding:8px;border:1px solid #777;border-radius:6px;"><strong>Marriages</strong><br>${escapeHtml(marriageRecords.length)} / ${escapeHtml(MARRIAGE_SLOT_LIMIT)}</div>
+              <div style="padding:8px;border:1px solid #777;border-radius:6px;"><strong>Realm Stockpile</strong><br>${escapeHtml(goldFoodOnlyText(summary.stockpile))}</div>
+              <div style="padding:8px;border:1px solid #777;border-radius:6px;"><strong>House Income</strong><br>Gross: ${escapeHtml(resourceMapToText(summary.income, "None"))}<br>Military: ${escapeHtml(militaryUpkeepText)}<br><strong>Net: ${escapeHtml(resourceMapToText(netIncome, "None"))}</strong></div>
+            </div>
+            <p style="margin:4px 0 8px;opacity:0.8;"><strong>Realm Population:</strong> ${escapeHtml(summary.population.toLocaleString())}</p>
+            <div style="padding:8px;border:1px solid #777;border-radius:6px;margin-bottom:10px;"><strong>Marriage Alliances</strong>${marriageList}</div>
+            <table style="border-collapse:collapse;width:100%;font-size:13px;">
+              <thead><tr>
                 <th style="padding:5px 7px;border:1px solid #777;text-align:left;">Tile</th>
                 <th style="padding:5px 7px;border:1px solid #777;text-align:left;">Allegiance / Ruler</th>
                 <th style="padding:5px 7px;border:1px solid #777;text-align:left;">Development</th>
                 <th style="padding:5px 7px;border:1px solid #777;text-align:left;">Economy</th>
                 <th style="padding:5px 7px;border:1px solid #777;text-align:left;">Exports</th>
-              </tr>
-            </thead>
-            <tbody>${rows}</tbody>
-          </table>
+              </tr></thead>
+              <tbody>${rows}</tbody>
+            </table>
+          </section>
+
+          <section data-holdings-panel="military" style="display:none;">
+            <h2 style="margin-top:0;">Raised Armies & Navies</h2>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-bottom:10px;">
+              <div style="padding:8px;border:1px solid #777;border-radius:6px;"><strong>Raised Forces</strong><br>${escapeHtml(raisedMilitary.length)}</div>
+              <div style="padding:8px;border:1px solid #777;border-radius:6px;"><strong>Current Upkeep</strong><br>${escapeHtml(resourceMapToText(militaryUpkeep, "None"))}</div>
+              <div style="padding:8px;border:1px solid #777;border-radius:6px;"><strong>Net Round Income</strong><br>${escapeHtml(resourceMapToText(netIncome, "None"))}</div>
+            </div>
+            <table style="border-collapse:collapse;width:100%;font-size:13px;">
+              <thead><tr>
+                <th style="padding:6px 8px;border:1px solid #777;text-align:left;">Force</th>
+                <th style="padding:6px 8px;border:1px solid #777;text-align:left;">Commander</th>
+                <th style="padding:6px 8px;border:1px solid #777;text-align:left;">Location</th>
+                <th style="padding:6px 8px;border:1px solid #777;text-align:left;">Strength</th>
+                <th style="padding:6px 8px;border:1px solid #777;text-align:left;">Upkeep / Round</th>
+              </tr></thead>
+              <tbody>${militaryRows}</tbody>
+            </table>
+          </section>
         </div>
       `,
       buttons: { close: { label: "Close" } },
-      default: "close"
-    }, { width: 1000, height: "auto", resizable: true }).render(true);
+      default: "close",
+      render: html => {
+        const root = html[0].querySelector(".coa-holdings-tabs");
+        if (!root) return;
+        const buttons = [...root.querySelectorAll("[data-holdings-tab]")];
+        const panels = [...root.querySelectorAll("[data-holdings-panel]")];
+        const activate = key => {
+          for (const panel of panels) panel.style.display = panel.dataset.holdingsPanel === key ? "" : "none";
+          for (const button of buttons) button.disabled = button.dataset.holdingsTab === key;
+        };
+        for (const button of buttons) button.addEventListener("click", () => activate(button.dataset.holdingsTab));
+        activate("realm");
+      }
+    }, { width: 1050, height: "auto", resizable: true }).render(true);
   }
 
 
@@ -12061,6 +16216,40 @@ function getHoldingsForUser(user) {
     ui.notifications.info("Market forces updated.");
   }
 
+  async function toggleSelectedHoldingCurse() {
+    if (!requireOverviewScene()) return;
+    if (!game.user?.isGM) { ui.notifications.warn("Only the GM can curse or uncurse holdings."); return; }
+    const selected = canvas.drawings.controlled.filter(drawing => Boolean(getWorldTile(drawing)));
+    if (selected.length !== 1) { ui.notifications.warn("Select exactly one land holding first."); return; }
+    const drawing = selected[0];
+    const doc = drawing.document;
+    const worldTile = foundry.utils.deepClone(getWorldTile(drawing) || {});
+    if (isSeaByTile(worldTile)) { ui.notifications.warn("Sea tiles cannot be cursed holdings."); return; }
+    const house = foundry.utils.deepClone(doc.getFlag(FLAG_SCOPE, HOUSE_KEY) || {});
+    const currentlyCursed = isHoldingCursed(worldTile, house);
+    const tileName = String(worldTile.name || "Selected Holding");
+    const nextCursed = !currentlyCursed;
+    const confirmed = await Dialog.confirm({
+      title: `${nextCursed ? "Curse" : "Lift Curse from"} ${tileName}`,
+      content: `<p>${nextCursed ? `<strong>${escapeHtml(tileName)}</strong> will become <strong>CURSED</strong> and produce only <strong>50%</strong> of all positive income.` : `The curse on <strong>${escapeHtml(tileName)}</strong> will be lifted and its normal income restored.`}</p><p class="notes">The CURSED marker is public and appears on province highlight regardless of intelligence access.</p>`,
+      yes: () => true,
+      no: () => false,
+      defaultYes: false
+    });
+    if (!confirmed) return;
+
+    worldTile.cursedHolding = nextCursed;
+    worldTile.curseUpdatedAt = new Date().toISOString();
+    worldTile.curseUpdatedBy = game.user.name;
+    house.cursedHolding = nextCursed;
+    house.curseUpdatedAt = worldTile.curseUpdatedAt;
+    house.curseUpdatedBy = game.user.name;
+    await doc.setFlag(FLAG_SCOPE, WORLD_TILE_KEY, worldTile);
+    await doc.setFlag(FLAG_SCOPE, HOUSE_KEY, house);
+    refreshSceneFeatures();
+    ui.notifications.info(`${tileName} is ${nextCursed ? "now cursed (50% income)" : "no longer cursed"}.`);
+  }
+
   async function manageTileEconomy() {
     if (!requireOverviewScene()) return;
     if (!game.user.isGM) { ui.notifications.warn("Only the GM can manage tile economy data."); return; }
@@ -12088,7 +16277,7 @@ function getHoldingsForUser(user) {
             <strong>House:</strong> ${escapeHtml(house.house || worldTile.owner || "None")}<br>
             <strong>Trade Goods:</strong> ${escapeHtml(tradeGoodSummaryText(house))}<br>
             <strong>Development Bonus:</strong> ${escapeHtml(breakdown.trade.development.label)} — Gold ${escapeHtml(breakdown.trade.development.gold)}, Food ${escapeHtml(breakdown.trade.development.food)}<br>
-            <strong>Current round total income estimate:</strong> ${escapeHtml(breakdown.totalText)}
+            <strong>Current round total income estimate:</strong> ${escapeHtml(breakdown.totalText)}${breakdown.cursed ? ` <strong style="color:#d96b91;">(CURSED — 50% income)</strong>` : ""}
           </div>
 
           <div class="form-group">
@@ -12145,7 +16334,10 @@ function getHoldingsForUser(user) {
 
     const updatedHouse = foundry.utils.deepClone(house);
     updatedHouse.economyEnabled = result.economyEnabled;
-    setHouseTradeGoods(updatedHouse, result.primaryTradeGood, result.secondaryTradeGood);
+    setHouseTradeGoods(updatedHouse, result.primaryTradeGood, result.secondaryTradeGood, {
+      primary: normalize(result.primaryTradeGood) === normalize(goods.primary?.name) ? goods.primary : undefined,
+      secondary: normalize(result.secondaryTradeGood) === normalize(goods.secondary?.name) ? goods.secondary : undefined
+    });
     const cleanManualIncome = normalizeResourceMap(result.resourceIncome);
     updatedHouse.manualResourceIncome = cleanManualIncome;
     updatedHouse.manualResourceIncomeCleared = !hasAnyResources(cleanManualIncome);
@@ -12162,9 +16354,11 @@ function getHoldingsForUser(user) {
     await doc.setFlag(FLAG_SCOPE, HOUSE_KEY, updatedHouse);
 
     const updatedBreakdown = getTileEconomyBreakdownText(updatedHouse, getClock());
+    const gmIds = game.users.filter(user => user.isGM && user.active).map(user => user.id);
     await ChatMessage.create({
       speaker: ChatMessage.getSpeaker({ alias: "Crown Economy" }),
-      content: `<h2>Tile Economy Updated</h2><p><strong>Tile:</strong> ${escapeHtml(worldTile.name || "Unnamed Tile")}</p><p><strong>Trade Goods:</strong> ${escapeHtml(tradeGoodSummaryText(updatedHouse))}</p><p><strong>Manual Base Income:</strong> ${escapeHtml(resourceMapToText(updatedHouse.manualResourceIncome))}</p><p><strong>Current Total Income:</strong> ${escapeHtml(updatedBreakdown.totalText)}</p><p><strong>Stockpile:</strong> ${escapeHtml(resourceMapToText(updatedHouse.resourceStockpile))}</p><p><strong>Economy Enabled:</strong> ${updatedHouse.economyEnabled ? "Yes" : "No"}</p>`
+      whisper: gmIds,
+      content: `<h2>Tile Economy Updated</h2><p><strong>Tile:</strong> ${escapeHtml(worldTile.name || "Unnamed Tile")}</p><p><strong>Trade Goods:</strong> ${escapeHtml(tradeGoodSummaryText(updatedHouse))}</p><p><strong>Manual Base Income:</strong> ${escapeHtml(resourceMapToText(updatedHouse.manualResourceIncome))}</p><p><strong>Current Total Income:</strong> ${escapeHtml(updatedBreakdown.totalText)}${updatedBreakdown.cursed ? ` <strong>(CURSED — 50%)</strong>` : ""}</p><p><strong>Stockpile:</strong> ${escapeHtml(resourceMapToText(updatedHouse.resourceStockpile))}</p><p><strong>Economy Enabled:</strong> ${updatedHouse.economyEnabled ? "Yes" : "No"}</p>`
     });
 
     ui.notifications.info(`Economy updated for ${worldTile.name || "selected tile"}.`);
@@ -12179,7 +16373,9 @@ function getHoldingsForUser(user) {
     }
 
     if (scope === "player") {
-      entries = entries.filter(entry => String(getTileOwnerUserId(entry.tile, entry.house) || "") === String(userId || ""));
+      const user = game.users.get(String(userId || ""));
+      const allowed = new Set((user ? getRealmLandEntriesForUser(user) : []).map(entry => String(getTileId(entry))));
+      entries = entries.filter(entry => allowed.has(String(getTileId(entry))));
     }
 
     return entries;
@@ -12193,11 +16389,73 @@ function getHoldingsForUser(user) {
     return String(piece.ownerUserName || piece.playerOwnerUserName || piece.requesterUserName || "").trim();
   }
 
+  function scaleForceCompositionToCurrentStrength(composition = {}, currentStrength = null) {
+    const total = Object.values(composition || {}).reduce((sum, value) => sum + Math.max(0, Number(value || 0)), 0);
+    if (!(total > 0)) return foundry.utils.deepClone(composition || {});
+    const requested = currentStrength === null || currentStrength === undefined || currentStrength === ""
+      ? total
+      : Math.max(0, Number(currentStrength || 0));
+    const ratio = Math.min(1, requested / total);
+    if (ratio >= 1) return foundry.utils.deepClone(composition || {});
+    const scaled = {};
+    for (const [key, value] of Object.entries(composition || {})) scaled[key] = Math.max(0, Number(value || 0)) * ratio;
+    return scaled;
+  }
+
   function getMilitaryForceUpkeep(piece = {}) {
     const type = normalize(piece.pieceType || piece.forceType || "");
-    if (type === "fleet" || type === "navy") return hasAnyResources(piece.upkeep) ? normalizeResourceMap(piece.upkeep) : calculateNavyUpkeep(getNavyComposition(piece));
-    if (type === "army") return hasAnyResources(piece.upkeep) ? normalizeResourceMap(piece.upkeep) : calculateArmyUpkeep(getArmyComposition(piece), getSiegeEquipment(piece));
+    if (type === "fleet" || type === "navy") {
+      const composition = getNavyComposition(piece);
+      const total = getNavyTotalShips(composition);
+      if (total > 0) {
+        const current = piece.strengthCurrent ?? piece.shipsCurrent ?? piece.totalShips ?? total;
+        return calculateNavyUpkeep(scaleForceCompositionToCurrentStrength(composition, current));
+      }
+      // Compatibility for old/imported fleets that stored upkeep but not composition.
+      return hasAnyResources(piece.upkeep) ? normalizeResourceMap(piece.upkeep) : {};
+    }
+    if (type === "army") {
+      const composition = getArmyComposition(piece);
+      const total = getArmyTotalStrength(composition);
+      if (total > 0) {
+        const current = piece.strengthCurrent ?? piece.totalStrength ?? total;
+        return calculateArmyUpkeep(scaleForceCompositionToCurrentStrength(composition, current), getSiegeEquipment(piece));
+      }
+      // Compatibility for old/imported armies that stored upkeep but not composition.
+      return hasAnyResources(piece.upkeep) ? normalizeResourceMap(piece.upkeep) : calculateSiegeEquipmentUpkeep(getSiegeEquipment(piece));
+    }
     return {};
+  }
+
+  function getMilitaryForceController(token, piece = getWorldPiece(token) || {}) {
+    // The currently assigned commander/character is the strongest signal. Old force
+    // owner fields can survive a character reassignment and must not pin upkeep to
+    // the previous player forever.
+    const linkedCharacterId = String(piece.linkedCharacterId || piece.commanderCharacterId || "").trim();
+    const linkedCharacter = linkedCharacterId ? getCharacterTokenById(linkedCharacterId) : null;
+    if (linkedCharacter) {
+      const controller = getCharacterControllerIdentity(linkedCharacter);
+      const user = getUserByIdOrName(controller.id, controller.name);
+      if (user && !user.isGM) return user;
+    }
+
+    const explicit = getUserByIdOrName(getForceOwnerId(piece), getForceOwnerName(piece));
+    if (explicit && !explicit.isGM) return explicit;
+
+    const actorOwners = token?.actor ? getPlayerUsers().filter(user => {
+      const level = Number(token.actor.ownership?.[user.id] || 0);
+      const ownerLevel = CONST.DOCUMENT_OWNERSHIP_LEVELS?.OWNER ?? 3;
+      return level >= ownerLevel;
+    }) : [];
+    if (actorOwners.length === 1) return actorOwners[0];
+
+    const forceHouse = normalizeHouseIdentity(piece.allegiance || piece.house || piece.faction || "");
+    if (forceHouse) {
+      const matches = getPlayerUsers().filter(user => getPlayerHouseIdentityKeys(user).has(forceHouse));
+      if (matches.length === 1) return matches[0];
+    }
+
+    return null;
   }
 
   function isActiveMilitaryForceForUpkeep(token) {
@@ -12207,6 +16465,79 @@ function getHoldingsForUser(user) {
     if (normalize(piece.status || '') === 'dismissed') return false;
     if (Number(piece.strengthCurrent ?? piece.totalStrength ?? 1) <= 0) return false;
     return hasAnyResources(getMilitaryForceUpkeep(piece));
+  }
+
+  function getRealmLevyCapacityForEntries(entries = []) {
+    const landEntries = entries.filter(entry => !isSeaByTile(entry.tile));
+    let rawMax = 0;
+    for (const entry of landEntries) {
+      const house = getHouseData(entry.drawing) || entry.house || {};
+      rawMax += getProvinceManpowerMax(house);
+    }
+    const influence = getInfluenceSummaryForEntries(landEntries);
+    const cap = Math.max(0, Math.floor(rawMax * influence.levyMultiplier));
+    return { rawMax, cap, influence };
+  }
+
+  function getActiveArmyRowsForUser(user) {
+    if (!user || user.isGM) return [];
+    const rows = [];
+    for (const token of getMilitaryForceTokensForUpkeep()) {
+      const piece = getWorldPiece(token) || {};
+      if (normalize(piece.pieceType || piece.forceType || "") !== "army") continue;
+      if (normalize(piece.status || "") === "dismissed") continue;
+      const controller = getMilitaryForceController(token, piece);
+      if (!controller || String(controller.id || "") !== String(user.id || "")) continue;
+      const compositionTotal = getArmyTotalStrength(getArmyComposition(piece));
+      const current = Math.max(0, Math.floor(Number(piece.strengthCurrent ?? piece.totalStrength ?? compositionTotal ?? 0)));
+      if (current <= 0) continue;
+      rows.push({ token, piece, current });
+    }
+    return rows;
+  }
+
+  async function applyLevyOvercapAttrition(user, entries, clock = getClock()) {
+    const armies = getActiveArmyRowsForUser(user);
+    const fielded = armies.reduce((sum, row) => sum + row.current, 0);
+    const levy = getRealmLevyCapacityForEntries(entries);
+    const excess = Math.max(0, fielded - levy.cap);
+    if (!fielded || !excess) {
+      return { applied: false, fielded, rawCap: levy.rawMax, levyCap: levy.cap, excess: 0, loss: 0, influence: levy.influence, armyLosses: [] };
+    }
+
+    // Attrition is gradual: 5% of the currently fielded force each round, but
+    // never more than the number of troops actually above the current levy cap.
+    const lossTarget = Math.min(excess, Math.max(1, Math.ceil(fielded * LEVY_OVERCAP_ATTRITION_RATE)));
+    const allocations = armies.map(row => {
+      const exact = lossTarget * (row.current / fielded);
+      return { ...row, loss: Math.min(row.current, Math.floor(exact)), remainder: exact - Math.floor(exact) };
+    });
+    let assigned = allocations.reduce((sum, row) => sum + row.loss, 0);
+    let remaining = lossTarget - assigned;
+    allocations.sort((a, b) => b.remainder - a.remainder || b.current - a.current || String(a.token.document.id).localeCompare(String(b.token.document.id)));
+    for (const row of allocations) {
+      if (remaining <= 0) break;
+      if (row.loss >= row.current) continue;
+      row.loss += 1;
+      remaining -= 1;
+    }
+
+    const armyLosses = [];
+    for (const row of allocations) {
+      if (!row.loss) continue;
+      const updated = foundry.utils.deepClone(row.piece);
+      const before = row.current;
+      const after = Math.max(0, before - row.loss);
+      updated.strengthCurrent = after;
+      updated.lastLevyAttritionRoundKey = getRoundKey(clock);
+      updated.lastLevyAttritionLoss = row.loss;
+      updated.lastLevyAttritionAt = new Date().toISOString();
+      updated.lastLevyAttritionReason = `Realm fielded strength exceeded levy cap (${fielded.toLocaleString()} > ${levy.cap.toLocaleString()}).`;
+      await saveWorldPiece(row.token, updated);
+      armyLosses.push({ name: updated.name || row.token.document.name, before, after, loss: row.loss });
+    }
+
+    return { applied: armyLosses.length > 0, fielded, rawCap: levy.rawMax, levyCap: levy.cap, excess, loss: armyLosses.reduce((sum, row) => sum + row.loss, 0), influence: levy.influence, armyLosses };
   }
 
   async function applyResourceDeltaToTile(entry, deltaMap, reason = "Resource adjustment") {
@@ -12318,41 +16649,86 @@ function getHoldingsForUser(user) {
     return { before, after, deltas: appliedDeltas, deficit: normalizeResourceMap(deficit) };
   }
 
-  async function debitMilitaryUpkeepForRound(clock = getClock(), { scope = "all", userId = "", silent = false } = {}) {
+  async function debitMilitaryUpkeepForRound(clock = getClock(), { scope = "all", userId = "", silent = false, force = false } = {}) {
     const includeUpkeep = scope === "all" || scope === "player";
-    if (!includeUpkeep) return { applied: 0, totals: {}, lines: [], skipped: true };
+    if (!includeUpkeep) return { applied: 0, totals: {}, lines: [], skipped: true, failed: [], ownerDetails: [] };
 
+    const roundKey = getRoundKey(clock);
+    if (!roundKey) throw new Error("World Round Clock is not initialized.");
     const ownerFilter = scope === "player" ? String(userId || "").trim() : "";
-    const forces = getMilitaryForceTokens().filter(isActiveMilitaryForceForUpkeep).filter(token => {
-      if (!ownerFilter) return true;
-      return String(getForceOwnerId(getWorldPiece(token) || "")) === ownerFilter;
-    });
+    const upkeepLedger = foundry.utils.deepClone(getMilitaryUpkeepLedger() || {});
+    const forces = getMilitaryForceTokensForUpkeep().filter(isActiveMilitaryForceForUpkeep);
 
     let totals = {};
     const ownerCosts = new Map();
     const lines = [];
     const ownerDetails = [];
+    const failed = [];
+    let skippedOwners = 0;
 
     for (const token of forces) {
       const piece = getWorldPiece(token) || {};
+      const controller = getMilitaryForceController(token, piece);
+      if (ownerFilter && String(controller?.id || "") !== ownerFilter) continue;
       const upkeep = getMilitaryForceUpkeep(piece);
       if (!hasAnyResources(upkeep)) continue;
-      const ownerId = getForceOwnerId(piece);
-      const ownerName = getForceOwnerName(piece) || game.users.get(ownerId)?.name || "Unassigned";
-      if (!ownerCosts.has(ownerId || ownerName)) ownerCosts.set(ownerId || ownerName, { ownerId, ownerName, cost: {}, forceLines: [] });
-      const bucket = ownerCosts.get(ownerId || ownerName);
+
+      if (!controller) {
+        failed.push(`${piece.name || token.document.name}: could not resolve a current player/House controller for ${resourceMapToText(upkeep)}`);
+        continue;
+      }
+
+      const ownerId = String(controller.id || "");
+      const ownerName = String(controller.name || getForceOwnerName(piece) || "Unassigned");
+      if (!ownerCosts.has(ownerId)) ownerCosts.set(ownerId, { user: controller, ownerId, ownerName, cost: {}, forceLines: [] });
+      const bucket = ownerCosts.get(ownerId);
       bucket.cost = addResourceMaps(bucket.cost, upkeep);
       bucket.forceLines.push(`${piece.name || token.document.name}: ${resourceMapToText(upkeep)}`);
       totals = addResourceMaps(totals, upkeep);
     }
 
     let applied = 0;
-    const failed = [];
-
     for (const bucket of ownerCosts.values()) {
-      const entries = getEconomyTilesForScope("player", bucket.ownerId).filter(entry => !isSeaByTile(entry.tile));
+      const ledgerKey = `${roundKey}|${bucket.ownerId}`;
+      if (!force && upkeepLedger[ledgerKey]?.charged) {
+        skippedOwners++;
+        const prior = upkeepLedger[ledgerKey];
+        const lineHtml = `<li><strong>${escapeHtml(bucket.ownerName)}</strong>: upkeep already charged for ${escapeHtml(getDateLabel(clock))} (${escapeHtml(resourceMapToText(prior.cost || bucket.cost))}).</li>`;
+        lines.push(lineHtml);
+        ownerDetails.push({ ownerId: bucket.ownerId, ownerName: bucket.ownerName, cost: {}, forceLines: [...bucket.forceLines], paidFrom: "Already charged", lineHtml, skipped: true });
+        continue;
+      }
+
+      const houseName = getPrimaryPlayerHouseName(bucket.user);
+      const entries = getRealmEntriesForPlayerHouse(bucket.user, houseName).filter(entry => !isSeaByTile(entry.tile));
       if (!entries.length) {
-        failed.push(`${bucket.ownerName || bucket.ownerId || "Unknown"}: no controlled realm stockpile found for ${resourceMapToText(bucket.cost)}`);
+        // A landless House has no province stockpile to debit, but its levy cap is
+        // necessarily 0. Keep the upkeep failure visible while still applying the
+        // normal over-cap attrition to any surviving field army.
+        const priorLedger = upkeepLedger[ledgerKey] || {};
+        const attrition = priorLedger.attritionApplied
+          ? { applied: false, fielded: Number(priorLedger.fieldedBeforeAttrition || 0), levyCap: Number(priorLedger.levyCap || 0), loss: 0, armyLosses: [] }
+          : await applyLevyOvercapAttrition(bucket.user, [], clock);
+        const attritionNote = attrition.applied
+          ? `; levy cap 0 attrition removed ${attrition.loss.toLocaleString()} troops`
+          : "";
+        failed.push(`${bucket.ownerName}: no controlled/sworn realm stockpile found for ${resourceMapToText(bucket.cost)}${attritionNote}`);
+        upkeepLedger[ledgerKey] = {
+          charged: false,
+          unresolved: true,
+          roundKey,
+          dateLabel: getDateLabel(clock),
+          ownerId: bucket.ownerId,
+          ownerName: bucket.ownerName,
+          houseName: houseName || "",
+          cost: normalizeResourceMap(bucket.cost),
+          levyCap: attrition.levyCap,
+          fieldedBeforeAttrition: attrition.fielded,
+          attritionLoss: attrition.loss,
+          attritionApplied: true,
+          attemptedAt: new Date().toISOString(),
+          attemptedBy: game.user.name
+        };
         continue;
       }
 
@@ -12362,33 +16738,138 @@ function getHoldingsForUser(user) {
         `Realm military upkeep for ${getDateLabel(clock)}`
       );
 
+      // Military upkeep may push Gold/Food below zero. A realm that ends upkeep
+      // negative burns 1 Influence that round to represent political favours,
+      // requisitions, and loyalty being spent to keep the host in the field.
+      const postUpkeepStockpile = getRealmStockpileForEntries(entries);
+      const negativeAfterUpkeep = Number(postUpkeepStockpile.Gold || 0) < 0 || Number(postUpkeepStockpile.Food || 0) < 0;
+      const influenceBefore = getInfluenceSummaryForEntries(entries);
+      let influenceLoss = 0;
+      if (negativeAfterUpkeep && influenceBefore.score > 0) {
+        influenceLoss = Math.min(NEGATIVE_UPKEEP_INFLUENCE_LOSS, influenceBefore.score);
+        await debitCostFromRealmStockpile(
+          entries,
+          { Influence: influenceLoss },
+          `Political favours spent sustaining negative military upkeep for ${getDateLabel(clock)}`
+        );
+      }
+      const influenceAfter = getInfluenceSummaryForEntries(entries);
+
+      // Province loss or the Influence loss above can lower the real levy cap below
+      // the troops already in the field. Attrition then removes 5% per round, capped
+      // at the actual overage, and is spread proportionally across the realm's armies.
+      const priorLedger = upkeepLedger[ledgerKey] || {};
+      const attrition = priorLedger.attritionApplied
+        ? { applied: false, fielded: Number(priorLedger.fieldedBeforeAttrition || 0), levyCap: Number(priorLedger.levyCap || 0), loss: 0, armyLosses: [] }
+        : await applyLevyOvercapAttrition(bucket.user, entries, clock);
+      const realmAfter = getRealmStockpileForEntries(entries);
+
       applied++;
       const beforeText = goldFoodOnlyText(realmDebit.before, "None");
-      const afterText = goldFoodOnlyText(realmDebit.after, "None");
+      const afterText = goldFoodOnlyText(realmAfter, "None");
       const deficitText = hasAnyResources(realmDebit.deficit)
         ? `<br><span style="opacity:0.85;"><strong>Realm shortfall:</strong> ${escapeHtml(resourceMapToText(realmDebit.deficit))} — deficit distributed across realm balances.</span>`
         : "";
-      const lineHtml = `<li><strong>${escapeHtml(bucket.ownerName || bucket.ownerId || "Unknown")}</strong>: -${escapeHtml(resourceMapToText(bucket.cost))} from <strong>Realm Stockpile</strong><br><span style="opacity:0.85;">Realm: ${escapeHtml(beforeText)} → ${escapeHtml(afterText)}<br>${bucket.forceLines.map(escapeHtml).join("; ")}</span>${deficitText}</li>`;
+      const influenceText = influenceLoss > 0
+        ? `<br><span style="opacity:0.85;"><strong>Political strain:</strong> negative military upkeep costs ${escapeHtml(influenceLoss)} Influence (${escapeHtml(influenceBefore.score)} → ${escapeHtml(influenceAfter.score)}).</span>`
+        : (negativeAfterUpkeep ? `<br><span style="opacity:0.85;"><strong>Political strain:</strong> realm remains negative; Influence is already at 0.</span>` : "");
+      const attritionText = attrition.applied
+        ? `<br><span style="opacity:0.85;"><strong>Levy over-cap attrition:</strong> ${escapeHtml(attrition.fielded.toLocaleString())} fielded / ${escapeHtml(attrition.levyCap.toLocaleString())} levy cap; ${escapeHtml(attrition.loss.toLocaleString())} troops lost this round. ${attrition.armyLosses.map(row => `${escapeHtml(row.name)} -${escapeHtml(row.loss.toLocaleString())}`).join("; ")}</span>`
+        : "";
+      const lineHtml = `<li><strong>${escapeHtml(houseName || bucket.ownerName)}</strong> (${escapeHtml(bucket.ownerName)}): -${escapeHtml(resourceMapToText(bucket.cost))} from <strong>Realm Stockpile</strong><br><span style="opacity:0.85;">Realm: ${escapeHtml(beforeText)} → ${escapeHtml(afterText)}<br>${bucket.forceLines.map(escapeHtml).join("; ")}</span>${deficitText}${influenceText}${attritionText}</li>`;
       lines.push(lineHtml);
       ownerDetails.push({
-        ownerId: bucket.ownerId || "",
-        ownerName: bucket.ownerName || "",
+        ownerId: bucket.ownerId,
+        ownerName: bucket.ownerName,
+        houseName: houseName || "",
         cost: bucket.cost,
         forceLines: [...bucket.forceLines],
         paidFrom: "Realm Stockpile",
         realmBefore: realmDebit.before,
-        realmAfter: realmDebit.after,
+        realmAfter,
         deficit: realmDebit.deficit,
+        negativeAfterUpkeep,
+        influenceLoss,
+        influenceBefore: influenceBefore.score,
+        influenceAfter: influenceAfter.score,
+        attrition,
         lineHtml
       });
+      upkeepLedger[ledgerKey] = {
+        charged: true,
+        roundKey,
+        dateLabel: getDateLabel(clock),
+        ownerId: bucket.ownerId,
+        ownerName: bucket.ownerName,
+        houseName: houseName || "",
+        cost: normalizeResourceMap(bucket.cost),
+        negativeAfterUpkeep,
+        influenceLoss,
+        influenceBefore: influenceBefore.score,
+        influenceAfter: influenceAfter.score,
+        levyCap: attrition.levyCap,
+        fieldedBeforeAttrition: attrition.fielded,
+        attritionLoss: attrition.loss,
+        attritionApplied: true,
+        chargedAt: new Date().toISOString(),
+        chargedBy: game.user.name
+      };
     }
 
     for (const line of failed) {
       lines.push(`<li><strong>Unpaid:</strong> ${escapeHtml(line)}</li>`);
       ownerDetails.push({ ownerId: "", ownerName: "Unpaid", cost: {}, forceLines: [line], paidFrom: "", lineHtml: `<li><strong>Unpaid:</strong> ${escapeHtml(line)}</li>`, failed: true });
     }
-    if (!silent && lines.length) ui.notifications.info(`Military upkeep applied: ${resourceMapToText(totals)}.`);
-    return { applied, totals, lines, failed, ownerDetails, skipped: false };
+    await saveMilitaryUpkeepLedger(upkeepLedger);
+    if (!silent && lines.length) ui.notifications.info(`Military upkeep: ${applied} realm(s) charged${skippedOwners ? `; ${skippedOwners} already charged` : ""}${failed.length ? `; ${failed.length} unresolved` : ""}.`);
+    return { applied, totals, lines, failed, ownerDetails, skipped: applied === 0 && skippedOwners > 0 && failed.length === 0, skippedOwners };
+  }
+
+  async function chargeMilitaryUpkeep() {
+    if (!requireOverviewScene()) return;
+    if (!game.user.isGM) { ui.notifications.warn("Only the GM can charge military upkeep."); return; }
+    const clock = getClock();
+    if (!clock) { ui.notifications.warn("Initialize the World Round Clock first."); return; }
+
+    const rows = [];
+    const unresolved = [];
+    const buckets = new Map();
+    for (const token of getMilitaryForceTokensForUpkeep().filter(isActiveMilitaryForceForUpkeep)) {
+      const piece = getWorldPiece(token) || {};
+      const controller = getMilitaryForceController(token, piece);
+      const upkeep = getMilitaryForceUpkeep(piece);
+      if (!controller) {
+        unresolved.push(`${piece.name || token.document.name}: ${resourceMapToText(upkeep)}`);
+        continue;
+      }
+      if (!buckets.has(controller.id)) buckets.set(controller.id, { user: controller, cost: {}, forces: [] });
+      const bucket = buckets.get(controller.id);
+      bucket.cost = addResourceMaps(bucket.cost, upkeep);
+      bucket.forces.push(`${piece.name || token.document.name}: ${resourceMapToText(upkeep)}`);
+    }
+    const ledger = getMilitaryUpkeepLedger();
+    const roundKey = getRoundKey(clock);
+    for (const bucket of buckets.values()) {
+      const houseName = getPrimaryPlayerHouseName(bucket.user) || bucket.user.name;
+      const charged = Boolean(ledger[`${roundKey}|${bucket.user.id}`]?.charged);
+      rows.push(`<li><strong>${escapeHtml(houseName)}</strong> (${escapeHtml(bucket.user.name)}): ${escapeHtml(resourceMapToText(bucket.cost))} — <strong>${charged ? "ALREADY CHARGED" : "DUE"}</strong><br><span style="opacity:0.8;">${bucket.forces.map(escapeHtml).join("; ")}</span></li>`);
+    }
+
+    const confirmed = await Dialog.confirm({
+      title: "Charge / Audit Military Upkeep",
+      content: `<p><strong>Round:</strong> ${escapeHtml(getDateLabel(clock))}</p><p>This recalculates upkeep from the troops/ships currently alive and charges only player realms not already recorded as paid this round.</p><ul>${rows.join("") || "<li>No active military upkeep found.</li>"}</ul>${unresolved.length ? `<p><strong>Unresolved forces (will not be charged):</strong><br>${unresolved.map(escapeHtml).join("<br>")}</p>` : ""}<p class="notes">This is safe to run more than once: the military-upkeep ledger prevents duplicate charges for the same realm and round.</p>`,
+      yes: () => true,
+      no: () => false,
+      defaultYes: false
+    });
+    if (!confirmed) return;
+    const summary = await debitMilitaryUpkeepForRound(clock, { scope: "all", silent: false, force: false });
+    const gmIds = game.users.contents.filter(user => user.isGM).map(user => user.id);
+    await ChatMessage.create({
+      speaker: ChatMessage.getSpeaker({ alias: "Crown Military Upkeep" }),
+      whisper: gmIds.length ? gmIds : undefined,
+      content: `<h2>Military Upkeep Audit — ${escapeHtml(getDateLabel(clock))}</h2><p><strong>Realms charged now:</strong> ${escapeHtml(summary.applied || 0)}</p><p><strong>Already charged:</strong> ${escapeHtml(summary.skippedOwners || 0)}</p><p><strong>Unresolved:</strong> ${escapeHtml(summary.failed?.length || 0)}</p><ul>${summary.lines?.join("") || "<li>No upkeep due.</li>"}</ul>`
+    });
   }
 
   async function collectEconomyForRound(clock = getClock(), { scope = "all", userId = "", force = false, silent = false } = {}) {
@@ -12399,10 +16880,7 @@ function getHoldingsForUser(user) {
     const ledger = foundry.utils.deepClone(getEconomyLedger());
     const ledgerKey = `${roundKey}|${scope}|${userId || "all"}`;
 
-    if (!force && ledger[ledgerKey]?.collected) {
-      if (!silent) ui.notifications.warn(`Economy has already been collected for ${dateLabel}. Use Force collect if this is a test/correction.`);
-      return { applied: 0, skipped: true, totals: {}, dateLabel };
-    }
+    const scopePreviouslyCollected = Boolean(!force && ledger[ledgerKey]?.collected);
 
     const entries = getEconomyTilesForScope(scope, userId);
     const seasonMultiplier = getGeneralMarketMultiplierText(clock);
@@ -12416,8 +16894,44 @@ function getHoldingsForUser(user) {
       const house = foundry.utils.deepClone(doc.getFlag(FLAG_SCOPE, HOUSE_KEY) ?? {});
       if (!isEconomyEnabled(house)) continue;
 
+      const raidPenaltyApplies = Boolean(roundKey && String(house.raidIncomePenaltyRoundKey || "") === String(roundKey));
+      const alreadyCollectedThisRound = Boolean(roundKey && String(house.lastEconomyCollectedRoundKey || "") === String(roundKey));
+      if (!force && alreadyCollectedThisRound) {
+        // A tile may be reached through Collect All, Collect Player, or Collect Selected.
+        // The province marker is authoritative so changing scope cannot pay it twice.
+        // Also clean an impossible stale due-raid marker rather than carrying it forever.
+        if (raidPenaltyApplies) {
+          delete house.raidIncomePenaltyRoundKey;
+          delete house.raidIncomePenalty;
+          delete house.lastRaidedRoundKey;
+          await doc.unsetFlag(FLAG_SCOPE, HOUSE_KEY);
+          await doc.setFlag(FLAG_SCOPE, HOUSE_KEY, house);
+        }
+        continue;
+      }
+
       const income = getTileTotalIncome(house, clock);
-      if (!hasAnyResources(income)) continue;
+
+      // v1.0.1 restored in v1.0.13: a raid penalty is a one-collection effect.
+      // Consume its marker even when the penalty reduces this province's income to zero.
+      if (raidPenaltyApplies) {
+        delete house.raidIncomePenaltyRoundKey;
+        delete house.raidIncomePenalty;
+        delete house.lastRaidedRoundKey;
+      }
+
+      if (!hasAnyResources(income)) {
+        // Zero income is still a completed collection. Stamp every economy-enabled
+        // province so a GM edit later in the same round cannot manufacture a second
+        // payout merely because the original result happened to be zero.
+        house.lastEconomyCollectedRoundKey = roundKey;
+        house.lastEconomyCollectedDateLabel = dateLabel;
+        house.lastEconomyCollectedAt = new Date().toISOString();
+        house.lastEconomyCollectedBy = game.user.name;
+        await doc.unsetFlag(FLAG_SCOPE, HOUSE_KEY);
+        await doc.setFlag(FLAG_SCOPE, HOUSE_KEY, house);
+        continue;
+      }
 
       const stockpile = addResourceIncomeToStockpile(getHouseResourceStockpile(house), income);
       const cleanManualIncome = getHouseResourceIncome(house);
@@ -12474,6 +16988,8 @@ function getHoldingsForUser(user) {
       totals,
       militaryUpkeep: upkeepSummary.totals || {},
       upkeepApplied: upkeepSummary.applied || 0,
+      upkeepFailed: Array.isArray(upkeepSummary.failed) ? upkeepSummary.failed.length : 0,
+      upkeepSkippedOwners: Number(upkeepSummary.skippedOwners || 0),
       collectedAt: new Date().toISOString(),
       collectedBy: game.user.name
     };
@@ -12520,10 +17036,11 @@ function getHoldingsForUser(user) {
         }
       }
 
-      ui.notifications.info(`Economy collected for ${dateLabel}: ${resourceMapToText(totals)}.`);
+      if (applied === 0 && scopePreviouslyCollected && Number(upkeepSummary.applied || 0) === 0) ui.notifications.warn(`Economy has already been collected for ${dateLabel}. Use Force collect if this is a test/correction.`);
+      else ui.notifications.info(`Economy collected for ${dateLabel}: ${resourceMapToText(totals)}.`);
     }
 
-    return { applied, skipped: false, totals, militaryUpkeep: upkeepSummary.totals || {}, upkeepApplied: upkeepSummary.applied || 0, dateLabel };
+    return { applied, skipped: applied === 0 && scopePreviouslyCollected && Number(upkeepSummary.applied || 0) === 0, totals, militaryUpkeep: upkeepSummary.totals || {}, upkeepApplied: upkeepSummary.applied || 0, dateLabel };
   }
 
   async function collectEconomy() {
@@ -12705,7 +17222,15 @@ function getHoldingsForUser(user) {
         updatedAt: new Date().toISOString(),
         updatedBy: game.user.name
       };
-      setHouseTradeGoods(updatedHouse, getColumn(row, "Primary Trade Good") || updatedHouse.primaryExport, getColumn(row, "Secondary Trade Good") || updatedHouse.secondaryExport);
+      const primaryTradeName = String(getColumn(row, "Primary Trade Good") || updatedHouse.primaryExport || "").trim();
+      const secondaryTradeName = String(getColumn(row, "Secondary Trade Good") || updatedHouse.secondaryExport || "").trim();
+      const primaryCatalog = getTradeGoodByName(primaryTradeName);
+      const secondaryCatalog = getTradeGoodByName(secondaryTradeName);
+      const csvNumberOrFallback = (value, fallback = 0) => { const text = String(value ?? "").trim(); const number = Number(text); return text !== "" && Number.isFinite(number) ? number : Number(fallback || 0); };
+      setHouseTradeGoods(updatedHouse, primaryTradeName, secondaryTradeName, {
+        primary: primaryTradeName ? { name: primaryTradeName, category: String(getColumn(row, "Primary Trade Category") || primaryCatalog?.category || existingHouse.tradeGoods?.primary?.category || "Trade & Industry").trim(), goldValue: csvNumberOrFallback(getColumn(row, "Primary Trade Gold Value"), primaryCatalog?.goldValue ?? existingHouse.tradeGoods?.primary?.goldValue ?? 0), foodValue: csvNumberOrFallback(getColumn(row, "Primary Trade Food Value"), primaryCatalog?.foodValue ?? existingHouse.tradeGoods?.primary?.foodValue ?? 0) } : null,
+        secondary: secondaryTradeName ? { name: secondaryTradeName, category: String(getColumn(row, "Secondary Trade Category") || secondaryCatalog?.category || existingHouse.tradeGoods?.secondary?.category || "Trade & Industry").trim(), goldValue: csvNumberOrFallback(getColumn(row, "Secondary Trade Gold Value"), secondaryCatalog?.goldValue ?? existingHouse.tradeGoods?.secondary?.goldValue ?? 0), foodValue: csvNumberOrFallback(getColumn(row, "Secondary Trade Food Value"), secondaryCatalog?.foodValue ?? existingHouse.tradeGoods?.secondary?.foodValue ?? 0) } : null
+      });
       updatedHouse.buildingSlots = getBuildingSlotsAfterCatalogChange({ builtBuildings: buildings, buildingSlots: existingHouse.buildingSlots || [] }, "");
       delete updatedHouse.resourceIncome;
       delete updatedHouse.resourcesIncome;
@@ -12962,6 +17487,48 @@ function getHoldingsForUser(user) {
     ui.notifications.info(`Hidden original world tile labels: ${updated}. Failed: ${failed}.`);
   }
 
+
+  async function hideProvinceDrawingLines(notify = true) {
+    if (!isOverviewScene() || !canvas?.drawings?.placeables) return { updated: 0, failed: 0 };
+    if (!game.user.isGM) {
+      if (notify) ui.notifications.warn("GM only: province Drawing appearance is stored on the Scene.");
+      return { updated: 0, failed: 0 };
+    }
+
+    // Foundry v13 rejects a Drawing with no visible text, fill, or line.
+    // 0.001 is the same validation-safe near-transparent value Crown 1.0.0
+    // used for its original Hide Tile Text maintenance action. It is visually
+    // imperceptible while leaving the Drawing geometry valid for Crown math.
+    const drawings = canvas.drawings.placeables.filter(drawing =>
+      Boolean(getWorldTile(drawing)) || Boolean(drawing.document.getFlag(FLAG_SCOPE, "worldTileLabel"))
+    );
+    let updated = 0, failed = 0;
+    for (const drawing of drawings) {
+      const doc = drawing.document;
+      const changes = {};
+      const isLabel = Boolean(doc.getFlag(FLAG_SCOPE, WORLD_LABEL_KEY));
+      const targetAlpha = isLabel ? 0 : 0.001;
+      if (Number(doc.strokeAlpha ?? 1) !== targetAlpha) changes.strokeAlpha = targetAlpha;
+      if (Number(doc.fillAlpha ?? 1) !== targetAlpha) changes.fillAlpha = targetAlpha;
+      if (Number(doc.strokeWidth ?? 1) !== 1) changes.strokeWidth = 1;
+      if (!Object.keys(changes).length) continue;
+      try {
+        await doc.update(changes, { crownProvinceAppearanceRepair: true });
+        updated++;
+      } catch (err) {
+        console.warn("Failed to hide Crown province Drawing line:", doc.id, err);
+        failed++;
+      }
+    }
+    // Ensure Drawing editing frames are not the active layer either.
+    try { canvas.drawings?.releaseAll?.(); } catch (err) {}
+    if (getProvinceHighlightsMode() === "off") {
+      try { canvas.tokens?.activate?.({ tool: "select" }); } catch (err) {}
+    }
+    if (notify) ui.notifications.info(`Province Drawing lines hidden: ${updated} updated${failed ? `, ${failed} failed` : ""}.`);
+    return { updated, failed };
+  }
+
   function getCanonicalHouseNameForPlayer(userId = "", userName = "") {
     const wantedId = String(userId || "").trim();
     const wantedName = normalize(userName || "");
@@ -13006,6 +17573,164 @@ function getHoldingsForUser(user) {
     if (!rows.length) return "";
     if (rows.length > 1 && rows[0].count === rows[1].count) return "";
     return rows[0].name;
+  }
+
+  function getPlayerHouseControllerMapFromCharacters() {
+    const houseOwners = new Map();
+
+    for (const token of getCharacterTokens()) {
+      const character = getCharacterDataFromToken(token) || {};
+      const piece = getWorldPiece(token) || {};
+      const houseName = String(character.house || piece.house || piece.faction || "").trim();
+      const houseKey = normalizeHouseIdentity(houseName);
+      if (!houseKey || isGenericNeutralLocalHouse(houseKey)) continue;
+
+      let controller = getCharacterControllerIdentity(token);
+      let user = controller?.id ? game.users.get(String(controller.id)) : null;
+      if (!user && controller?.name) {
+        user = game.users.contents.find(candidate => !candidate.isGM && normalize(candidate.name) === normalize(controller.name)) || null;
+      }
+
+      // Match the tested repair macro: if old character flags do not identify a
+      // current player, a unique non-GM Actor owner is safe evidence of control.
+      if (!user && token.actor?.ownership) {
+        const owners = game.users.contents.filter(candidate =>
+          !candidate.isGM &&
+          Number(token.actor.ownership?.[candidate.id] ?? 0) >= CONST.DOCUMENT_OWNERSHIP_LEVELS.OWNER
+        );
+        if (owners.length === 1) user = owners[0];
+      }
+      if (!user || user.isGM) continue;
+
+      if (!houseOwners.has(houseKey)) houseOwners.set(houseKey, new Map());
+      houseOwners.get(houseKey).set(user.id, { user, displayHouse: houseName });
+    }
+
+    // Never guess when two current players genuinely resolve to the same House.
+    const resolved = new Map();
+    const ambiguous = [];
+    for (const [houseKey, owners] of houseOwners.entries()) {
+      const rows = [...owners.values()];
+      if (rows.length === 1) resolved.set(houseKey, rows[0]);
+      else if (rows.length > 1) ambiguous.push({ houseKey, players: rows.map(row => row.user.name) });
+    }
+    return { resolved, ambiguous };
+  }
+
+  async function syncProvinceControllersFromPoliticalAllegiance({ silent = true, drawingIds = null } = {}) {
+    if (!game.user?.isGM || !isOverviewScene()) return { updated: 0, skipped: 0, ambiguous: [] };
+
+    const manager = globalThis[PROVINCE_CONTROLLER_SYNC_MANAGER_KEY] ||= { inFlight: false, timer: null, pending: false };
+    if (manager.inFlight) {
+      manager.pending = true;
+      return { updated: 0, skipped: 0, ambiguous: [], deferred: true };
+    }
+
+    manager.inFlight = true;
+    let updated = 0;
+    let skipped = 0;
+    const updatedRows = [];
+    try {
+      const { resolved, ambiguous } = getPlayerHouseControllerMapFromCharacters();
+      const wantedIds = drawingIds ? new Set([...drawingIds].map(value => String(value || ""))) : null;
+      const neutralKeys = new Set(["", "neutral", "unaligned", "independent", "npc", "none", "unassigned"]);
+
+      for (const entry of getWorldTileEntries()) {
+        if (isSeaByTile(entry.tile)) continue;
+        const doc = entry?.drawing?.document;
+        if (!doc) continue;
+        if (wantedIds && !wantedIds.has(String(doc.id || ""))) continue;
+
+        const worldTile = foundry.utils.deepClone(entry.tile || {});
+        const house = foundry.utils.deepClone(getHouseData(entry.drawing) || {});
+        const allegiance = String(house.allegiance || worldTile.allegiance || "").trim();
+        const allegianceKey = normalizeHouseIdentity(allegiance);
+
+        // Neutral/Unaligned remains authoritative and must never be reattached to
+        // the preserved local House merely because that House name still exists.
+        if (neutralKeys.has(allegianceKey)) {
+          skipped++;
+          continue;
+        }
+
+        // Preserve the established political-control hierarchy. A current explicit
+        // controller wins; otherwise a current sworn player wins; only then do we
+        // derive the controller from the province's House allegiance. This keeps
+        // the successful Karhold repair without stealing vassal/sworn provinces.
+        const explicitUser = resolveCurrentPlayerFromCandidates(getProvinceControllerCandidates(worldTile, house));
+        const swornUser = getUserByIdOrName(
+          house.swornToPlayerUserId || worldTile.swornToPlayerUserId || "",
+          house.swornToPlayerName || worldTile.swornToPlayerName || ""
+        );
+        const ownerRow = resolved.get(allegianceKey);
+        const owner = explicitUser && !explicitUser.isGM
+          ? explicitUser
+          : (swornUser && !swornUser.isGM ? swornUser : ownerRow?.user);
+        if (!owner) {
+          skipped++;
+          continue;
+        }
+
+        const alreadySynced = [worldTile, house].every(data =>
+          String(data.ownerUserId || "") === String(owner.id) &&
+          normalize(data.ownerUserName || "") === normalize(owner.name) &&
+          String(data.playerOwnerUserId || "") === String(owner.id) &&
+          normalize(data.playerOwnerUserName || "") === normalize(owner.name) &&
+          String(data.controllerPlayerUserId || "") === String(owner.id) &&
+          normalize(data.controllerPlayerName || "") === normalize(owner.name)
+        );
+        if (alreadySynced) continue;
+
+        const now = new Date().toISOString();
+        for (const data of [worldTile, house]) {
+          data.ownerUserId = owner.id;
+          data.ownerUserName = owner.name;
+          data.playerOwnerUserId = owner.id;
+          data.playerOwnerUserName = owner.name;
+          data.controllerPlayerUserId = owner.id;
+          data.controllerPlayerName = owner.name;
+          data.ownerAssignedAt = now;
+          data.ownerAssignedBy = game.user.name;
+          data.ownerAssignedSource = `Crown Overview Tools ${MODULE_VERSION} — Political Allegiance Sync`;
+          data.updatedAt = now;
+          data.updatedBy = game.user.name;
+        }
+
+        await doc.setFlag(FLAG_SCOPE, WORLD_TILE_KEY, worldTile);
+        await doc.setFlag(FLAG_SCOPE, HOUSE_KEY, house);
+        updated++;
+        updatedRows.push(`${getTileName(entry)} → ${owner.name} (${allegiance})`);
+      }
+
+      if (updated) {
+        // Identity did not change, but refresh any open/active political presentation
+        // so the corrected explicit controller is visible immediately.
+        redrawPoliticalOverlay({ force: true });
+      }
+
+      if (!silent && updated) ui.notifications.info(`Synced ${updated} province controller${updated === 1 ? "" : "s"} from political allegiance.`);
+      if (ambiguous.length) console.warn("Crown Overview Tools: ambiguous player House mappings were not auto-synced.", ambiguous);
+      if (updatedRows.length) console.info("Crown Overview Tools: province controller sync", updatedRows);
+      return { updated, skipped, ambiguous, updatedRows };
+    } finally {
+      manager.inFlight = false;
+      if (manager.pending) {
+        manager.pending = false;
+        scheduleProvinceControllerSync(100);
+      }
+    }
+  }
+
+  function scheduleProvinceControllerSync(delay = 200) {
+    if (!game.user?.isGM || !isOverviewScene()) return;
+    const manager = globalThis[PROVINCE_CONTROLLER_SYNC_MANAGER_KEY] ||= { inFlight: false, timer: null, pending: false };
+    if (manager.timer) clearTimeout(manager.timer);
+    manager.timer = setTimeout(() => {
+      manager.timer = null;
+      syncProvinceControllersFromPoliticalAllegiance({ silent: true }).catch(error =>
+        console.warn("Crown Overview Tools: province political-controller sync failed.", error)
+      );
+    }, Math.max(0, Number(delay || 0)));
   }
 
   async function repairPlayerProvinceAllegiances() {
@@ -13191,7 +17916,9 @@ function getHoldingsForUser(user) {
   function startSceneFeatures() {
     updateDateBanner();
     renderPanel();
-    startHover();
+    if (getProvinceHighlightsMode() === "on") startHover(); else stopHover();
+    startWorldMapVisualSuppression();
+    applyProvinceDrawingInteraction();
     startVisibility();
     startPoliticalOverlay();
   }
@@ -13199,6 +17926,9 @@ function getHoldingsForUser(user) {
   function stopSceneFeatures() {
     removeDateBanner();
     removePanel();
+    stopWorldMapVisualSuppression();
+    globalThis[TILE_NAME_EDIT_MODE_KEY] = false;
+    globalThis[PROVINCE_EDIT_MODE_KEY] = false;
     stopHover();
     stopRouteTooltip(false);
     stopPieceTooltip(false);
@@ -13213,8 +17943,56 @@ function getHoldingsForUser(user) {
     else stopSceneFeatures();
   }
 
+  function getStrategicArmiesForBattle() {
+    const armies = [];
+    for (const scene of game.scenes?.contents || []) {
+      for (const tokenDoc of scene.tokens?.contents || []) {
+        const piece = tokenDoc.getFlag?.(FLAG_SCOPE, WORLD_PIECE_KEY);
+        if (normalize(piece?.pieceType) !== "army") continue;
+        const composition = getArmyComposition(piece);
+        const originalTotal = getArmyTotalStrength(composition);
+        const currentStrength = Math.max(0, Math.floor(Number(piece.strengthCurrent ?? originalTotal)));
+        const target = Math.min(originalTotal, currentStrength);
+        const scaled = {};
+        if (originalTotal > 0 && target < originalTotal) {
+          let assigned = 0;
+          const fractions = [];
+          for (const troop of ARMY_TROOP_TYPES) {
+            const raw = Math.max(0, Number(composition[troop.key] || 0));
+            const exact = raw * target / originalTotal;
+            const whole = Math.floor(exact);
+            scaled[troop.key] = whole;
+            assigned += whole;
+            fractions.push({ key: troop.key, fraction: exact - whole });
+          }
+          fractions.sort((a,b) => b.fraction - a.fraction);
+          for (let i=0; assigned < target && i<fractions.length; i++,assigned++) scaled[fractions[i].key] += 1;
+        } else Object.assign(scaled, composition);
+        armies.push({
+          armyId: piece.id || tokenDoc.id,
+          tokenId: tokenDoc.id,
+          sceneId: scene.id,
+          sceneName: scene.name,
+          armyName: piece.armyName || piece.name || tokenDoc.name || "Army",
+          house: piece.house || piece.faction || "",
+          ownerUserId: piece.ownerUserId || piece.playerOwnerUserId || "",
+          ownerUserName: piece.ownerUserName || piece.playerOwnerUserName || "",
+          commanderId: piece.linkedCharacterId || piece.commanderCharacterId || "",
+          commanderName: piece.linkedCharacterName || piece.commanderName || "",
+          strengthCurrent: target,
+          strengthMax: Math.max(target, Math.floor(Number(piece.strengthMax ?? originalTotal))),
+          composition: scaled,
+          siegeEquipment: getSiegeEquipment(piece),
+          location: { tileId: piece.currentTileId || "", tileName: piece.currentTileName || "", region: piece.currentRegion || "" }
+        });
+      }
+    }
+    return armies;
+  }
+
   const API = {
     version: MODULE_VERSION,
+    getStrategicArmiesForBattle,
     isOverviewScene,
     refresh: refreshSceneFeatures,
     start: startSceneFeatures,
@@ -13222,15 +18000,23 @@ function getHoldingsForUser(user) {
     pathMove,
     selectAssignedActorMenu,
     characterMoveMenu,
+    editPlayerCharacterDetails,
+    takeDiligentBuildAction,
     spreadSelected,
     toggleClickMove,
     toggleRouteTooltip,
     togglePieceTooltip,
+    toggleProvinceHighlights,
+    toggleProvinceEditMode,
+    toggleTileNameEditMode,
+    repairCharacterControl,
     portCrossing,
     buildOnCurrentTile,
     showHoldings,
+    summonMilitary,
     summonArmy,
     summonNavy,
+    embarkDisembark,
     embarkArmy,
     disembarkArmy,
     diplomaticTakeover,
@@ -13252,6 +18038,7 @@ function getHoldingsForUser(user) {
     exportCharacterCsv,
     processArmyMusters,
     editSelectedArmy,
+    cancelPendingArmyMuster,
     dismissSelectedArmy,
     importTileOwnershipCsv,
     exportTileOwnershipCsv,
@@ -13263,10 +18050,15 @@ function getHoldingsForUser(user) {
     assignPieceOwner,
     editWorldPiece,
     assignHouse,
+    manageMarriageAlliances,
     setSelectedTerritoryNeutral,
     auditProvinceHouseData,
     repairPlayerProvinceAllegiances,
+    syncProvinceControllersFromPoliticalAllegiance,
     manageTileEconomy,
+    toggleSelectedHoldingCurse,
+    adjustHouseGoldFood,
+    chargeMilitaryUpkeep,
     manageMarketForces,
     collectEconomy,
     repairEconomyData,
@@ -13274,6 +18066,7 @@ function getHoldingsForUser(user) {
     exportRealm,
     importRealm,
     hideTileText,
+    hideProvinceDrawingLines,
     togglePoliticalOverlay,
     setSceneOverviewMode: async value => {
       await canvas.scene.setFlag(FLAG_SCOPE, SCENE_MODE_KEY, Boolean(value));
@@ -13281,9 +18074,492 @@ function getHoldingsForUser(user) {
     }
   };
 
+  async function migrateInitialCursedHoldings148() {
+    if (!game.user?.isGM) return;
+    if (game.settings.get(MODULE_ID, "initialCursedHoldings148")) return;
+    let cursed = 0;
+    const found = new Set();
+    for (const scene of game.scenes ?? []) {
+      const updates = [];
+      for (const drawing of scene.drawings ?? []) {
+        const rawWorldTile = drawing.getFlag(FLAG_SCOPE, WORLD_TILE_KEY);
+        if (!isRealWorldTileData(rawWorldTile)) continue;
+        const worldTile = foundry.utils.deepClone(rawWorldTile);
+        if (isSeaByTile(worldTile)) continue;
+        const key = normalize(worldTile.name || "");
+        if (!INITIAL_CURSED_HOLDING_KEYS.has(key)) continue;
+        found.add(key);
+        const house = foundry.utils.deepClone(drawing.getFlag(FLAG_SCOPE, HOUSE_KEY) || {});
+        if (isHoldingCursed(worldTile, house)) continue;
+        worldTile.cursedHolding = true;
+        worldTile.curseUpdatedAt = new Date().toISOString();
+        worldTile.curseUpdatedBy = `${MODULE_VERSION} initial curse migration`;
+        house.cursedHolding = true;
+        house.curseUpdatedAt = worldTile.curseUpdatedAt;
+        house.curseUpdatedBy = worldTile.curseUpdatedBy;
+        updates.push({
+          _id: drawing.id,
+          [`flags.${FLAG_SCOPE}.${WORLD_TILE_KEY}`]: worldTile,
+          [`flags.${FLAG_SCOPE}.${HOUSE_KEY}`]: house
+        });
+        cursed++;
+      }
+      if (updates.length) await scene.updateEmbeddedDocuments("Drawing", updates);
+    }
+    await game.settings.set(MODULE_ID, "initialCursedHoldings148", true);
+    const missing = INITIAL_CURSED_HOLDINGS.filter(name => !found.has(normalize(name)));
+    console.info(`Crown Overview Tools ${MODULE_VERSION}: initialized ${cursed} cursed holding(s).${missing.length ? ` Missing from loaded world data: ${missing.join(", ")}.` : ""}`);
+    if (cursed) ui.notifications.info(`Initialized ${cursed} cursed holding(s). Their income is halved.`);
+    if (missing.length) ui.notifications.warn(`Initial cursed holdings not found: ${missing.join(", ")}.`);
+  }
+
+  async function migrateCharacterIdentityData141() {
+    if (!game.user?.isGM) return;
+    let assigned = 0;
+    let normalized = 0;
+    for (const scene of game.scenes ?? []) {
+      for (const tokenDoc of scene.tokens ?? []) {
+        const token = scene.id === canvas.scene?.id ? canvas.tokens?.placeables?.find(t => t.document.id === tokenDoc.id) : null;
+        // Off-canvas scenes do not have Token objects with geometry helpers, so
+        // use the document data and explicit current tile metadata there.
+        const stored = foundry.utils.deepClone(tokenDoc.getFlag(FLAG_SCOPE, WORLD_CHARACTER_KEY) || {});
+        const piece = foundry.utils.deepClone(tokenDoc.getFlag(FLAG_SCOPE, WORLD_PIECE_KEY) || {});
+        const isCharacter = normalize(piece.pieceType || stored.ownerType || "").includes("character") || Boolean(stored.characterId || piece.characterId || piece.characterData);
+        if (!isCharacter) continue;
+
+        const beforeCulture = String(stored.culture || piece.culture || "").trim();
+        const beforeReligion = String(stored.religion || piece.religion || "").trim();
+        const canonicalCulture = canonicalizeCultureLabel(beforeCulture);
+        const canonicalReligion = canonicalizeReligionLabel(beforeReligion);
+        let culture = canonicalCulture;
+        let religion = canonicalReligion;
+
+        if ((!culture || !religion) && token) {
+          const inferred = inferMissingCharacterIdentity(token, { ...stored, culture, religion });
+          culture = culture || inferred.culture;
+          religion = religion || inferred.religion;
+        } else if (!culture || !religion) {
+          const seed = String(stored.characterId || piece.characterId || tokenDoc.id || tokenDoc.name || "character");
+          const region = String(stored.currentRegion || piece.currentRegion || "").trim();
+          culture = culture || stablePick(regionalCulturePool(region, stored.currentTileName || piece.currentTileName || ""), `${seed}:culture`) || "Other";
+          religion = religion || regionalReligionForSeed(region, culture, `${seed}:religion`);
+        }
+
+        if (!culture || !religion) continue;
+        if (!beforeCulture || !beforeReligion) assigned += 1;
+        if ((beforeCulture && canonicalCulture !== beforeCulture) || (beforeReligion && canonicalReligion !== beforeReligion)) normalized += 1;
+        if (culture === beforeCulture && religion === beforeReligion) continue;
+
+        const now = new Date().toISOString();
+        stored.culture = culture;
+        stored.religion = religion;
+        stored.updatedAt = now;
+        stored.updatedBy = game.user.name;
+        stored.updatedSource = `Crown Overview Tools ${MODULE_VERSION} - Identity Migration`;
+        piece.culture = culture;
+        piece.religion = religion;
+        piece.characterData = foundry.utils.deepClone({ ...(piece.characterData || {}), ...stored, culture, religion });
+        piece.version = `Crown Overview Tools ${MODULE_VERSION}`;
+        piece.updatedAt = now;
+        piece.updatedBy = game.user.name;
+        await tokenDoc.setFlag(FLAG_SCOPE, WORLD_CHARACTER_KEY, stored);
+        await tokenDoc.setFlag(FLAG_SCOPE, WORLD_PIECE_KEY, piece);
+        if (tokenDoc.actor) {
+          await tokenDoc.actor.setFlag(FLAG_SCOPE, WORLD_CHARACTER_KEY, foundry.utils.deepClone(stored));
+          await tokenDoc.actor.setFlag(FLAG_SCOPE, WORLD_PIECE_KEY, foundry.utils.deepClone(piece));
+        }
+      }
+    }
+    if (assigned || normalized) {
+      console.info(`Crown Overview Tools ${MODULE_VERSION}: assigned missing culture/faith to ${assigned} character(s); normalized ${normalized} existing label(s).`);
+      if (assigned) ui.notifications.info(`Assigned region-appropriate Culture/Faith to ${assigned} character(s) with blank identity fields.`);
+    }
+  }
+
+  async function migrateCanonicalReligionLabels() {
+    if (!game.user?.isGM) return;
+    let provinceCount = 0;
+    let characterCount = 0;
+
+    for (const scene of game.scenes ?? []) {
+      const drawingUpdates = [];
+      for (const drawing of scene.drawings ?? []) {
+        const rawWorldTile = drawing.getFlag(FLAG_SCOPE, WORLD_TILE_KEY);
+        if (!isRealWorldTileData(rawWorldTile)) continue;
+        const worldTile = foundry.utils.deepClone(rawWorldTile);
+        const house = foundry.utils.deepClone(drawing.getFlag(FLAG_SCOPE, HOUSE_KEY) || {});
+        const worldBefore = String(worldTile.religion || "").trim();
+        const houseBefore = String(house.religion || "").trim();
+        const worldAfter = canonicalizeReligionLabel(worldBefore);
+        const houseAfter = canonicalizeReligionLabel(houseBefore);
+        const update = { _id: drawing.id };
+        let changed = false;
+        if (worldBefore && worldAfter !== worldBefore) {
+          worldTile.religion = worldAfter;
+          update[`flags.${FLAG_SCOPE}.${WORLD_TILE_KEY}`] = worldTile;
+          changed = true;
+        }
+        if (houseBefore && houseAfter !== houseBefore) {
+          house.religion = houseAfter;
+          update[`flags.${FLAG_SCOPE}.${HOUSE_KEY}`] = house;
+          changed = true;
+        }
+        if (changed) { drawingUpdates.push(update); provinceCount += 1; }
+      }
+      if (drawingUpdates.length) await scene.updateEmbeddedDocuments("Drawing", drawingUpdates);
+
+      const tokenUpdates = [];
+      for (const tokenDoc of scene.tokens ?? []) {
+        const character = foundry.utils.deepClone(tokenDoc.getFlag(FLAG_SCOPE, WORLD_CHARACTER_KEY) || {});
+        const piece = foundry.utils.deepClone(tokenDoc.getFlag(FLAG_SCOPE, WORLD_PIECE_KEY) || {});
+        const charBefore = String(character.religion || "").trim();
+        const pieceBefore = String(piece.religion || "").trim();
+        const charAfter = canonicalizeReligionLabel(charBefore);
+        const pieceAfter = canonicalizeReligionLabel(pieceBefore);
+        const update = { _id: tokenDoc.id };
+        let changed = false;
+        if (charBefore && charAfter !== charBefore) {
+          character.religion = charAfter;
+          update[`flags.${FLAG_SCOPE}.${WORLD_CHARACTER_KEY}`] = character;
+          changed = true;
+        }
+        if (pieceBefore && pieceAfter !== pieceBefore) {
+          piece.religion = pieceAfter;
+          if (piece.characterData && typeof piece.characterData === "object") piece.characterData.religion = canonicalizeReligionLabel(piece.characterData.religion || pieceAfter);
+          update[`flags.${FLAG_SCOPE}.${WORLD_PIECE_KEY}`] = piece;
+          changed = true;
+        }
+        if (changed) { tokenUpdates.push(update); characterCount += 1; }
+      }
+      if (tokenUpdates.length) await scene.updateEmbeddedDocuments("Token", tokenUpdates);
+    }
+
+    if (provinceCount || characterCount) {
+      console.info(`Crown Overview Tools ${MODULE_VERSION}: normalized religion labels on ${provinceCount} province(s) and ${characterCount} character token(s).`);
+    }
+  }
+
+  async function migrateFaithOfSevenSects() {
+    if (!game.user?.isGM) return;
+    if (game.settings.get(MODULE_ID, "fotsSectMigration136")) return;
+
+    const standard = [];
+    const existingSects = [];
+
+    for (const scene of game.scenes ?? []) {
+      for (const drawing of scene.drawings ?? []) {
+        const rawWorldTile = drawing.getFlag(FLAG_SCOPE, WORLD_TILE_KEY);
+        if (!isRealWorldTileData(rawWorldTile)) continue;
+        const worldTile = foundry.utils.deepClone(rawWorldTile);
+        if (isSeaByTile(worldTile)) continue;
+        const house = foundry.utils.deepClone(drawing.getFlag(FLAG_SCOPE, HOUSE_KEY) || {});
+        const religion = canonicalizeReligionLabel(house.religion || worldTile.religion || "");
+        const record = { scene, drawing, worldTile, house, religion };
+        if (religion === "Faith of the Seven") standard.push(record);
+        else if (isFaithOfSevenSect(religion)) existingSects.push(record);
+      }
+    }
+
+    const familyTotal = standard.length + existingSects.length;
+    const targetSectCount = Math.round(familyTotal * 0.30);
+    const needed = Math.max(0, targetSectCount - existingSects.length);
+
+    standard.sort((a, b) => {
+      const ah = stableStringHash(`${a.scene.id}:${a.drawing.id}:${a.worldTile.name || ""}`);
+      const bh = stableStringHash(`${b.scene.id}:${b.drawing.id}:${b.worldTile.name || ""}`);
+      return ah - bh || String(a.drawing.id).localeCompare(String(b.drawing.id));
+    });
+
+    const selected = standard.slice(0, needed);
+    const byScene = new Map();
+    const sectCounts = new Map();
+
+    selected.forEach((record, index) => {
+      const sectSeed = stableStringHash(`${record.scene.id}:${record.drawing.id}:sect`);
+      const sect = FOTS_SECT_RELIGIONS[(sectSeed + index) % FOTS_SECT_RELIGIONS.length];
+      record.worldTile.religion = sect;
+      record.house.religion = sect;
+      const update = {
+        _id: record.drawing.id,
+        [`flags.${FLAG_SCOPE}.${WORLD_TILE_KEY}`]: record.worldTile,
+        [`flags.${FLAG_SCOPE}.${HOUSE_KEY}`]: record.house
+      };
+      if (!byScene.has(record.scene.id)) byScene.set(record.scene.id, { scene: record.scene, updates: [] });
+      byScene.get(record.scene.id).updates.push(update);
+      sectCounts.set(sect, (sectCounts.get(sect) || 0) + 1);
+    });
+
+    for (const { scene, updates } of byScene.values()) {
+      if (updates.length) await scene.updateEmbeddedDocuments("Drawing", updates);
+    }
+
+    await game.settings.set(MODULE_ID, "fotsSectMigration136", true);
+    console.info(`Crown Overview Tools ${MODULE_VERSION}: Faith of the Seven sect split assigned ${selected.length}/${familyTotal} province(s) to sects (~30%).`, Object.fromEntries(sectCounts));
+    if (selected.length) ui.notifications.info(`Faith of the Seven split: ${selected.length} province(s) assigned to devotional sects (~30% of standard FotS provinces).`);
+  }
+
+  async function migrateProvinceIdentityData146() {
+    if (!game.user?.isGM) return;
+    let assigned = 0;
+    let normalized = 0;
+
+    for (const scene of game.scenes ?? []) {
+      const drawingUpdates = [];
+      for (const drawing of scene.drawings ?? []) {
+        const rawWorldTile = drawing.getFlag(FLAG_SCOPE, WORLD_TILE_KEY);
+        if (!isRealWorldTileData(rawWorldTile)) continue;
+        const worldTile = foundry.utils.deepClone(rawWorldTile);
+        if (isSeaByTile(worldTile)) continue;
+        const house = foundry.utils.deepClone(drawing.getFlag(FLAG_SCOPE, HOUSE_KEY) || {});
+
+        const beforeCulture = String(house.culture || worldTile.culture || "").trim();
+        const beforeReligion = String(house.religion || worldTile.religion || "").trim();
+        const canonicalCulture = canonicalizeCultureLabel(beforeCulture);
+        const canonicalReligion = canonicalizeReligionLabel(beforeReligion);
+        const inferred = inferMissingProvinceIdentity(worldTile, house);
+        const afterCulture = canonicalCulture || inferred.culture;
+        const afterReligion = canonicalReligion || inferred.religion;
+
+        let changed = false;
+        const update = { _id: drawing.id };
+
+        if ((!beforeCulture && afterCulture) || (!beforeReligion && afterReligion)) assigned += 1;
+        if ((beforeCulture && canonicalCulture !== beforeCulture) || (beforeReligion && canonicalReligion !== beforeReligion)) normalized += 1;
+
+        if (afterCulture && String(worldTile.culture || "").trim() !== afterCulture) {
+          worldTile.culture = afterCulture;
+          changed = true;
+        }
+        if (afterReligion && String(worldTile.religion || "").trim() !== afterReligion) {
+          worldTile.religion = afterReligion;
+          changed = true;
+        }
+        if (afterCulture && String(house.culture || "").trim() !== afterCulture) {
+          house.culture = afterCulture;
+          changed = true;
+        }
+        if (afterReligion && String(house.religion || "").trim() !== afterReligion) {
+          house.religion = afterReligion;
+          changed = true;
+        }
+
+        if (!changed) continue;
+        update[`flags.${FLAG_SCOPE}.${WORLD_TILE_KEY}`] = worldTile;
+        update[`flags.${FLAG_SCOPE}.${HOUSE_KEY}`] = house;
+        drawingUpdates.push(update);
+      }
+      if (drawingUpdates.length) await scene.updateEmbeddedDocuments("Drawing", drawingUpdates);
+    }
+
+    if (assigned || normalized) {
+      console.info(`Crown Overview Tools ${MODULE_VERSION}: assigned missing culture/faith to ${assigned} province(s); normalized ${normalized} existing province label(s).`);
+      // Startup migration is intentionally silent; details remain in the console.
+    }
+  }
+
+  async function migrateLegacyGreatHallData150() {
+    if (!game.user?.isGM) return;
+    let cleaned = 0;
+    for (const scene of game.scenes ?? []) {
+      const updates = [];
+      for (const drawing of scene.drawings ?? []) {
+        const rawWorldTile = drawing.getFlag(FLAG_SCOPE, WORLD_TILE_KEY);
+        if (!isRealWorldTileData(rawWorldTile)) continue;
+        const house = foundry.utils.deepClone(drawing.getFlag(FLAG_SCOPE, HOUSE_KEY) || {});
+        if (!house || typeof house !== "object") continue;
+        const beforeBuilt = Array.isArray(house.builtBuildings) ? house.builtBuildings : [];
+        const beforeData = Array.isArray(house.buildingData) ? house.buildingData : [];
+        const beforeSlots = Array.isArray(house.buildingSlots) ? house.buildingSlots : [];
+        const afterBuilt = beforeBuilt.filter(name => normalize(name) !== "great hall");
+        const afterData = beforeData.filter(item => normalize(item?.name || item?.building || item) !== "great hall");
+        const afterSlots = beforeSlots.filter(item => normalize(item?.name || item?.building || item?.label || "") !== "great hall");
+        if (afterBuilt.length === beforeBuilt.length && afterData.length === beforeData.length && afterSlots.length === beforeSlots.length) continue;
+        house.builtBuildings = afterBuilt;
+        house.buildingData = afterData;
+        house.buildingSlots = afterSlots;
+        house.developmentLevel = getBuildingSlotCount(house);
+        house.developmentLabel = DEVELOPMENT_LEVELS[house.developmentLevel]?.label || "Ruins";
+        updates.push({ _id: drawing.id, [`flags.${FLAG_SCOPE}.${HOUSE_KEY}`]: house });
+        cleaned += 1;
+      }
+      if (updates.length) await scene.updateEmbeddedDocuments("Drawing", updates);
+    }
+    if (cleaned) {
+      console.info(`Crown Overview Tools ${MODULE_VERSION}: removed obsolete Great Hall legacy data from ${cleaned} province(s).`);
+      // Startup migration is intentionally silent; details remain in the console.
+    }
+  }
+
+  const LEGACY_ECONOMY_UNIT_RESOURCES = new Set([
+    "Light Infantry", "Spearmen", "Heavy Infantry", "Pikemen", "Archers",
+    "Crossbowmen", "Light Cavalry", "Lancers", "Heavy Cavalry", "Ships", "Siege"
+  ]);
+
+  function stripLegacyUnitResources(raw = {}) {
+    const clean = normalizeResourceMap(raw);
+    let removed = 0;
+    for (const key of LEGACY_ECONOMY_UNIT_RESOURCES) {
+      if (Number(clean[key] || 0) !== 0) removed += 1;
+      delete clean[key];
+    }
+    return { clean, removed };
+  }
+
+  async function migrateStaleProvinceData151() {
+    if (!game.user?.isGM) return;
+    let provincesChanged = 0;
+    let invalidBuildingsRemoved = 0;
+    let orphanBuildRowsRemoved = 0;
+    let staleUnitResourceFieldsRemoved = 0;
+
+    for (const scene of game.scenes ?? []) {
+      const updates = [];
+      for (const drawing of scene.drawings ?? []) {
+        const rawWorldTile = drawing.getFlag(FLAG_SCOPE, WORLD_TILE_KEY);
+        if (!isRealWorldTileData(rawWorldTile)) continue;
+        const worldTile = foundry.utils.deepClone(rawWorldTile);
+        if (isSeaByTile(worldTile)) continue;
+        const house = foundry.utils.deepClone(drawing.getFlag(FLAG_SCOPE, HOUSE_KEY) || {});
+        if (!house || typeof house !== "object") continue;
+        let changed = false;
+
+        // Current BUILDING_LINES is the sole source of truth. Canonicalize aliases
+        // and discard buildings from obsolete pre-catalog systems.
+        const canonicalBuilt = [];
+        const seenBuilt = new Set();
+        for (const rawName of Array.isArray(house.builtBuildings) ? house.builtBuildings : []) {
+          const meta = getBuildingMetaByName(rawName);
+          if (!meta) { invalidBuildingsRemoved += 1; changed = true; continue; }
+          const canonical = meta.level.name;
+          const key = normalize(canonical);
+          if (seenBuilt.has(key)) { changed = true; continue; }
+          seenBuilt.add(key);
+          canonicalBuilt.push(canonical);
+          if (String(rawName) !== canonical) changed = true;
+        }
+
+        const builtKeys = new Set(canonicalBuilt.map(normalize));
+        const cleanData = [];
+        for (const rawItem of Array.isArray(house.buildingData) ? house.buildingData : []) {
+          const item = (rawItem && typeof rawItem === "object") ? foundry.utils.deepClone(rawItem) : { name: String(rawItem || "") };
+          const rawName = String(item.name || item.building || "").trim();
+          const meta = getBuildingMetaByName(rawName);
+          if (!meta) { orphanBuildRowsRemoved += 1; changed = true; continue; }
+          const canonical = meta.level.name;
+          if (!builtKeys.has(normalize(canonical))) { orphanBuildRowsRemoved += 1; changed = true; continue; }
+          if (item.name !== canonical || item.building !== canonical) changed = true;
+          item.name = canonical;
+          item.building = canonical;
+          item.lineKey = meta.line.key;
+          item.lineLabel = meta.line.label;
+          item.group = meta.line.group;
+          item.level = Number(meta.level.level || 1);
+          cleanData.push(item);
+        }
+
+        const cleanSlots = getBuildingSlotsAfterCatalogChange({ builtBuildings: canonicalBuilt, buildingSlots: [] }, "");
+        if (JSON.stringify(house.buildingSlots || []) !== JSON.stringify(cleanSlots)) changed = true;
+
+        // Province economy no longer stores troops/ships/siege as resources.
+        // Those are represented by military tokens, muster/manpower, and capacity systems.
+        for (const field of ["resourceStockpile", "resources", "stockpile", "manualResourceIncome", "resourceIncome"]) {
+          if (!house[field] || typeof house[field] !== "object") continue;
+          const result = stripLegacyUnitResources(house[field]);
+          if (result.removed) {
+            staleUnitResourceFieldsRemoved += result.removed;
+            house[field] = result.clean;
+            changed = true;
+          }
+        }
+
+        const developmentLevel = getBuildingSlotCount({ builtBuildings: canonicalBuilt, buildingSlots: cleanSlots });
+        const developmentLabel = DEVELOPMENT_LEVELS[developmentLevel]?.label || "Ruins";
+        if (Number(house.developmentLevel || 0) !== Number(developmentLevel)) changed = true;
+        if (String(house.developmentLabel || "") !== developmentLabel) changed = true;
+
+        if (!changed) continue;
+        house.builtBuildings = canonicalBuilt;
+        house.buildingData = cleanData;
+        house.buildingSlots = cleanSlots;
+        house.developmentLevel = developmentLevel;
+        house.developmentLabel = developmentLabel;
+        house.staleProvinceDataRepairedAt = new Date().toISOString();
+        house.staleProvinceDataRepairedBy = game.user.name;
+        house.staleProvinceDataRepairedSource = `Crown Overview Tools ${MODULE_VERSION}`;
+        updates.push({ _id: drawing.id, [`flags.${FLAG_SCOPE}.${HOUSE_KEY}`]: house });
+        provincesChanged += 1;
+      }
+      if (updates.length) await scene.updateEmbeddedDocuments("Drawing", updates);
+    }
+
+    if (provincesChanged) {
+      console.info(`Crown Overview Tools ${MODULE_VERSION}: stale province scrub repaired ${provincesChanged} province(s); removed ${invalidBuildingsRemoved} obsolete building(s), ${orphanBuildRowsRemoved} orphan building-data row(s), and ${staleUnitResourceFieldsRemoved} legacy military resource field(s).`);
+      // Startup migration is intentionally silent; details remain in the console.
+    }
+  }
+
+  async function scrubBogusProvinceFlags158() {
+    if (!game.user?.isGM) return { cleaned: 0, real: 0 };
+    let cleaned = 0;
+    let real = 0;
+    for (const scene of game.scenes ?? []) {
+      const updates = [];
+      for (const doc of scene.drawings ?? []) {
+        const rawTile = doc.getFlag?.(FLAG_SCOPE, WORLD_TILE_KEY);
+        const isLabel = Boolean(doc.getFlag?.(FLAG_SCOPE, WORLD_LABEL_KEY));
+        if (!isLabel && isRealWorldTileData(rawTile)) { real += 1; continue; }
+
+        const hasTile = rawTile !== undefined && rawTile !== null;
+        const hasHouse = doc.getFlag?.(FLAG_SCOPE, HOUSE_KEY) !== undefined && doc.getFlag?.(FLAG_SCOPE, HOUSE_KEY) !== null;
+        if (!hasTile && !hasHouse) continue;
+
+        const update = { _id: doc.id };
+        if (hasTile) update[`flags.${FLAG_SCOPE}.-=${WORLD_TILE_KEY}`] = null;
+        if (hasHouse) update[`flags.${FLAG_SCOPE}.-=${HOUSE_KEY}`] = null;
+        updates.push(update);
+      }
+      if (updates.length) {
+        await scene.updateEmbeddedDocuments("Drawing", updates, { crownBogusProvinceScrub158: true });
+        cleaned += updates.length;
+      }
+    }
+    if (cleaned) console.info(`Crown Overview Tools ${MODULE_VERSION}: removed bogus province/house flags from ${cleaned} non-province Drawing(s). Real province Drawings found: ${real}.`);
+    return { cleaned, real };
+  }
+
+  async function sanitizeWorldTileLabelDrawings154() {
+    if (!game.user?.isGM) return;
+    let cleaned = 0;
+    for (const scene of game.scenes ?? []) {
+      const updates = [];
+      for (const doc of scene.drawings ?? []) {
+        if (!doc.getFlag?.(FLAG_SCOPE, WORLD_LABEL_KEY)) continue;
+        const hasWorldTile = Boolean(doc.getFlag?.(FLAG_SCOPE, WORLD_TILE_KEY));
+        const hasHouse = Boolean(doc.getFlag?.(FLAG_SCOPE, HOUSE_KEY));
+        const update = { _id: doc.id };
+        if (hasWorldTile) update[`flags.${FLAG_SCOPE}.-=${WORLD_TILE_KEY}`] = null;
+        if (hasHouse) update[`flags.${FLAG_SCOPE}.-=${HOUSE_KEY}`] = null;
+        // Label Drawings have visible text, so unlike invisible province geometry
+        // they can safely use true zero fill/stroke. This prevents the long
+        // rectangular label shapes from leaking onto the map as stray lines.
+        if (Number(doc.strokeAlpha ?? 0) !== 0) update.strokeAlpha = 0;
+        if (Number(doc.fillAlpha ?? 0) !== 0) update.fillAlpha = 0;
+        if (Object.keys(update).length > 1) updates.push(update);
+      }
+      if (updates.length) {
+        await scene.updateEmbeddedDocuments("Drawing", updates, { crownLabelSanitize154: true });
+        cleaned += updates.length;
+      }
+    }
+    if (cleaned) console.info(`Crown Overview Tools ${MODULE_VERSION}: stripped province/house data from ${cleaned} tile-name label Drawing(s).`);
+  }
+
   Hooks.once("init", () => {
     game.settings.register(MODULE_ID, "tradeLedger", { name: "Trade Ledger", scope: "world", config: false, type: Object, default: [] });
     game.settings.register(MODULE_ID, "bankLedger", { name: "Bank Ledger", scope: "world", config: false, type: Object, default: {} });
+    game.settings.register(MODULE_ID, "fotsSectMigration136", { name: "Faith of the Seven sect split migration", scope: "world", config: false, type: Boolean, default: false });
+    game.settings.register(MODULE_ID, "initialCursedHoldings148", { name: "Initial cursed holdings migration", scope: "world", config: false, type: Boolean, default: false });
+    game.settings.register(MODULE_ID, "diligentBuildPrep", { name: "Diligent construction preparation ledger", scope: "world", config: false, type: Array, default: [] });
     game.settings.register(MODULE_ID, "autoStart", {
       name: "Auto-start on Crown overview scenes",
       hint: "Automatically shows the date banner, panel, hover tooltip, and tile visibility on Crown of Ashes overview scenes.",
@@ -13295,13 +18571,85 @@ function getHoldingsForUser(user) {
   });
 
   Hooks.once("ready", () => {
+    globalThis[TILE_NAME_EDIT_MODE_KEY] = false;
+    globalThis[PROVINCE_EDIT_MODE_KEY] = false;
     globalThis.CROWN_OVERVIEW_TOOLS = API;
+    const module = game.modules.get(MODULE_ID);
+    if (module) module.api = API;
     registerSocketHandlers();
+    if (game.user?.isGM) {
+      scrubBogusProvinceFlags158()
+        .then(() => sanitizeWorldTileLabelDrawings154())
+        .then(() => migrateLegacyGreatHallData150())
+        .then(() => migrateStaleProvinceData151())
+        .then(() => migrateCanonicalReligionLabels())
+        .then(() => migrateProvinceIdentityData146())
+        .then(() => migrateFaithOfSevenSects())
+        .then(() => migrateCharacterIdentityData141())
+        .then(() => migrateInitialCursedHoldings148())
+        .then(() => repairStaleArmyMusterLocks147({ silent: true }))
+        .catch(err => console.warn("Crown Overview Tools: startup migration/repair failed.", err));
+    }
     if (game.settings.get(MODULE_ID, "autoStart")) refreshSceneFeatures();
   });
 
   Hooks.on("canvasReady", () => {
+    invalidateWorldTileCache();
     if (game.settings.get(MODULE_ID, "autoStart")) refreshSceneFeatures();
+    if (game.user.isGM && isOverviewScene()) {
+      setTimeout(() => repairCharacterControl(false), 500);
+      // Persist the same allegiance -> explicit-controller repair proven by the
+      // GM test macro, so player tooltip/holdings/muster/upkeep all share one owner.
+      setTimeout(() => scheduleProvinceControllerSync(0), 700);
+    }
+    if (isOverviewScene()) {
+      setTimeout(() => applyWorldMapVisualSuppression(), 250);
+      // Player clients can finish token/ownership hydration shortly after
+      // canvasReady. Recompute Crown reveal geometry and re-apply the political
+      // overlay after that settles so the overlay cannot remain masked by an
+      // empty first-pass reveal set.
+      if (!game.user.isGM) {
+        setTimeout(() => {
+          try { revealForCurrentPlayerPieces(); } catch (err) { console.warn("Crown Overview Tools: player visibility refresh failed.", err); }
+          try { startPoliticalOverlay(); } catch (err) { console.warn("Crown Overview Tools: player political overlay refresh failed.", err); }
+        }, 600);
+      }
+    }
+    if (isOverviewScene() && getProvinceHighlightsMode() === "off") {
+      setTimeout(() => {
+        try { canvas.drawings?.releaseAll?.(); } catch (err) {}
+        try { canvas.tokens?.activate?.({ tool: "select" }); } catch (err) {}
+      }, 900);
+    }
+  });
+
+  Hooks.on("createDrawing", document => {
+    if (document?.parent?.id === canvas.scene?.id) invalidateWorldTileCache();
+  });
+
+  Hooks.on("deleteDrawing", document => {
+    if (document?.parent?.id === canvas.scene?.id) invalidateWorldTileCache();
+  });
+
+  Hooks.on("updateDrawing", (document, changes) => {
+    if (document?.parent?.id === canvas.scene?.id) invalidateWorldTileCache();
+  });
+
+  Hooks.on("updateDrawing", (document, changes) => {
+    if (!game.user?.isGM || !isOverviewScene() || document?.parent?.id !== canvas.scene?.id) return;
+    const manager = globalThis[PROVINCE_CONTROLLER_SYNC_MANAGER_KEY];
+    if (manager?.inFlight) return;
+    const worldTileChanged = foundry.utils.hasProperty(changes || {}, `flags.${FLAG_SCOPE}.${WORLD_TILE_KEY}`);
+    const houseChanged = foundry.utils.hasProperty(changes || {}, `flags.${FLAG_SCOPE}.${HOUSE_KEY}`);
+    if (!worldTileChanged && !houseChanged) return;
+    scheduleProvinceControllerSync(150);
+  });
+
+  Hooks.on("updateToken", (document, changes) => {
+    if (!game.user?.isGM || !isOverviewScene() || document?.parent?.id !== canvas.scene?.id) return;
+    const characterChanged = foundry.utils.hasProperty(changes || {}, `flags.${FLAG_SCOPE}.${WORLD_CHARACTER_KEY}`);
+    const pieceChanged = foundry.utils.hasProperty(changes || {}, `flags.${FLAG_SCOPE}.${WORLD_PIECE_KEY}`);
+    if (characterChanged || pieceChanged) scheduleProvinceControllerSync(150);
   });
 
   Hooks.on("updateScene", (scene, changes) => {
