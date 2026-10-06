@@ -1,3 +1,6 @@
+## v1.1.40 — GM Marriage Management
+- GMs can inspect and end active marriage alliances, freeing marriage slots without automatically reversing territorial control.
+
 # Crown Overview Tools v1.1.26
 
 
