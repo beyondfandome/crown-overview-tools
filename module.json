@@ -1,8 +1,8 @@
 {
   "id": "crown-overview-tools",
   "title": "Crown Overview Tools",
-  "description": "Crown of Ashes strategic overview tools. v1.1.56 makes Diligent construction sales persist until consumed and adds an ALL BUILDINGS ON SALE banner with struck-through original prices and discounted costs in the Build UI.",
-  "version": "1.1.56",
+  "description": "Scene-gated strategic overview map tools for Crown of Ashes. v1.1.66 starts from the stable v1.1.65 performance build and adds situational Diplomacy trait/quirk rules (Patriot, Synchronist, Cultural Supremicist, Unorthodox, Valyraboo, Blasphemer, Kinslayer, Bastard) plus -1 Diplomacy for Dishonorable.",
+  "version": "1.1.66",
   "authors": [
     {
       "name": "Beyond Fandome"
@@ -20,6 +20,6 @@
   ],
   "url": "https://github.com/beyondfandome/crown-overview-tools",
   "manifest": "https://raw.githubusercontent.com/beyondfandome/crown-overview-tools/main/module.json",
-  "download": "https://github.com/beyondfandome/crown-overview-tools/releases/download/v1.1.56/crown-overview-tools-v1.1.56.zip",
+  "download": "https://github.com/beyondfandome/crown-overview-tools/releases/download/v1.1.66/crown-overview-tools-v1.1.66.zip",
   "socket": true
 }
