@@ -1,3 +1,7 @@
+## v1.1.91
+- Starting-capital migration and capital/province-marriage UI consistency.
+- Winter popup-only granary payment action; Main Action labels.
+
 ## v1.1.88 (test build)
 
 See `PATCH_NOTES_v1.1.88.md` for implemented features, unchanged rules, and explicitly pending work.
@@ -102,3 +106,6 @@ See `PATCH_NOTES_v1.1.88.md` for implemented features, unchanged rules, and expl
 - Missed wedding Influence penalties and GM postponement; diplomatic alliances remain until formally dissolved.
 - Marriage-allied raids/Quick Sieges warn and award Dishonorable on proceeding.
 - See PATCH_NOTES_v1.1.90.md for mechanics and testing guidance.
+
+## v1.1.92
+- Correct legacy/imported development income fallback when building metadata is missing.
