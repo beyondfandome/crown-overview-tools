@@ -117,3 +117,6 @@ See `PATCH_NOTES_v1.1.88.md` for implemented features, unchanged rules, and expl
 - Bounded province arrival spread with normal animated token movement.
 - Military raising messages private to raising player and GM.
 - GM My Realm province-marriage picker filtered to selected House characters.
+
+## 1.1.97
+- Bounded anchor-based arrival spreading; GM roster marriage selection compatibility fix.
