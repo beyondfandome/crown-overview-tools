@@ -112,3 +112,8 @@ See `PATCH_NOTES_v1.1.88.md` for implemented features, unchanged rules, and expl
 
 ## v1.1.94 — GM one-click Marriage Removal
 - Added Remove Marriage next to Edit Marriage in My Realm, with confirmation and no Influence/Main Action cost.
+
+## v1.1.96
+- Bounded province arrival spread with normal animated token movement.
+- Military raising messages private to raising player and GM.
+- GM My Realm province-marriage picker filtered to selected House characters.
