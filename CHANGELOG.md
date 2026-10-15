@@ -120,3 +120,6 @@ See `PATCH_NOTES_v1.1.88.md` for implemented features, unchanged rules, and expl
 
 ## 1.1.97
 - Bounded anchor-based arrival spreading; GM roster marriage selection compatibility fix.
+
+## 1.1.98
+- Repair GM province-marriage coring selection/slot validation and bounded local arrival spreading.
