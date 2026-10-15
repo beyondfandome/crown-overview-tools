@@ -1,3 +1,7 @@
+## v1.1.99
+- Independent Married/Occupied/Cursed/Capital hover labels for everyone.
+- Province coring disregards personal spouse text, but respects active core assignments.
+
 ## v1.1.91
 - Starting-capital migration and capital/province-marriage UI consistency.
 - Winter popup-only granary payment action; Main Action labels.
