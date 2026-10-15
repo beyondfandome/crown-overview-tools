@@ -109,3 +109,6 @@ See `PATCH_NOTES_v1.1.88.md` for implemented features, unchanged rules, and expl
 
 ## v1.1.92
 - Correct legacy/imported development income fallback when building metadata is missing.
+
+## v1.1.94 — GM one-click Marriage Removal
+- Added Remove Marriage next to Edit Marriage in My Realm, with confirmation and no Influence/Main Action cost.
