@@ -1,0 +1,3 @@
+# Crown of Ashes v1.2.03 — Influence Building Correction
+
+All social Influence buildings now give their tier bonus ONCE on activation: Tier 1 +1, Tier 2 +2, Tier 3 +3. There is no passive Influence income per collection at any tier. Upgrades pay their new tier bonus once, not cumulative tier amounts. Existing active building levels are treated as already credited to prevent fresh bonuses during installation. Existing v1.2.02 Tier 3 claim markers are honored. This patch does not subtract historical excess Influence; GMs can use the existing Influence adjustment button. Previous shared Gold/Food treasuries and migration flags are retained. v1.2.03 has not been tested in live Foundry. GitHub download metadata is future-facing and requires publishing the matching release.

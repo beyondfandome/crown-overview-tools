@@ -1,3 +1,9 @@
+## 1.2.12 — Schools, local event discounts, diplomatic briefing
+- See PATCH_NOTES_v1.2.12.md.
+
+## v1.2.06
+- City +12 Gold, -4 Food, base siege DC 60, one-time +2 Influence.
+
 ## v1.1.99
 - Independent Married/Occupied/Cursed/Capital hover labels for everyone.
 - Province coring disregards personal spouse text, but respects active core assignments.
