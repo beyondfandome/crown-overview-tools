@@ -1,3 +1,6 @@
+## 1.2.17
+- Fixed Main Actions submenu dialog compatibility; preserved v1.2.16 fixes.
+
 ## 1.2.15
 - Development economy now uses built slots/saved development levels; individual building income still waits for activation.
 - City prestige award still requires four active building slots.
