@@ -1,3 +1,14 @@
+## 1.2.15
+- Development economy now uses built slots/saved development levels; individual building income still waits for activation.
+- City prestige award still requires four active building slots.
+- Preserves v1.2.14 character Main Action menu and all other changes.
+
+## 1.2.14
+- Consolidated character Main Actions into a submenu.
+
+## 1.2.13 — Diplomatic preview error fix
+- See PATCH_NOTES_v1.2.13.md.
+
 ## 1.2.12 — Schools, local event discounts, diplomatic briefing
 - See PATCH_NOTES_v1.2.12.md.
 
